@@ -1,0 +1,173 @@
+﻿<Window x:Class="TestAutomationUI.AddStepWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Height="500" Width="800" 
+        WindowStartupLocation="CenterOwner"
+        AllowsTransparency="True"
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        Background="Transparent"
+        MouseDown="Window_MouseDown"
+        >
+
+    <Window.Resources>
+
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#06202B"/>
+            <Setter Property="BorderBrush" Value="#077A7D"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="FontFamily" Value="Century Gothic"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="ModernComboBox" TargetType="ComboBox">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#06202B"/>
+            <Setter Property="BorderBrush" Value="#077A7D"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontFamily" Value="Century Gothic"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="ModernTextBlock" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontFamily" Value="Century Gothic"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5,0,5,0"/>
+
+        </Style>
+
+        <Style x:Key="ModernLabel" TargetType="Label">
+            <Setter Property="Foreground" Value="#06202B"/>
+            <Setter Property="FontFamily" Value="Century Gothic"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="5,0,5,0"/>
+        </Style>
+
+        <Style x:Key="ModernButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#077A7D"/>
+            <Setter Property="FontFamily" Value="Century Gothic"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="5,0,5,0"/>
+            <Setter Property="Margin" Value="5,0,5,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                    CornerRadius="8"
+                    Padding="{TemplateBinding Padding}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#3FD2A4"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#064789"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Border Background="#06202B" CornerRadius="25">
+
+        <Grid Margin="20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- HEADER TOP MEZŐK -->
+            <TextBlock Text="Teszt név:" Grid.Row="0" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+            <TextBox x:Name="testNameTextBox" Grid.Row="0" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
+ 
+            <!-- HEADER BOTTOM MEZŐK -->
+            <TextBlock Text="Lépés neve:" Grid.Row="4" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+            <TextBox x:Name="stepNameTextBox" Grid.Row="4" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
+
+             <TextBlock Text="Metódus lista:" Grid.Row="5" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+             <ComboBox x:Name="actionComboBox" Grid.Row="5" Grid.Column="1" Margin="5" Style="{StaticResource ModernComboBox}">
+                <ComboBoxItem Content="Start"/>
+                <ComboBoxItem Content="Stop"/>
+                <ComboBoxItem Content="TakePrtsc"/>
+                <ComboBoxItem Content="Click"/>
+                <ComboBoxItem Content="DoubleClick"/>
+                <ComboBoxItem Content="RightClick"/>
+                <ComboBoxItem Content="TextClear"/>
+                <ComboBoxItem Content="SendKeys"/>
+                <ComboBoxItem Content="DragAndDrop"/>
+                <ComboBoxItem Content="MoveToElement"/>
+                <ComboBoxItem Content="ScrollToElementAndClick"/>
+            </ComboBox>
+
+            <TextBlock Text="Element:" Grid.Row="6" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+            <TextBox x:Name="targetTextBox" Grid.Row="6" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
+
+            <TextBlock Text="Property:" Grid.Row="7" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+            <ComboBox x:Name="propertyTypeComboBox" Grid.Row="7" Grid.Column="1" Margin="5" Style="{StaticResource ModernComboBox}">
+                <ComboBoxItem Content="Id"/>
+                <ComboBoxItem Content="Name"/>
+                <ComboBoxItem Content="ClassName"/>
+                <ComboBoxItem Content="TagName"/>
+                <ComboBoxItem Content="Xpath"/>
+            </ComboBox>
+
+                <TextBlock Text="Paraméter:" Grid.Row="8" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+                <TextBox x:Name="parametersTextBox" Grid.Row="8" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
+
+                <TextBlock Text="Timeout (mp):" Grid.Row="9" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+                <TextBox x:Name="timeoutTextBox" Grid.Row="9" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
+   
+            
+            <StackPanel Grid.Row="11" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Hozzáad"
+                        Margin="5"
+                        Padding="20"
+                        Style="{StaticResource ModernButtonStyle}"
+                        Click="AddStep_Click"/>
+                <Button Content="Mégse"
+                        Margin="5"
+                        Padding="20"
+                        Style="{StaticResource ModernButtonStyle}" 
+                        Click="Button_Click"
+                        />
+            </StackPanel>
+
+        </Grid>
+
+    </Border>
+</Window>

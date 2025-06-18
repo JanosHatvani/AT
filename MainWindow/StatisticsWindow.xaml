@@ -1,0 +1,80 @@
+﻿<Window x:Class="MainWindow.StatisticsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
+        xmlns:local="clr-namespace:MainWindow"
+        mc:Ignorable="d"
+        WindowStyle="None"
+        WindowStartupLocation="CenterScreen"
+        Height="800" Width="1400" Background="#FFF2F2F2">
+
+    <Window.Resources>
+        <Style x:Key="ModernButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#077A7D"/>
+            <Setter Property="FontFamily" Value="Century Gothic"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="5,0,5,0"/>
+            <Setter Property="Margin" Value="5,0,5,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#3FD2A4"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#064789"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="auto"/>
+        </Grid.RowDefinitions>
+
+        <lvc:CartesianChart Grid.Row="0" Margin="15" Series="{Binding StatusSeries}" LegendLocation="Top">
+            <lvc:CartesianChart.AxisX>
+                <lvc:Axis Title="Darabszám" MinValue="0" MaxValue="{Binding StepCount}"/>
+            </lvc:CartesianChart.AxisX>
+            <lvc:CartesianChart.AxisY>
+                <lvc:Axis Title="Metódusok" Labels="{Binding Labels}"/>
+            </lvc:CartesianChart.AxisY>
+        </lvc:CartesianChart>
+
+        <lvc:CartesianChart Grid.Row="1" Margin="15"  Series="{Binding DurationSeries}" LegendLocation="Top">
+            <lvc:CartesianChart.AxisX>
+                <lvc:Axis Title="Lépésszám" MinValue="1" Labels="{Binding StepIndexes}"/>
+            </lvc:CartesianChart.AxisX>
+            <lvc:CartesianChart.AxisY>
+                <lvc:Axis Title="Futási idő (mp)" MinValue="0"/>
+            </lvc:CartesianChart.AxisY>
+        </lvc:CartesianChart>
+
+        
+        <Button Style="{StaticResource ModernButtonStyle}" Grid.Row="2" Content="Kilépés" Width="100" Height="30" HorizontalAlignment="Right" Margin="15" Click="Close_Click"/>
+        <Button Style="{StaticResource ModernButtonStyle}" Grid.Row="2" Content="Mentés" Width="100" Height="30" HorizontalAlignment="Left" Margin="15" Click="ExportHtml_Click"/>
+    
+    
+    </Grid>
+
+</Window>

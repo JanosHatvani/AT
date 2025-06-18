@@ -1,0 +1,123 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <OutputType>WinExe</OutputType>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <ApplicationIcon>at_icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Icons\**" />
+    <EmbeddedResource Remove="Icons\**" />
+    <None Remove="Icons\**" />
+    <Page Remove="Icons\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Resources\background.jpg" />
+    <None Remove="Resources\Icons\icons8-add-25.png" />
+    <None Remove="Resources\Icons\icons8-add-25b.png" />
+    <None Remove="Resources\Icons\icons8-add-25g.png" />
+    <None Remove="Resources\Icons\icons8-add-properties-25.png" />
+    <None Remove="Resources\Icons\icons8-add-properties-25b.png" />
+    <None Remove="Resources\Icons\icons8-automatic-25.png" />
+    <None Remove="Resources\Icons\icons8-automatic-25b.png" />
+    <None Remove="Resources\Icons\icons8-delete-25.png" />
+    <None Remove="Resources\Icons\icons8-delete-25b.png" />
+    <None Remove="Resources\Icons\icons8-flutter-25b.png" />
+    <None Remove="Resources\Icons\icons8-flutter-25j.png" />
+    <None Remove="Resources\Icons\icons8-graph-report-25.png" />
+    <None Remove="Resources\Icons\icons8-graph-report-25b.png" />
+    <None Remove="Resources\Icons\icons8-hamburger-menu-25.png" />
+    <None Remove="Resources\Icons\icons8-hamburger-menu-25b.png" />
+    <None Remove="Resources\Icons\icons8-import-25.png" />
+    <None Remove="Resources\Icons\icons8-import-25b.png" />
+    <None Remove="Resources\Icons\icons8-logout-rounded-25.png" />
+    <None Remove="Resources\Icons\icons8-power-off-25.png" />
+    <None Remove="Resources\Icons\icons8-power-off-25b.png" />
+    <None Remove="Resources\Icons\icons8-power-off-button-25.png" />
+    <None Remove="Resources\Icons\icons8-quit-25.png" />
+    <None Remove="Resources\Icons\icons8-save-25.png" />
+    <None Remove="Resources\Icons\icons8-save-25b.png" />
+    <None Remove="Resources\Icons\icons8-sign-out-25.png" />
+    <None Remove="Resources\Icons\icons8-sign-out-50.png" />
+    <None Remove="Resources\Icons\icons8-start-25.png" />
+    <None Remove="Resources\Icons\icons8-start-25b.png" />
+    <None Remove="Resources\Icons\icons8-stop-25.png" />
+    <None Remove="Resources\Icons\icons8-stop-25b.png" />
+    <None Remove="Resources\Icons\icons8-toggle-25b.png" />
+    <None Remove="Resources\Icons\icons8-toggle-25w.png" />
+    <None Remove="Resources\Icons\icons8-toggle-50b.png" />
+    <None Remove="Resources\Icons\icons8-toggle-50w.png" />
+    <None Remove="Resources\Icons\icons8-upload-25.png" />
+    <None Remove="Resources\Icons\icons8-upload-25g.png" />
+    <None Remove="Tools\Winium.Desktop.Driver.exe" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="at_icon.ico" />
+    <Content Include="Tools\Winium.Desktop.Driver.exe">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Modules\Modules.csproj" />
+    <ProjectReference Include="..\TruMES_Test\TruMES_Test.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Fonts\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LiveCharts.Wpf" Version="0.9.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\background.jpg" />
+    <Resource Include="Resources\Icons\icons8-add-25.png" />
+    <Resource Include="Resources\Icons\icons8-add-25b.png" />
+    <Resource Include="Resources\Icons\icons8-add-25g.png" />
+    <Resource Include="Resources\Icons\icons8-add-properties-25.png" />
+    <Resource Include="Resources\Icons\icons8-add-properties-25b.png" />
+    <Resource Include="Resources\Icons\icons8-automatic-25.png" />
+    <Resource Include="Resources\Icons\icons8-automatic-25b.png" />
+    <Resource Include="Resources\Icons\icons8-delete-25.png" />
+    <Resource Include="Resources\Icons\icons8-delete-25b.png" />
+    <Resource Include="Resources\Icons\icons8-flutter-25bb.png" />
+    <Resource Include="Resources\Icons\icons8-flutter-25b.png" />
+    <Resource Include="Resources\Icons\icons8-flutter-25jb.png" />
+    <Resource Include="Resources\Icons\icons8-flutter-25j.png" />
+    <Resource Include="Resources\Icons\icons8-graph-report-25.png" />
+    <Resource Include="Resources\Icons\icons8-graph-report-25b.png" />
+    <Resource Include="Resources\Icons\icons8-hamburger-menu-25.png" />
+    <Resource Include="Resources\Icons\icons8-hamburger-menu-25b.png" />
+    <Resource Include="Resources\Icons\icons8-import-25.png" />
+    <Resource Include="Resources\Icons\icons8-import-25b.png" />
+    <Resource Include="Resources\Icons\icons8-logout-rounded-25.png" />
+    <Resource Include="Resources\Icons\icons8-power-off-25.png" />
+    <Resource Include="Resources\Icons\icons8-power-off-25b.png" />
+    <Resource Include="Resources\Icons\icons8-power-off-button-25.png" />
+    <Resource Include="Resources\Icons\icons8-quit-25.png" />
+    <Resource Include="Resources\Icons\icons8-save-25.png" />
+    <Resource Include="Resources\Icons\icons8-save-25b.png" />
+    <Resource Include="Resources\Icons\icons8-sign-out-25.png" />
+    <Resource Include="Resources\Icons\icons8-sign-out-50.png" />
+    <Resource Include="Resources\Icons\icons8-start-25.png" />
+    <Resource Include="Resources\Icons\icons8-start-25b.png" />
+    <Resource Include="Resources\Icons\icons8-stop-25.png" />
+    <Resource Include="Resources\Icons\icons8-stop-25b.png" />
+    <Resource Include="Resources\Icons\icons8-toggle-25b.png" />
+    <Resource Include="Resources\Icons\icons8-toggle-25w.png" />
+    <Resource Include="Resources\Icons\icons8-toggle-50b.png" />
+    <Resource Include="Resources\Icons\icons8-toggle-50w.png" />
+    <Resource Include="Resources\Icons\icons8-upload-25.png" />
+    <Resource Include="Resources\Icons\icons8-upload-25g.png" />
+  </ItemGroup>
+
+</Project>

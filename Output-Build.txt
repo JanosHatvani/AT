@@ -1,0 +1,4 @@
+﻿Build started...
+1>------ Build started: Project: Modules, Configuration: Debug Any CPU ------
+1>Modules -> C:\Users\hatvani.janos\source\repos\TruMES\Modules\bin\Debug\net48\Modules.dll
+========== Build: 1 succeeded, 0 failed, 1 up-to-date, 0 skipped ==========
