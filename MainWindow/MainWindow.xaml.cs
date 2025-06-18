@@ -389,35 +389,33 @@ namespace TestAutomationUI
                             continue;
                         }
                     }
-                                       
-                    using (cts)
+
+                    Task task = step.Action switch
                     {
-                        writelogtotext("var task");
-                        var task = step.Action switch
-                        {
-                            "Start" => Task.Run(() => WDMethods.Start(programPath, winiumDriverPath), cts.Token),
-                            "Click" => Task.Run(() => WDMethods.Click(step.Target ?? "", propType, effectiveTimeout), cts.Token),
-                            "RightClick" => Task.Run(() => WDMethods.RightClick(step.Target ?? "", propType, effectiveTimeout), cts.Token),
-                            "SendKeys" => Task.Run(() => WDMethods.Sendkeys(step.Target ?? "", step.Parameter ?? "", propType, effectiveTimeout), cts.Token),
-                            "DoubleClick" => Task.Run(() => WDMethods.DoubleClick(step.Target ?? "", propType, effectiveTimeout), cts.Token),
-                            "TextClear" => Task.Run(() => WDMethods.TextClear(step.Target ?? "", propType, effectiveTimeout), cts.Token),
-                            "MoveToElement" => Task.Run(() => WDMethods.MoveToElement(step.Target ?? "", propType, effectiveTimeout), cts.Token),
-                            "ScrollToElementAndClick" => Task.Run(() => WDMethods.ScrollToElementAndClick(step.Target ?? "", propType, step.Parameter ?? "", effectiveTimeout), cts.Token),
-                            "Stop" => Task.Run(() => WDMethods.Stop(), cts.Token),
-                            _ => throw new Exception($"Ismeretlen művelet: {step.Action}")
-                        };
-                        writelogtotext("await task előtt");
-                        await task;
-                        writelogtotext("ok kép előtt");
-                        WDMethods.TakePrtsc(testNameMain, prtscfolderpathMain);
-                        stopwatch.Stop();
-                        writelogtotext("gok státusz előtt");
-                        step.Duration = Math.Round(stopwatch.Elapsed.TotalSeconds, 2);                        
-                        step.Status = "OK";
-                        writelogtotext("ok státusz után");
-                    }
+                        "Start" => WDMethods.StartProg(programPath, winiumDriverPath),
+                        "Click" => WDMethods.Click(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "SendKeys" => WDMethods.Sendkeys(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "DoubleClick" => WDMethods.DoubleClick(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "RightClick" => WDMethods.RightClick(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "TextClear" => WDMethods.TextClear(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "MoveToElement" => WDMethods.MoveToElement(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "ScrollToElementAndClick" => WDMethods.ScrollToElementAndClick(step.Target ?? "", propType, step.Parameter ?? "", step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "Stop" => Task.Run(() => WDMethods.Stop()),
+                        _ => throw new Exception($"Ismeretlen művelet: {step.Action}")
+                    };
+
+                    writelogtotext("await task előtt");
+                    await task;
+                    writelogtotext("await task után, ok kép előtt");
+                    WDMethods.TakePrtsc(testNameMain, prtscfolderpathMain);
+                    stopwatch.Stop();
+                    writelogtotext("ok státusz előtt");
+                    step.Duration = Math.Round(stopwatch.Elapsed.TotalSeconds, 2);                        
+                    step.Status = "OK";
+                    writelogtotext("ok státusz után");
+                    
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     writelogtotext("catch ág");
                     if (stopwatch.IsRunning)
@@ -508,6 +506,7 @@ namespace TestAutomationUI
                 WDMethods.Stop(); // <-- garantált driver leállítás itt
                 writelogtotext("finnaly ág");
             }
+            StopSpinner();
         }
         
         private void DeleteStep_Click(object sender, RoutedEventArgs e)

@@ -6,6 +6,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
 using Winium.Elements.Desktop.Extensions;
@@ -198,57 +199,110 @@ namespace Modules
             action(elem);
         }
 
-
-        public static void Click(string element, PropertyTypes elementType, int timeoutSeconds) =>
-            PerformElementAction(element, elementType, elem => elem.Click(), timeoutSeconds);
-
-        public static void Sendkeys(string element, string text, PropertyTypes elementType, int timeoutSeconds) =>
-            PerformElementAction(element, elementType, elem => elem.SendKeys(text), timeoutSeconds);
-
-        public static void TextClear(string element, PropertyTypes elementType, int timeoutSeconds) =>
-            PerformElementAction(element, elementType, elem => elem.Clear(), timeoutSeconds);
-
-        public static void DoubleClick(string element, PropertyTypes elementType, int timeoutSeconds) =>
-            PerformElementAction(element, elementType, elem => new Actions(driver).DoubleClick(elem).Perform(), timeoutSeconds);
-
-        public static void RightClick(string element, PropertyTypes elementType, int timeoutSeconds) =>
-            PerformElementAction(element, elementType, elem => new Actions(driver).ContextClick(elem).Perform(), timeoutSeconds);
-
-        public static void MoveToElement(string element, PropertyTypes elementType, int timeoutSeconds) =>
-            PerformElementAction(element, elementType, elem => new Actions(driver).MoveToElement(elem).Perform(), timeoutSeconds);
-
-        public static void ScrollToElementAndClick(string element, PropertyTypes elementType, string name, int timeoutSeconds)
+        public static Task StartProg(string programPath, string driverPath)
         {
-            var parent = FindElement(element, elementType, timeoutSeconds);
-            ComboBox comboBox = new ComboBox(parent);
-            comboBox.Expand();
-            comboBox.ScrollTo(By.Name(name));
-            parent.FindElement(By.Name(name)).Click();
+            return Task.Run(() =>
+            {
+                Start(programPath, driverPath);
+            });
         }
 
-        public static void ElementCheck(string element, PropertyTypes elementType, string value, int timeoutSeconds)
+        public static Task Click(string element, PropertyTypes elementType, int timeoutSeconds)
         {
-            var elem = FindElement(element, elementType, timeoutSeconds);
-            MessageBox.Show($"Checked value: {elem.GetAttribute(value)}", "Title");
+            return Task.Run(() =>
+            {
+                PerformElementAction(element, elementType, elem => elem.Click(), timeoutSeconds);
+            });
         }
 
-        public static int ValueReadAndParse(string element, PropertyTypes elementType, string value, int timeoutSeconds)
+        public static Task Sendkeys(string element, string text, PropertyTypes elementType, int timeoutSeconds)
         {
-            var elem = FindElement(element, elementType, timeoutSeconds);
-            return int.Parse(elem.GetAttribute(value));
+            return Task.Run(() =>
+            {
+                PerformElementAction(element, elementType, elem => elem.SendKeys(text), timeoutSeconds);
+            });
         }
 
-        public static string GetTextFromSelectedElement(string element, PropertyTypes elementType, string value, int timeoutSeconds)
+        public static Task TextClear(string element, PropertyTypes elementType, int timeoutSeconds)
         {
-            var elem = FindElement(element, elementType, timeoutSeconds);
-            return elem.GetAttribute(value);
+            return Task.Run(() =>
+            {
+                PerformElementAction(element, elementType, elem => elem.Clear(), timeoutSeconds);
+            });
         }
 
-        public static void DragAndDrop(string sourceElement, string targetElement, PropertyTypes elementType, int timeoutSeconds)
+        public static Task DoubleClick(string element, PropertyTypes elementType, int timeoutSeconds)
         {
-            var fromElement = FindElement(sourceElement, elementType, timeoutSeconds);
-            var toElement = FindElement(targetElement, elementType, timeoutSeconds);
-            new Actions(driver).DragAndDrop(fromElement, toElement).Perform();
+            return Task.Run(() =>
+            {
+                PerformElementAction(element, elementType, elem => new Actions(driver).DoubleClick(elem).Perform(), timeoutSeconds);
+            });
         }
+
+        public static Task RightClick(string element, PropertyTypes elementType, int timeoutSeconds)
+        {
+            return Task.Run(() =>
+            {
+                PerformElementAction(element, elementType, elem => new Actions(driver).ContextClick(elem).Perform(), timeoutSeconds);
+            });
+        }
+
+        public static Task MoveToElement(string element, PropertyTypes elementType, int timeoutSeconds)
+        {
+            return Task.Run(() =>
+            {
+                PerformElementAction(element, elementType, elem => new Actions(driver).MoveToElement(elem).Perform(), timeoutSeconds);
+            });
+        }
+
+        public static Task ScrollToElementAndClick(string element, PropertyTypes elementType, string name, int timeoutSeconds)
+        {
+            return Task.Run(() =>
+            {
+                var parent = FindElement(element, elementType, timeoutSeconds);
+                ComboBox comboBox = new ComboBox(parent);
+                comboBox.Expand();
+                comboBox.ScrollTo(By.Name(name));
+                parent.FindElement(By.Name(name)).Click();
+            });
+        }
+
+        public static Task ElementCheck(string element, PropertyTypes elementType, string value, int timeoutSeconds)
+        {
+            return Task.Run(() =>
+            {
+                var elem = FindElement(element, elementType, timeoutSeconds);
+                MessageBox.Show($"Checked value: {elem.GetAttribute(value)}", "Title");
+            });
+        }
+
+        public static Task<int> ValueReadAndParse(string element, PropertyTypes elementType, string value, int timeoutSeconds)
+        {
+            return Task.Run(() =>
+            {
+                var elem = FindElement(element, elementType, timeoutSeconds);
+                return int.Parse(elem.GetAttribute(value));
+            });
+        }
+
+        public static Task<string> GetTextFromSelectedElement(string element, PropertyTypes elementType, string value, int timeoutSeconds)
+        {
+            return Task.Run(() =>
+            {
+                var elem = FindElement(element, elementType, timeoutSeconds);
+                return elem.GetAttribute(value);
+            });
+        }
+
+        public static Task DragAndDrop(string sourceElement, string targetElement, PropertyTypes elementType, int timeoutSeconds)
+        {
+            return Task.Run(() =>
+            {
+                var fromElement = FindElement(sourceElement, elementType, timeoutSeconds);
+                var toElement = FindElement(targetElement, elementType, timeoutSeconds);
+                new Actions(driver).DragAndDrop(fromElement, toElement).Perform();
+            });
+        }
+
     }
 }
