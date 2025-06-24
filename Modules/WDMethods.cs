@@ -60,50 +60,54 @@ namespace Modules
             }
         }
 
-        public static void Stop()
+        public static Task Stop()
         {
-            if (!isRunning)
-                return;
-
-            try
+            return Task.Run(() =>
             {
-                driver?.Quit();
-                driver = null;
+                if (!isRunning)
+                    return;
 
-                if (service != null)
+                try
                 {
-                    if (service.IsRunning)
-                    {
-                        service.Dispose(); // már meglévő takarítás
-                    }
+                    driver?.Quit();
+                    driver = null;
 
-                    //Folyamat kilövése, ha még futna
-                    try
+                    if (service != null)
                     {
-                        var processes = System.Diagnostics.Process.GetProcessesByName("Winium.Desktop.Driver");
-                        foreach (var process in processes)
+                        if (service.IsRunning)
                         {
-                            process.Kill();
-                            process.WaitForExit();
+                            service.Dispose();
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("Nem sikerült teljesen leállítani a Winium drivert: " + ex.Message);
-                    }
 
-                    service = null;
+                        // Folyamat kilövése, ha még futna
+                        try
+                        {
+                            var processes = System.Diagnostics.Process.GetProcessesByName("Winium.Desktop.Driver");
+                            foreach (var process in processes)
+                            {
+                                process.Kill();
+                                process.WaitForExit();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show("Nem sikerült teljesen leállítani a Winium drivert: " + ex.Message);
+                        }
+
+                        service = null;
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Hiba történt a driver vagy service leállításakor: " + ex.Message);
-            }
-            finally
-            {
-                isRunning = false;
-            }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Hiba történt a driver vagy service leállításakor: " + ex.Message);
+                }
+                finally
+                {
+                    isRunning = false;
+                }
+            });
         }
+
 
         public static void TakePrtsc(string testName, string prtScfolderpath)
         {
@@ -147,7 +151,7 @@ namespace Modules
                     throw new NotSupportedException($"Nem támogatott property típus: {elementType}");
             }
 
-            int intervalMs = 100;
+            int intervalMs = 200;
             int elapsed = 0;
             while (elapsed < timeoutSeconds * 1000)
             {
@@ -303,6 +307,5 @@ namespace Modules
                 new Actions(driver).DragAndDrop(fromElement, toElement).Perform();
             });
         }
-
     }
 }

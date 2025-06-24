@@ -2,6 +2,7 @@
 using Microsoft.Win32;
 using Modules;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -272,23 +273,26 @@ namespace TestAutomationUI
             actualstepTextBox.Text = (stepsDataGrid.SelectedIndex + 1).ToString();
         }
 
+        private string _currentLogFilePath;
 
+        // Ezt használd a writelogtotext-ben:
         public void writelogtotext(string msg)
         {
+            if (string.IsNullOrEmpty(_currentLogFilePath))
+            {
+                string timestamp = DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss", CultureInfo.InvariantCulture);
+                _currentLogFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"Log_{timestamp}.txt");
+            }
+
             try
             {
-                string txtlogPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Log.txt");
-
-                // Append mód: nem írja felül minden hívásnál a fájlt
-                using (var txtwriter = new StreamWriter(txtlogPath, true, Encoding.UTF8))
+                using (var txtwriter = new StreamWriter(_currentLogFilePath, true, Encoding.UTF8))
                 {
-                    txtwriter.WriteLine($"{msg} - {DateTime.Now:MM/dd/yyyy hh:mm:ss}");
+                    txtwriter.WriteLine($"{msg} - {DateTime.Now:yyyy.MM.dd HH:mm:ss}");
                 }
             }
             catch (Exception ex)
             {
-                // Hibakezelés, hogy ne dobjon ki a program
-                // (akár ezt is naplózhatnád egy külön fájlba)
                 Debug.WriteLine("Log írás sikertelen: " + ex.Message);
             }
         }
@@ -329,6 +333,24 @@ namespace TestAutomationUI
                 CustomMessageBox.Show("Kérlek, adj meg egy érvényes számot a MaxWaitTime mezőben.");
                 return;
             }
+            if (stepsDataGrid.CommitEdit(DataGridEditingUnit.Row, true))
+            {
+                bool? result = CustomMessageBox.Show(
+                    "A lépések valamelyike szerkesztés alatt áll.\nSzeretnéd megszakítani a szerkesztést?",
+                    "Szerkesztés aktív",
+                    true,  // ez jelzi, hogy Igen/Nem gombokat jelenítsen meg
+                    this
+                );
+
+                if (result == true) // Igen
+                {
+                    stepsDataGrid.CancelEdit();
+                }
+                else // Nem
+                {
+                    WDMethods.Stop();
+                }
+            }
 
             string testNameMain = this.testnameTextBox.Text;
             string programPath = settingsWindow.programPathTextBox.Text;
@@ -344,7 +366,6 @@ namespace TestAutomationUI
                 int timeout = step.TimeoutSeconds.Value;
                 int effectiveTimeout = timeout;
                 writelogtotext("foreach kezdés");
-                var cts = new CancellationTokenSource(TimeSpan.FromSeconds(effectiveTimeout)); 
 
                 if (_stopRequested)
                 {
@@ -400,7 +421,7 @@ namespace TestAutomationUI
                         "TextClear" => WDMethods.TextClear(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
                         "MoveToElement" => WDMethods.MoveToElement(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
                         "ScrollToElementAndClick" => WDMethods.ScrollToElementAndClick(step.Target ?? "", propType, step.Parameter ?? "", step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "Stop" => Task.Run(() => WDMethods.Stop()),
+                        "Stop" => WDMethods.Stop(),
                         _ => throw new Exception($"Ismeretlen művelet: {step.Action}")
                     };
 
@@ -426,10 +447,11 @@ namespace TestAutomationUI
                     if (step.CanContinueOnError)
                     {
                         writelogtotext("hiba de folytatva");
-                        cts.Cancel(); // Megszakítjuk a futó taskot, ha van
                         step.Status = "HIBA, de folytatva";
                         step.Errortext = $"Az element nem található: {step.Target}";
-                        writelogtotext("hiba de folytatva continue előtt");
+                        stepsDataGrid.Items.Refresh(); // <-- EZ HIÁNYZOTT
+                        //writelogtotext("hiba de folytatva continue előtt");
+                        //await Task.Delay(300);
                         continue;
                     }
                     else
@@ -605,6 +627,8 @@ namespace TestAutomationUI
                 Title = "Teszt mentése XML fájlba",
                 FileName = "test.xml"
             };
+
+            var bgtask = new BackgroundWorker();
 
             if (saveFileDialog.ShowDialog() == true)
             {

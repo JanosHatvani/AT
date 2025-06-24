@@ -584,7 +584,7 @@
                                          Height="20"
                                          Margin="15,0,0,0"
                                          FontSize="12"
-                                         IsReadOnly="True"
+                                         IsReadOnly="False"
                                          BorderBrush="#CCC"
                                          Background="Transparent"
                                          VerticalContentAlignment="Center"
