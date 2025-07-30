@@ -22,6 +22,7 @@ namespace TestAutomationUI
         public SettingsModel LoadedSettings { get; set; } = new();
 
         public string ProgramPath => programPathTextBox.Text;
+        public string Webpath => webPathTextBox.Text;
 
         private void LoadSettings()
         {
@@ -30,7 +31,7 @@ namespace TestAutomationUI
                 var json = File.ReadAllText(SettingsPath);
                 //CustomMessageBox.Show(SettingsPath);
                 var settings = JsonSerializer.Deserialize<SettingsModel>(json) ?? new SettingsModel();
-
+                webPathTextBox.Text = settings.WEbPath ?? string.Empty;
                 waitTimeText.Text = settings.WaitTime;
                 screenshotFolderTextBox.Text = settings.ScreenshotFolder;
                 fastModeCheckBox.IsChecked = settings.FastMode;
@@ -48,6 +49,7 @@ namespace TestAutomationUI
             var settings = new SettingsModel
             {
                 WaitTime = waitTimeText.Text,
+                WEbPath = webPathTextBox.Text,
                 ScreenshotFolder = screenshotFolderTextBox.Text,
                 ProgramPath = programPathTextBox.Text,
                 FastMode = fastModeCheckBox.IsChecked == true,
@@ -77,6 +79,7 @@ namespace TestAutomationUI
             public string ScreenshotFolder { get; set; }
             public bool FastMode { get; set; }
             public string ProgramPath { get; set; }
+            public string WEbPath { get; set; }
         }
 
 

@@ -125,11 +125,14 @@
 
                 <TextBlock Text="Indítandó program:" Grid.Row="2" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
                 <TextBox x:Name="programPathTextBox" Grid.Row="2" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
-               
-                <TextBlock Text="Képek mentés mappa:" Grid.Row="3" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+
+            <TextBlock Text="Indítandó weboldal:" Grid.Row="4" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+            <TextBox x:Name="webPathTextBox" Grid.Row="4" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
+
+            <TextBlock Text="Képek mentés mappa:" Grid.Row="3" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
                 <TextBox x:Name="screenshotFolderTextBox" Grid.Row="3" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
 
-                <CheckBox x:Name="fastModeCheckBox" Content="Gyors üzemmód" Grid.Row="4" Grid.Column="0" Margin="5" VerticalAlignment="Center" Style="{StaticResource CheckBox}"/>
+                <CheckBox x:Name="fastModeCheckBox" Content="Gyors üzemmód" Grid.Row="5" Grid.Column="0" Margin="5" VerticalAlignment="Center" Style="{StaticResource CheckBox}"/>
 
                 <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="Mentés"

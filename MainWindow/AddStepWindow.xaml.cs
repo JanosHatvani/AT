@@ -15,6 +15,8 @@ namespace TestAutomationUI
         public string StepName => stepNameTextBox.Text;
         public string Action => ((ComboBoxItem)actionComboBox.SelectedItem)?.Content?.ToString();
         public string Target => targetTextBox.Text;
+        public string TargetElement => targetsourceTextBox.Text;
+
         public string Property => ((ComboBoxItem)propertyTypeComboBox.SelectedItem)?.Content?.ToString();
         public string Parameter => parametersTextBox.Text;
         public string TimeoutText => timeoutTextBox.Text;
@@ -25,8 +27,7 @@ namespace TestAutomationUI
             if (e.ChangedButton == MouseButton.Left)
                 this.DragMove();
         }
-
-        
+              
 
         private void AddStep_Click(object sender, RoutedEventArgs e)
         {

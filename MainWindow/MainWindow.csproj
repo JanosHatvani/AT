@@ -8,6 +8,9 @@
     <OutputType>WinExe</OutputType>
     <NuGetAuditMode>all</NuGetAuditMode>
     <ApplicationIcon>at_icon.ico</ApplicationIcon>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>AnyCPU;x64</Platforms>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,15 +22,36 @@
 
   <ItemGroup>
     <None Remove="Resources\background.jpg" />
+    <None Remove="Resources\background.png" />
+    <None Remove="Resources\background2.png" />
+    <None Remove="Resources\Icons\add-list-25_green.png" />
+    <None Remove="Resources\Icons\add-list-25_white.png" />
+    <None Remove="Resources\Icons\at.png" />
+    <None Remove="Resources\Icons\at_icon.ico" />
+    <None Remove="Resources\Icons\at_icon.png" />
+    <None Remove="Resources\Icons\delete-list-item-25_green.png" />
+    <None Remove="Resources\Icons\delete-list-item-25_white.png" />
+    <None Remove="Resources\Icons\edit-list-25_green.png" />
+    <None Remove="Resources\Icons\edit-list-25_white.png" />
     <None Remove="Resources\Icons\icons8-add-25.png" />
     <None Remove="Resources\Icons\icons8-add-25b.png" />
     <None Remove="Resources\Icons\icons8-add-25g.png" />
+    <None Remove="Resources\Icons\icons8-add-new-25.png" />
+    <None Remove="Resources\Icons\icons8-add-new-25b.png" />
     <None Remove="Resources\Icons\icons8-add-properties-25.png" />
     <None Remove="Resources\Icons\icons8-add-properties-25b.png" />
+    <None Remove="Resources\Icons\icons8-add-webpage-25.png" />
+    <None Remove="Resources\Icons\icons8-add-webpage-25b.png" />
     <None Remove="Resources\Icons\icons8-automatic-25.png" />
     <None Remove="Resources\Icons\icons8-automatic-25b.png" />
+    <None Remove="Resources\Icons\icons8-close-25.png" />
+    <None Remove="Resources\Icons\icons8-close-25b.png" />
     <None Remove="Resources\Icons\icons8-delete-25.png" />
     <None Remove="Resources\Icons\icons8-delete-25b.png" />
+    <None Remove="Resources\Icons\icons8-delete-file-25.png" />
+    <None Remove="Resources\Icons\icons8-delete-file-25b.png" />
+    <None Remove="Resources\Icons\icons8-desktop-download-25.png" />
+    <None Remove="Resources\Icons\icons8-desktop-download-25b.png" />
     <None Remove="Resources\Icons\icons8-flutter-25b.png" />
     <None Remove="Resources\Icons\icons8-flutter-25j.png" />
     <None Remove="Resources\Icons\icons8-graph-report-25.png" />
@@ -36,7 +60,17 @@
     <None Remove="Resources\Icons\icons8-hamburger-menu-25b.png" />
     <None Remove="Resources\Icons\icons8-import-25.png" />
     <None Remove="Resources\Icons\icons8-import-25b.png" />
+    <None Remove="Resources\Icons\icons8-import-file-25.png" />
+    <None Remove="Resources\Icons\icons8-import-file-25b.png" />
+    <None Remove="Resources\Icons\icons8-insert-table-25.png" />
+    <None Remove="Resources\Icons\icons8-insert-table-25b.png" />
+    <None Remove="Resources\Icons\icons8-log-out-25.png" />
+    <None Remove="Resources\Icons\icons8-log-out-25b.png" />
     <None Remove="Resources\Icons\icons8-logout-rounded-25.png" />
+    <None Remove="Resources\Icons\icons8-new-file-25.png" />
+    <None Remove="Resources\Icons\icons8-new-file-25b.png" />
+    <None Remove="Resources\Icons\icons8-new-window-25.png" />
+    <None Remove="Resources\Icons\icons8-new-window-25b.png" />
     <None Remove="Resources\Icons\icons8-power-off-25.png" />
     <None Remove="Resources\Icons\icons8-power-off-25b.png" />
     <None Remove="Resources\Icons\icons8-power-off-button-25.png" />
@@ -55,6 +89,24 @@
     <None Remove="Resources\Icons\icons8-toggle-50w.png" />
     <None Remove="Resources\Icons\icons8-upload-25.png" />
     <None Remove="Resources\Icons\icons8-upload-25g.png" />
+    <None Remove="Resources\Icons\import-list-25_green.png" />
+    <None Remove="Resources\Icons\import-list-25_white.png" />
+    <None Remove="Resources\Icons\inspect-25_green.png" />
+    <None Remove="Resources\Icons\inspect-25_white.png" />
+    <None Remove="Resources\Icons\new-item-25_green.png" />
+    <None Remove="Resources\Icons\new-item-25_white.png" />
+    <None Remove="Resources\Icons\save-list-25_green.png" />
+    <None Remove="Resources\Icons\save-list-25_white.png" />
+    <None Remove="Resources\Icons\setting-25_green.png" />
+    <None Remove="Resources\Icons\setting-25_white.png" />
+    <None Remove="Resources\Icons\start-test-25_green.png" />
+    <None Remove="Resources\Icons\start-test-25_white.png" />
+    <None Remove="Resources\Icons\stat-25_green.png" />
+    <None Remove="Resources\Icons\stat-25_white.png" />
+    <None Remove="Resources\Icons\stop-test-25_green.png" />
+    <None Remove="Resources\Icons\stop-test-25_white.png" />
+    <None Remove="Resources\mainbackground.png" />
+    <None Remove="Resources\mainbackground2.png" />
     <None Remove="Tools\Winium.Desktop.Driver.exe" />
   </ItemGroup>
 
@@ -65,9 +117,9 @@
     </Content>
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Modules\Modules.csproj" />
-    <ProjectReference Include="..\TruMES_Test\TruMES_Test.csproj" />
+  <ItemGroup>    
+    <ProjectReference Include="..\WDModules\WDModules.csproj" />
+    <ProjectReference Include="..\WebModules\WebModules.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -76,48 +128,64 @@
 
   <ItemGroup>
     <PackageReference Include="LiveCharts.Wpf" Version="0.9.7" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3351.48" />
+    <PackageReference Include="WebView2.Runtime.X64" Version="138.0.3351.109" />
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Resources\background.jpg" />
-    <Resource Include="Resources\Icons\icons8-add-25.png" />
-    <Resource Include="Resources\Icons\icons8-add-25b.png" />
-    <Resource Include="Resources\Icons\icons8-add-25g.png" />
-    <Resource Include="Resources\Icons\icons8-add-properties-25.png" />
-    <Resource Include="Resources\Icons\icons8-add-properties-25b.png" />
-    <Resource Include="Resources\Icons\icons8-automatic-25.png" />
-    <Resource Include="Resources\Icons\icons8-automatic-25b.png" />
-    <Resource Include="Resources\Icons\icons8-delete-25.png" />
-    <Resource Include="Resources\Icons\icons8-delete-25b.png" />
+    <Resource Include="Resources\Icons\add-list-25_green.png" />
+    <Resource Include="Resources\Icons\add-list-25_white.png" />
+    <Resource Include="Resources\Icons\at.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Resources\Icons\at_icon.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Resources\Icons\at_icon.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Resources\Icons\delete-list-item-25_green.png" />
+    <Resource Include="Resources\Icons\delete-list-item-25_white.png" />
+    <Resource Include="Resources\Icons\edit-list-25_green.png" />
+    <Resource Include="Resources\Icons\edit-list-25_white.png" />
     <Resource Include="Resources\Icons\icons8-flutter-25bb.png" />
     <Resource Include="Resources\Icons\icons8-flutter-25b.png" />
     <Resource Include="Resources\Icons\icons8-flutter-25jb.png" />
     <Resource Include="Resources\Icons\icons8-flutter-25j.png" />
-    <Resource Include="Resources\Icons\icons8-graph-report-25.png" />
-    <Resource Include="Resources\Icons\icons8-graph-report-25b.png" />
-    <Resource Include="Resources\Icons\icons8-hamburger-menu-25.png" />
-    <Resource Include="Resources\Icons\icons8-hamburger-menu-25b.png" />
-    <Resource Include="Resources\Icons\icons8-import-25.png" />
-    <Resource Include="Resources\Icons\icons8-import-25b.png" />
-    <Resource Include="Resources\Icons\icons8-logout-rounded-25.png" />
     <Resource Include="Resources\Icons\icons8-power-off-25.png" />
     <Resource Include="Resources\Icons\icons8-power-off-25b.png" />
-    <Resource Include="Resources\Icons\icons8-power-off-button-25.png" />
-    <Resource Include="Resources\Icons\icons8-quit-25.png" />
-    <Resource Include="Resources\Icons\icons8-save-25.png" />
-    <Resource Include="Resources\Icons\icons8-save-25b.png" />
-    <Resource Include="Resources\Icons\icons8-sign-out-25.png" />
-    <Resource Include="Resources\Icons\icons8-sign-out-50.png" />
-    <Resource Include="Resources\Icons\icons8-start-25.png" />
-    <Resource Include="Resources\Icons\icons8-start-25b.png" />
-    <Resource Include="Resources\Icons\icons8-stop-25.png" />
-    <Resource Include="Resources\Icons\icons8-stop-25b.png" />
-    <Resource Include="Resources\Icons\icons8-toggle-25b.png" />
-    <Resource Include="Resources\Icons\icons8-toggle-25w.png" />
-    <Resource Include="Resources\Icons\icons8-toggle-50b.png" />
-    <Resource Include="Resources\Icons\icons8-toggle-50w.png" />
-    <Resource Include="Resources\Icons\icons8-upload-25.png" />
-    <Resource Include="Resources\Icons\icons8-upload-25g.png" />
+    <Resource Include="Resources\Icons\import-list-25_green.png" />
+    <Resource Include="Resources\Icons\import-list-25_white.png" />
+    <Resource Include="Resources\Icons\inspect-25_green.png" />
+    <Resource Include="Resources\Icons\inspect-25_white.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Resources\Icons\new-item-25_green.png" />
+    <Resource Include="Resources\Icons\new-item-25_white.png" />
+    <Resource Include="Resources\Icons\save-list-25_green.png" />
+    <Resource Include="Resources\Icons\save-list-25_white.png" />
+    <Resource Include="Resources\Icons\setting-25_green.png" />
+    <Resource Include="Resources\Icons\setting-25_white.png" />
+    <Resource Include="Resources\Icons\start-test-25_green.png" />
+    <Resource Include="Resources\Icons\start-test-25_white.png" />
+    <Resource Include="Resources\Icons\stat-25_green.png" />
+    <Resource Include="Resources\Icons\stat-25_white.png" />
+    <Resource Include="Resources\Icons\stop-test-25_green.png" />
+    <Resource Include="Resources\Icons\stop-test-25_white.png" />
+    <Resource Include="Resources\mainbackground.png" />
+    <Resource Include="Resources\mainbackground2.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Tools\chromedriver.exe">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Tools\geckodriver.exe">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Tools\msedgedriver.exe">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

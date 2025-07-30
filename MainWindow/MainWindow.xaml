@@ -242,16 +242,16 @@
                             <Border Background="{TemplateBinding Background}">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Image x:Name="icon" Height="20" VerticalAlignment="Center"
-                                   Source="/Resources/Icons/icons8-add-25.png" />
+                                   Source="/Resources/Icons/add-list-25_white.png" />
                                     <TextBlock Text="Új teszt" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
                                 </StackPanel>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-add-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/add-list-25_white.png"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-add-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/add-list-25_green.png"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -267,16 +267,16 @@
                             <Border Background="{TemplateBinding Background}">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Image x:Name="icon" Height="20" VerticalAlignment="Center"
-                                   Source="/Resources/Icons/icons8-add-properties-25.png" />
+                                   Source="/Resources/Icons/new-item-25_white.png" />
                                     <TextBlock Text="Lépés hozzáadás" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
                                 </StackPanel>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-add-properties-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/new-item-25_white.png"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-add-properties-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/new-item-25_green.png"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -284,23 +284,47 @@
                 </Setter>
             </Style>
 
-            <Style x:Key="deletestepstyle" TargetType="Button">
+        <Style x:Key="insertstepstyle" TargetType="Button">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Image x:Name="icon" Height="20" VerticalAlignment="Center"
+                                   Source="/Resources/Icons/edit-list-25_white.png" />
+                                <TextBlock Text="Lépés beszúrása" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/edit-list-25_white.png"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/edit-list-25_green.png"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="deletestepstyle" TargetType="Button">
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
                             <Border Background="{TemplateBinding Background}">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Image x:Name="icon" Height="20" VerticalAlignment="Center"
-                                   Source="/Resources/Icons/icons8-delete-25.png" />
+                                   Source="/Resources/Icons/delete-list-item-25_white.png" />
                                     <TextBlock Text="Lépés törlése" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
                                 </StackPanel>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-delete-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/delete-list-item-25_white.png"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-delete-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/delete-list-item-25_green.png"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -315,16 +339,16 @@
                             <Border Background="{TemplateBinding Background}">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Image x:Name="icon" Height="20" VerticalAlignment="Center"
-                                   Source="/Resources/Icons/icons8-save-25.png" />
+                                   Source="/Resources/Icons/save-list-25_white.png" />
                                     <TextBlock Text="Teszt mentése" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
                                 </StackPanel>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-save-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/save-list-25_white.png"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-save-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/save-list-25_green.png"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -339,16 +363,16 @@
                             <Border Background="{TemplateBinding Background}">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Image x:Name="icon" Height="20" VerticalAlignment="Center"
-                                   Source="/Resources/Icons/icons8-import-25.png" />
+                                   Source="/Resources/Icons/import-list-25_white.png" />
                                     <TextBlock Text="Teszt importálása" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
                                 </StackPanel>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-import-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/import-list-25_white.png"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-import-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/import-list-25_green.png"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -363,16 +387,16 @@
                             <Border Background="{TemplateBinding Background}">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Image x:Name="icon" Height="20" VerticalAlignment="Center"
-                                   Source="/Resources/Icons/icons8-start-25.png" />
+                                   Source="/Resources/Icons/start-test-25_white.png" />
                                     <TextBlock Text="Teszt indítása" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
                                 </StackPanel>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-start-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/start-test-25_white.png"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-start-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/start-test-25_green.png"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -387,16 +411,16 @@
                             <Border Background="{TemplateBinding Background}">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Image x:Name="icon" Height="20" VerticalAlignment="Center"
-                                   Source="/Resources/Icons/icons8-stop-25.png" />
+                                   Source="/Resources/Icons/stop-test-25_white.png" />
                                     <TextBlock Text="Teszt megállítása" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
                                 </StackPanel>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-stop-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/stop-test-25_white.png"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-stop-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/stop-test-25_green.png"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -411,16 +435,16 @@
                             <Border Background="{TemplateBinding Background}">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Image x:Name="icon" Height="20" VerticalAlignment="Center"
-                                   Source="/Resources/Icons/icons8-graph-report-25.png" />
+                                   Source="/Resources/Icons/stat-25_white.png" />
                                     <TextBlock Text="Teszt statisztika" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
                                 </StackPanel>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-graph-report-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/stat-25_white.png"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-graph-report-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/stat-25_green.png"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -428,23 +452,71 @@
                 </Setter>
             </Style>
 
-            <Style x:Key="settingsstyle" TargetType="Button">
+        <Style x:Key="desktopelementinspectstyle" TargetType="Button">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Image x:Name="icon" Height="20" VerticalAlignment="Center"
+                                   Source="/Resources/Icons/inspect-25_white.png" />
+                                <TextBlock Text="Dekstop inspect" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/inspect-25_white.png"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/inspect-25_green.png"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="webelementinspectstyle" TargetType="Button">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Image x:Name="icon" Height="20" VerticalAlignment="Center"
+                                   Source="/Resources/Icons/inspect-25_white.png" />
+                                <TextBlock Text="Web inspect" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/inspect-25_white.png"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/inspect-25_green.png"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="settingsstyle" TargetType="Button">
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
                             <Border Background="{TemplateBinding Background}">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Image x:Name="icon" Height="20" VerticalAlignment="Center"
-                                   Source="/Resources/Icons/icons8-automatic-25.png" />
+                                   Source="/Resources/Icons/setting-25_white.png" />
                                     <TextBlock Text="Beállítások" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
                                 </StackPanel>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-automatic-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/setting-25_white.png"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-automatic-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/setting-25_green.png"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -465,10 +537,10 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-power-off-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-power-off-25.png"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-power-off-25b.png"/>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-power-off-25b.png"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -552,28 +624,56 @@
 
                     </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Column="1" Margin="5">
+                <Grid Grid.Column="1" Margin="5">
+                    <!-- Kezdő háttér overlay -->
+                    <Grid x:Name="IntroOverlay" Background="Transparent" Panel.ZIndex="10">
+                        <!-- Lekerekített sarkú kép háttérként -->
+                        <Border Margin="15,5,5,5" CornerRadius="20" ClipToBounds="True">
+                            <Border.Background>
+                                <ImageBrush ImageSource="/Resources/mainbackground.png" Stretch="Fill" />
+                            </Border.Background>
+                        </Border>
 
+                        <!-- Overlay szöveg -->
+                        <Grid Background="Transparent" Margin="10,5,5,5">
+                            <TextBlock FontSize="24"
+                                       FontWeight="Bold"
+                                       Foreground="White"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Bottom"
+                                       TextAlignment="Center"
+                                       Margin="0,0,0,0"
+                                       Cursor="Hand"
+                                       MouseDown="IntroOverlay_MouseDown">
+                                
+                                Vágjunk bele!
+                                <LineBreak />
+                                Kattints ide a kezdéshez
+                                
+                            </TextBlock>
+                        </Grid>
+                    </Grid>
+
+
+                    <!-- Eredeti tartalom elrejtve induláskor -->
+                    <Grid x:Name="MainContentGrid" Visibility="Collapsed">
                         <Grid.RowDefinitions>
-
-                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
-                            <RowDefinition Height="auto" />
- 
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <Border 
-                            Grid.Row="0"
-                            Background="White"    
-                            BorderBrush="#093A3E"
-                            BorderThickness="5,5,5,3"    
-                            Padding="5,2"
-                            CornerRadius="20, 20, 0, 0"
-                            Margin="15,5,5,0"
-                            HorizontalAlignment="Stretch"
-                                >
-                            <DockPanel
-                                LastChildFill="False" HorizontalAlignment="Left">
+                        <Border Grid.Row="0"
+                                Background="White"    
+                                BorderBrush="#093A3E"
+                                BorderThickness="5,5,5,3"    
+                                Padding="5,2"
+                                CornerRadius="20, 20, 0, 0"
+                                Margin="15,5,5,0"
+                                HorizontalAlignment="Stretch"
+                  >
+                            <DockPanel LastChildFill="False" 
+                                       HorizontalAlignment="Left">
                                 <TextBlock Text="Test megnevezése:"
                                            VerticalAlignment="Center"
                                            Margin="15,0,0,0"
@@ -592,188 +692,196 @@
                             </DockPanel>
                         </Border>
 
-                    <Border Grid.Row="1" 
-                            Background="Transparent">
-                        <Border.Clip>
-                            <RectangleGeometry RadiusX="10" RadiusY="10" Rect="0,0,9999,9999"/>
-                        </Border.Clip>
-                        <Grid >
+                        <Border Grid.Row="1" 
+                                Background="Transparent">
+                            <Border.Clip>
+                                <RectangleGeometry RadiusX="10" RadiusY="10" Rect="0,0,9999,9999"/>
+                            </Border.Clip>
+                            <Grid>
+                                <Grid x:Name="SpinnerGrid"
+                                      Visibility="Collapsed"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Height="50" Width="50"
+                                      Background="Transparent"
+                                      Panel.ZIndex="1">
+                                    <Ellipse Stroke="#06202B"
+                                             StrokeThickness="4"
+                                             StrokeDashArray="2,3"
+                                             RenderTransformOrigin="0.5,0.5"
+                                             Stretch="Fill">
+                                        <Ellipse.RenderTransform>
+                                            <RotateTransform x:Name="SpinnerRotate" Angle="0"/>
+                                        </Ellipse.RenderTransform>
+                                    </Ellipse>
+                                </Grid>
 
-                            <Grid x:Name="SpinnerGrid"
-                                  Visibility="Collapsed"
-                                  HorizontalAlignment="Center"
-                                  VerticalAlignment="Center"
-                                  Height="50" Width="50"
-                                  Background="Transparent"
-                                  Panel.ZIndex="1">
-                                <Ellipse Stroke="#06202B"
-                                         StrokeThickness="4"
-                                         StrokeDashArray="2,3"
-                                         RenderTransformOrigin="0.5,0.5"
-                                         Stretch="Fill">
-                                    <Ellipse.RenderTransform>
-                                        <RotateTransform x:Name="SpinnerRotate" Angle="0"/>
-                                    </Ellipse.RenderTransform>
-                                </Ellipse>
+                                <DataGrid x:Name="stepsDataGrid"                                  
+                                          HorizontalAlignment="Stretch"
+                                          VerticalAlignment="Stretch"                              
+                                          AutoGenerateColumns="False"
+                                          Margin="15, 0, 5, 0" 
+                                          HeadersVisibility="Column"
+                                          CanUserAddRows="False"
+                                          AlternationCount="2"                                
+                                          AllowDrop="True"   
+                                          Background="White"
+                                          ColumnHeaderStyle="{StaticResource DataGridHeaderStyle}"                                
+                                          BorderBrush="#093A3E"
+                                          BorderThickness="5,2.5,5,2.5"     
+                                          GridLinesVisibility="None"
+                                          RowStyle="{StaticResource StepRowStyle}"
+                                          IsReadOnly="false"
+                                          SelectionMode="Single"
+                                          SelectionUnit="FullRow"
+                                          CanUserSortColumns="True"
+                                          FontSize="14"
+                                          Foreground="#06202B"
+                                          PreviewMouseLeftButtonDown="stepsDataGrid_PreviewMouseLeftButtonDown"
+                                          MouseMove="stepsDataGrid_MouseMove"
+                                          Drop="stepsDataGrid_Drop">
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn CellStyle="{StaticResource GridCellWithBorder}" Header="#" Width="20">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Index}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Lépés címe" Binding="{Binding StepName}" Width="*">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="HorizontalAlignment" Value="Left"/>
+                                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                                    <Setter Property="TextAlignment" Value="Center"/>
+                                                    <Setter Property="Margin" Value="3,0,0,0"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Művelet" Binding="{Binding Action}" Width="*">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="HorizontalAlignment" Value="Left"/>
+                                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                                    <Setter Property="TextAlignment" Value="Center"/>
+                                                    <Setter Property="Margin" Value="3,0,0,0"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Element" Binding="{Binding Target}" Width="150">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="HorizontalAlignment" Value="Left"/>
+                                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                                    <Setter Property="TextAlignment" Value="Center"/>
+                                                    <Setter Property="Margin" Value="3,0,0,0"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Target" Binding="{Binding TargetElement}" Width="*">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="HorizontalAlignment" Value="Left"/>
+                                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                                    <Setter Property="TextAlignment" Value="Center"/>
+                                                    <Setter Property="Margin" Value="3,0,0,0"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Property" Binding="{Binding Property}" Width="*">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="HorizontalAlignment" Value="Left"/>
+                                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                                    <Setter Property="TextAlignment" Value="Center"/>
+                                                    <Setter Property="Margin" Value="3,0,0,0"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Text" Binding="{Binding Parameter}" Width="*">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="HorizontalAlignment" Value="Left"/>
+                                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                                    <Setter Property="TextAlignment" Value="Center"/>
+                                                    <Setter Property="Margin" Value="3,0,0,0"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Status" Binding="{Binding Status}" Width="*">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="HorizontalAlignment" Value="Left"/>
+                                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                                    <Setter Property="TextAlignment" Value="Center"/>
+                                                    <Setter Property="Margin" Value="3,0,0,0"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridCheckBoxColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Átlépés" Binding="{Binding Skip}" Width="80"/>
+                                        <DataGridCheckBoxColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Folytatódhat?!" Binding="{Binding CanContinueOnError}" Width="90" />
+                                        <DataGridTextColumn Header="Timeout (mp)"
+                                      Binding="{Binding TimeoutSeconds}"
+                                      Width="80"
+                                      CellStyle="{StaticResource GridCellWithBorder}">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                                    <Setter Property="TextAlignment" Value="Center"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <!--<DataGridTextColumn Header="FE timeour (mp)"
+                                      Binding="{Binding FEDuration}"
+                                      Width="*"
+                                      CellStyle="{StaticResource GridCellWithBorder}">
+                      <DataGridTextColumn.ElementStyle>
+                          <Style TargetType="TextBlock">
+                              <Setter Property="HorizontalAlignment" Value="Center"/>
+                              <Setter Property="VerticalAlignment" Value="Center"/>
+                              <Setter Property="TextAlignment" Value="Center"/>
+                          </Style>
+                      </DataGridTextColumn.ElementStyle>
+                  </DataGridTextColumn>-->
+                                        <DataGridTextColumn Header="Futási idő (mp)"
+                                      Binding="{Binding Duration}"
+                                      Width="80"
+                                      CellStyle="{StaticResource GridCellWithBorder}">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                                    <Setter Property="TextAlignment" Value="Center"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTemplateColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Hibaüzenet" Width="200">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Errortext}" 
+                                          TextWrapping="Wrap" 
+                                          VerticalAlignment="Top" 
+                                          MaxHeight="200" 
+                                          />
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+
+                                </DataGrid>
+
                             </Grid>
+                        </Border>
 
-                            <DataGrid x:Name="stepsDataGrid"                                  
-                                    HorizontalAlignment="Stretch"
-                                    VerticalAlignment="Stretch"                              
-                                    AutoGenerateColumns="False"
-                                    Margin="15, 0, 5, 0" 
-                                    HeadersVisibility="Column"
-                                    CanUserAddRows="False"
-                                    AlternationCount="2"                                
-                                    AllowDrop="True"   
-                                    Background="White"
-                                    ColumnHeaderStyle="{StaticResource DataGridHeaderStyle}"                                
-                                    BorderBrush="#093A3E"
-                                    BorderThickness="5,2.5,5,2.5"     
-                                    GridLinesVisibility="None"
-                                    RowStyle="{StaticResource StepRowStyle}"
-                                    IsReadOnly="false"
-                                    SelectionMode="Single"
-                                    SelectionUnit="FullRow"
-                                    CanUserSortColumns="True"
-                                    FontSize="14"
-                                    Foreground="#06202B"
-                                    PreviewMouseLeftButtonDown="stepsDataGrid_PreviewMouseLeftButtonDown"
-                                    MouseMove="stepsDataGrid_MouseMove"
-                                    Drop="stepsDataGrid_Drop">
-                                <DataGrid.Columns>
-                                    <DataGridTemplateColumn CellStyle="{StaticResource GridCellWithBorder}" Header="#" Width="20">
-                                        <DataGridTemplateColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding Index}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"/>
-                                            </DataTemplate>
-                                        </DataGridTemplateColumn.CellTemplate>
-                                    </DataGridTemplateColumn>
-                                    <DataGridTextColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Lépés megnevezése" Binding="{Binding StepName}" Width="*">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="HorizontalAlignment" Value="Left"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                                <Setter Property="TextAlignment" Value="Center"/>
-                                                <Setter Property="Margin" Value="3,0,0,0"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Művelet megnevezése" Binding="{Binding Action}" Width="*">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="HorizontalAlignment" Value="Left"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                                <Setter Property="TextAlignment" Value="Center"/>
-                                                <Setter Property="Margin" Value="3,0,0,0"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Element" Binding="{Binding Target}" Width="*">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="HorizontalAlignment" Value="Left"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                                <Setter Property="TextAlignment" Value="Center"/>
-                                                <Setter Property="Margin" Value="3,0,0,0"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Property" Binding="{Binding Property}" Width="*">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="HorizontalAlignment" Value="Left"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                                <Setter Property="TextAlignment" Value="Center"/>
-                                                <Setter Property="Margin" Value="3,0,0,0"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Text" Binding="{Binding Parameter}" Width="*">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="HorizontalAlignment" Value="Left"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                                <Setter Property="TextAlignment" Value="Center"/>
-                                                <Setter Property="Margin" Value="3,0,0,0"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTextColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Status" Binding="{Binding Status}" Width="*">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="HorizontalAlignment" Value="Left"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                                <Setter Property="TextAlignment" Value="Center"/>
-                                                <Setter Property="Margin" Value="3,0,0,0"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridCheckBoxColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Átlépés" Binding="{Binding Skip}" Width="80"/>
-                                    <DataGridCheckBoxColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Folytatódhat?!" Binding="{Binding CanContinueOnError}" Width="90" />
-                                    <DataGridTextColumn Header="Timeout (mp)"
-                                                    Binding="{Binding TimeoutSeconds}"
-                                                    Width="80"
-                                                    CellStyle="{StaticResource GridCellWithBorder}">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="HorizontalAlignment" Value="Center"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                                <Setter Property="TextAlignment" Value="Center"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                <!--<DataGridTextColumn Header="FE timeour (mp)"
-                                                    Binding="{Binding FEDuration}"
-                                                    Width="*"
-                                                    CellStyle="{StaticResource GridCellWithBorder}">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="HorizontalAlignment" Value="Center"/>
-                                            <Setter Property="VerticalAlignment" Value="Center"/>
-                                            <Setter Property="TextAlignment" Value="Center"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>-->
-                                <DataGridTextColumn Header="Futási idő (mp)"
-                                                    Binding="{Binding Duration}"
-                                                    Width="90"
-                                                    CellStyle="{StaticResource GridCellWithBorder}">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="HorizontalAlignment" Value="Center"/>
-                                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                                <Setter Property="TextAlignment" Value="Center"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    <DataGridTemplateColumn CellStyle="{StaticResource GridCellWithBorder}" Header="Hibaüzenet" Width="200">
-                                        <DataGridTemplateColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding Errortext}" 
-                                                        TextWrapping="Wrap" 
-                                                        VerticalAlignment="Top" 
-                                                        MaxHeight="200" 
-                                                        />
-                                            </DataTemplate>
-                                        </DataGridTemplateColumn.CellTemplate>
-                                    </DataGridTemplateColumn>
-                                </DataGrid.Columns>
-
-                            </DataGrid>
-
-                        </Grid>
-                    </Border>
-
-                    <Border 
-                            Grid.Row="2"   
-                            BorderBrush="#093A3E"
-                            BorderThickness="5,3,5,5"    
-                            Padding="5,2"
-                            CornerRadius="0,0,20,20"
-                            Margin="15,0,5,5"
-                            HorizontalAlignment="Stretch"
-                            Background="White"
+                        <Border Background="White"
+                                Grid.Row="2"   
+                                BorderBrush="#093A3E"
+                                BorderThickness="5,3,5,5"    
+                                Padding="5,2"
+                                CornerRadius="0,0,20,20"
+                                Margin="15,0,5,5"
+                                HorizontalAlignment="Stretch"                                
                                 >
                             <DockPanel
                                 LastChildFill="False" HorizontalAlignment="Right" >
@@ -795,7 +903,11 @@
                         </Border>
 
                     </Grid>
+
+
+                    <!-- Az általad küldött részben ezek már megvannak, csak át kell őket mozgatni ide. -->
                 </Grid>
+            </Grid>
 
 
             <Border     Background="#093A3E" 
@@ -811,9 +923,9 @@
                     <StackPanel VerticalAlignment="Top">
                         <Grid Margin="20, 10, 15, 10" Height="150" Background="Transparent">
                                 <local:HamburgerButton x:Name="MyHamburgerButton"
-                           Style="{StaticResource hamburgermenustlye}"
-                           Width="30" Height="30"                                               
-                           Click="HamburgerButton_Click"/>
+                                                       Style="{StaticResource hamburgermenustlye}"
+                                                       Width="30" Height="30"                                               
+                                                       Click="HamburgerButton_Click"/>
                             </Grid>
                     </StackPanel>
 
@@ -821,10 +933,10 @@
                     <StackPanel VerticalAlignment="Center">
                         <ListView ItemContainerStyle="{StaticResource LvItemStyle}" Margin="20, 10, 15, 10" ClipToBounds="True" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled" BorderBrush="Transparent" Background="Transparent" FontFamily="Century Gothic" FontSize="14"  FontWeight="Bold" >
 
-                            <ListViewItem  Height="30">
+                            <ListViewItem x:Name="newtestadd"  Height="30">
                                 <Button Style="{StaticResource addteststyle}" Click="NewTest_Click" Background="Transparent" BorderThickness="0" Padding="0" >
                                     <StackPanel Orientation="Horizontal">
-                                        <Image  Source="/Resources/Icons/icons8-add-25.png" Height="20" VerticalAlignment="Center"/>
+                                        <Image    Source="/Resources/Icons/add-list-25_white.png" Height="20" VerticalAlignment="Center"/>
                                         <TextBlock Text="Új teszt" Margin="15,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
 
@@ -838,7 +950,7 @@
                             <ListViewItem  x:Name="newteststepadd" Height="30">
                                 <Button x:Name="newteststepaddbutton" Style="{StaticResource addstepstyle}" Foreground="White" Click="AddStep_Click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <Image Source="/Resources/Icons/icons8-add-properties-25.png" Height="20" VerticalAlignment="Center"/>
+                                        <Image Source="/Resources/Icons/new-item-25_white.png" Height="20" VerticalAlignment="Center"/>
                                         <TextBlock Text="Lépés hozzadás"  Margin="15,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
 
@@ -850,10 +962,25 @@
                                 </Button>
                             </ListViewItem>
 
+                            <ListViewItem  x:Name="insertteststep" Height="30">
+                                <Button x:Name="inserteststepbutton" Style="{StaticResource insertstepstyle}" Foreground="White" Click="InsertStep_Click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Source="/Resources/Icons/edit-list-25_white.png" Height="20" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Lépés beszúrása"  Margin="15,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <ToolTipService.ToolTip>
+                                        <ToolTip Style="{StaticResource CustomToolTipStyle}" Content="Lépés beszúrása"/>
+                                    </ToolTipService.ToolTip>
+
+
+                                </Button>
+                            </ListViewItem>
+
                             <ListViewItem Height="30">
                                 <Button Style="{StaticResource deletestepstyle}" Foreground="White" Click="DeleteStep_Click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <Image Source="/Resources/Icons/icons8-delete-25.png" Height="20" VerticalAlignment="Center"/>
+                                        <Image Source="/Resources/Icons/delete-list-item-25_white.png" Height="20" VerticalAlignment="Center"/>
                                         <TextBlock Text="Lépés törlése" Margin="15,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
 
@@ -868,7 +995,7 @@
                             <ListViewItem Height="30">
                                 <Button Style="{StaticResource saveteststyle}" Foreground="White" Click="SaveTest_Click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <Image Source="/Resources/Icons/icons8-save-25.png" Height="20" VerticalAlignment="Center"/>
+                                        <Image Source="/Resources/Icons/save-list-25_white.png" Height="20" VerticalAlignment="Center"/>
                                         <TextBlock Text="Teszt mentése" Margin="15,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
 
@@ -883,7 +1010,7 @@
                             <ListViewItem Height="30">
                                 <Button Style="{StaticResource loadteststyle}" Foreground="White" Click="LoadTest_Click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <Image Source="/Resources/Icons/icons8-import-25.png" Height="20" VerticalAlignment="Center"/>
+                                        <Image Source="/Resources/Icons/import-list-25_white.png" Height="20" VerticalAlignment="Center"/>
                                         <TextBlock Text="Teszt betöltése" Margin="15,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
 
@@ -898,7 +1025,7 @@
                             <ListViewItem Height="30">
                                 <Button Style="{StaticResource teststartstyle}" Foreground="White" Click="RunTest_Click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <Image Source="/Resources/Icons/icons8-start-25.png" Height="20" VerticalAlignment="Center"/>
+                                        <Image Source="/Resources/Icons/start-test-25_white.png" Height="20" VerticalAlignment="Center"/>
                                         <TextBlock Text="Teszt indítása" Margin="15,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
 
@@ -913,7 +1040,7 @@
                             <ListViewItem Height="30">
                                 <Button Style="{StaticResource teststopstyle}" Foreground="White" Click="StopTest_click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <Image Source="/Resources/Icons/icons8-stop-25.png" Height="20" VerticalAlignment="Center"/>
+                                        <Image Source="/Resources/Icons/stop-test-25_white.png" Height="20" VerticalAlignment="Center"/>
                                         <TextBlock Text="Teszt megállítása" Margin="15,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
 
@@ -927,14 +1054,14 @@
 
 
                             <ListViewItem Margin="0,25,0,0" Height="30">
-                                <Button  Style="{StaticResource settingsstyle}" Foreground="White" Click="ShowSettings_Click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left">
+                                <Button  Style="{StaticResource teststatstyle}" Foreground="White" Click="ShowStatistics_Click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <Image Source="/Resources/Icons/icons8-automatic-25.png" Height="20" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Beállítások" Margin="15,0,0,0" VerticalAlignment="Center"/>
+                                        <Image Source="/Resources/Icons/stat-25_white.png" Height="20" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Teszt statisztika" Margin="15,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
 
                                     <ToolTipService.ToolTip>
-                                        <ToolTip Style="{StaticResource CustomToolTipStyle}" Content="Teszteléshez szükséges beállítások itt végezhetőek el."/>
+                                        <ToolTip Style="{StaticResource CustomToolTipStyle}" Content="Teszt alapján megjeleníthető statisztika."/>
                                     </ToolTipService.ToolTip>
 
 
@@ -942,14 +1069,44 @@
                             </ListViewItem>
 
                             <ListViewItem Margin="0,25,0,0" Height="30">
-                                <Button  Style="{StaticResource teststatstyle}" Foreground="White" Click="ShowStatistics_Click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left">
+                                <Button  Style="{StaticResource desktopelementinspectstyle}" Foreground="White" Click="ElementInspect_Click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <Image Source="/Resources/Icons/icons8-graph-report-25.png" Height="20" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Teszt statisztika" Margin="15,0,0,0" VerticalAlignment="Center"/>
+                                        <Image Source="/Resources/Icons/inspect-25_green.png" Height="20" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Dektop inspect" Margin="15,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
 
                                     <ToolTipService.ToolTip>
-                                        <ToolTip Style="{StaticResource CustomToolTipStyle}" Content="Teszt alapján megjeleníthető statisztika."/>
+                                        <ToolTip Style="{StaticResource CustomToolTipStyle}" Content="Element inpsect segítség."/>
+                                    </ToolTipService.ToolTip>
+
+
+                                </Button>
+                            </ListViewItem>
+
+                            <ListViewItem Margin="0,0,0,0" Height="30">
+                                <Button  Style="{StaticResource webelementinspectstyle}" Foreground="White"  Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left" Click="WebElementInspect_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Source="/Resources/Icons/inspect-25_white.png" Height="20" VerticalAlignment="Center"/>
+                                        <TextBlock Text="WEB inspect" Margin="15,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <ToolTipService.ToolTip>
+                                        <ToolTip Style="{StaticResource CustomToolTipStyle}" Content="Element inpsect segítség."/>
+                                    </ToolTipService.ToolTip>
+
+
+                                </Button>
+                            </ListViewItem>
+
+                            <ListViewItem Margin="0,25,0,0" Height="30">
+                                <Button  Style="{StaticResource settingsstyle}" Foreground="White" Click="ShowSettings_Click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Source="/Resources/Icons/setting-25_white.png" Height="20" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Beállítások" Margin="15,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <ToolTipService.ToolTip>
+                                        <ToolTip Style="{StaticResource CustomToolTipStyle}" Content="Teszteléshez szükséges beállítások itt végezhetőek el."/>
                                     </ToolTipService.ToolTip>
 
 
@@ -965,7 +1122,7 @@
                                 <ListViewItem Height="30">
                                     <Button Style="{StaticResource logoutstyle}" Foreground="White" Click="Quit_Click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left">
                                         <StackPanel Orientation="Horizontal">
-                                            <Image Source="/Resources/Icons/icons8-power-off-25.png" Height="20" VerticalAlignment="Center"/>
+                                        <Image Source="/Resources/Icons/icons8-power-off-25.png" Height="20" VerticalAlignment="Center"/>
                                             <TextBlock Text="Kilépés" Margin="15,0,0,0" VerticalAlignment="Center"/>
                                         </StackPanel>
 

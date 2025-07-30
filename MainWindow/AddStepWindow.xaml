@@ -116,34 +116,47 @@
             <TextBox x:Name="testNameTextBox" Grid.Row="0" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
  
             <!-- HEADER BOTTOM MEZŐK -->
-            <TextBlock Text="Lépés neve:" Grid.Row="4" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
-            <TextBox x:Name="stepNameTextBox" Grid.Row="4" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
+            <TextBlock Text="Lépés neve:" Grid.Row="1" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+            <TextBox x:Name="stepNameTextBox" Grid.Row="1" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
 
-             <TextBlock Text="Metódus lista:" Grid.Row="5" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
-             <ComboBox x:Name="actionComboBox" Grid.Row="5" Grid.Column="1" Margin="5" Style="{StaticResource ModernComboBox}">
+             <TextBlock Text="Metódus lista:" Grid.Row="2" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+             <ComboBox x:Name="actionComboBox" Grid.Row="2" Grid.Column="1" Margin="5" Style="{StaticResource ModernComboBox}">
                 <ComboBoxItem Content="Start"/>
+                <ComboBoxItem Content="StartChrome"/>
+                <ComboBoxItem Content="StartFirefox"/>
+                <ComboBoxItem Content="StartMicrosoftEdge"/>
                 <ComboBoxItem Content="Stop"/>
-                <ComboBoxItem Content="TakePrtsc"/>
+                <ComboBoxItem Content="StopWeb"/>                 
                 <ComboBoxItem Content="Click"/>
+                <ComboBoxItem Content="ClickWeb"/>
                 <ComboBoxItem Content="DoubleClick"/>
+                <ComboBoxItem Content="DoubleClickWeb"/>
                 <ComboBoxItem Content="RightClick"/>
                 <ComboBoxItem Content="TextClear"/>
+                <ComboBoxItem Content="TextClearWeb"/>
                 <ComboBoxItem Content="SendKeys"/>
+                <ComboBoxItem Content="SendKeysWeb"/>
                 <ComboBoxItem Content="DragAndDrop"/>
                 <ComboBoxItem Content="MoveToElement"/>
                 <ComboBoxItem Content="ScrollToElementAndClick"/>
+                <ComboBoxItem Content="ScrollToElementAndClickWeb"/>
             </ComboBox>
 
-            <TextBlock Text="Element:" Grid.Row="6" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
-            <TextBox x:Name="targetTextBox" Grid.Row="6" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
+            <TextBlock Text="Element:" Grid.Row="3" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+            <TextBox x:Name="targetTextBox" Grid.Row="3" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
+            <TextBlock Text="Target:" Grid.Row="4" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+            <TextBox x:Name="targetsourceTextBox" Grid.Row="4" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
 
             <TextBlock Text="Property:" Grid.Row="7" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
             <ComboBox x:Name="propertyTypeComboBox" Grid.Row="7" Grid.Column="1" Margin="5" Style="{StaticResource ModernComboBox}">
                 <ComboBoxItem Content="Id"/>
                 <ComboBoxItem Content="Name"/>
+                <ComboBoxItem Content="CssSelector"/>
                 <ComboBoxItem Content="ClassName"/>
+                <ComboBoxItem Content="LinkText"/>
                 <ComboBoxItem Content="TagName"/>
                 <ComboBoxItem Content="Xpath"/>
+                <ComboBoxItem Content="PartialLinkText"/>
             </ComboBox>
 
                 <TextBlock Text="Paraméter:" Grid.Row="8" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>

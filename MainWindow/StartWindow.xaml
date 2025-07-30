@@ -1,12 +1,14 @@
 ﻿<Window x:Class="TestAutomationUI.StartWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Teszt Indító" Height="1000" Width="800"
+        
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"
         ResizeMode="NoResize"
         Background="Transparent"
+        Height="700"
+        Width="1230"
         >
 
     <Window.Resources>
@@ -38,7 +40,7 @@
             <Image Source="Resources/background.jpg" Stretch="fill" >
 
                 <Image.Clip>
-                    <RectangleGeometry Rect="0,0,800,1000" RadiusX="20" RadiusY="20"/>
+                    <RectangleGeometry Rect="0,0,1230,700" RadiusX="20" RadiusY="20"/>
                 </Image.Clip>
 
             </Image>

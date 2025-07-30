@@ -1,14 +1,19 @@
 ﻿using MainWindow;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.WinForms;
+using Microsoft.Web.WebView2.Wpf;
 using Microsoft.Win32;
-using Modules;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Reflection.Metadata;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
@@ -16,6 +21,9 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using System.Xml.Linq;
+using WDModules;
+using WebModules;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 using static TestAutomationUI.Settings;
 
 namespace TestAutomationUI
@@ -26,6 +34,7 @@ namespace TestAutomationUI
         public string StepName { get; set; }
         public string Action { get; set; }
         public string Target { get; set; }
+        public string TargetElement { get; set; }
         public string Property { get; set; }
         public string Parameter { get; set; }
         public double Duration { get; set; }
@@ -40,6 +49,8 @@ namespace TestAutomationUI
         public string Status { get; set; } = "";
         public bool CanContinueOnError { get; set; } = false; // A mező, amely azt jelzi, hogy a lépés folytatható-e hibával
         public string Errortext { get; set; } = "";  // ÚJ MEZŐ
+
+        private bool inspectModeActive = false;
     }
 
     public class IndexPlusOneConverter : IValueConverter
@@ -99,6 +110,8 @@ namespace TestAutomationUI
             pandelWidth = sidePanel.Width;
         }
 
+
+
         private void Timer_Tick(object? sender, EventArgs e)
         {
             if (hidden)
@@ -127,6 +140,12 @@ namespace TestAutomationUI
 
 
             }
+        }
+
+        private void IntroOverlay_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            IntroOverlay.Visibility = Visibility.Collapsed;
+            MainContentGrid.Visibility = Visibility.Visible;
         }
 
         private void SetSidePanelTextBlockVisibility(Visibility visibility)
@@ -165,6 +184,7 @@ namespace TestAutomationUI
         //{
         //    timer.Start();
         //}
+
         private void HamburgerButton_Click(object sender, RoutedEventArgs e)
         {
             timer.Start();
@@ -202,7 +222,7 @@ namespace TestAutomationUI
             SpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, null);
         }
 
-        ////winiummal kapcsolatos minden
+        //winiummal kapcsolatos minden
 
         // Új metódus, amelyet a checkbox állapotának változása kezel
 
@@ -216,6 +236,12 @@ namespace TestAutomationUI
 
         private void AddStep_Click(object sender, RoutedEventArgs e)
         {
+            if (IntroOverlay.Visibility == Visibility.Visible)
+            {
+                IntroOverlay.Visibility = Visibility.Collapsed;
+                MainContentGrid.Visibility = Visibility.Visible;
+            }
+
             var addStepWindow = new AddStepWindow
             {
                 Owner = this
@@ -233,6 +259,7 @@ namespace TestAutomationUI
                     StepName = addStepWindow.StepName,
                     Action = addStepWindow.Action,
                     Target = addStepWindow.Target,
+                    TargetElement = addStepWindow.TargetElement,
                     Property = addStepWindow.Property,
                     Parameter = addStepWindow.Parameter,
                     TimeoutSeconds = int.TryParse(addStepWindow.TimeoutText, out var timeout) ? timeout : (int?)null,
@@ -254,11 +281,23 @@ namespace TestAutomationUI
 
         private void StopTest_click(object sender, RoutedEventArgs e)
         {
+            if (IntroOverlay.Visibility == Visibility.Visible)
+            {
+                IntroOverlay.Visibility = Visibility.Collapsed;
+                MainContentGrid.Visibility = Visibility.Visible;
+            }
+
             _stopRequested = true;
 
             if (WDMethods.IsRunning)
             {
                 WDMethods.Stop();
+                StopSpinner();
+                CustomMessageBox.Show("Teszt megszakítva és a driver leállítva.", "Megszakítás");
+            }
+            if (WebMethods.IsRunningWEB)
+            {
+                WebMethods.StopWeb();
                 StopSpinner();
                 CustomMessageBox.Show("Teszt megszakítva és a driver leállítva.", "Megszakítás");
             }
@@ -299,7 +338,11 @@ namespace TestAutomationUI
 
         private async void RunTest_Click(object sender, RoutedEventArgs e)
         {
-            writelogtotext("runtest click");
+            if (IntroOverlay.Visibility == Visibility.Visible)
+            {
+                IntroOverlay.Visibility = Visibility.Collapsed;
+                MainContentGrid.Visibility = Visibility.Visible;
+            }
 
             foreach (var step in Steps)
             {
@@ -348,13 +391,26 @@ namespace TestAutomationUI
                 }
                 else // Nem
                 {
-                    WDMethods.Stop();
+                    if (WDMethods.IsRunning)
+                    {
+                        CustomMessageBox.Show("A teszt már fut, kérlek állítsd le a futó tesztet.", "Futó teszt");                        
+                        WDMethods.Stop();
+                    }
+                   
+                    if (WebMethods.IsRunningWEB)
+                    {
+                        CustomMessageBox.Show("A teszt már fut, kérlek állítsd le a futó tesztet.", "Futó teszt");
+                        WebMethods.StopWeb();
+                    }
+                    _stopRequested = true;
+                    stopwatch?.Stop();
                 }
             }
 
             string testNameMain = this.testnameTextBox.Text;
             string programPath = settingsWindow.programPathTextBox.Text;
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            
             string winiumDriverPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools");
             string prtscfolderpathMain = settingsWindow.screenshotFolderTextBox.Text;
             WDMethods.MaxWaitTime = maxWaitTime;
@@ -414,11 +470,21 @@ namespace TestAutomationUI
                     Task task = step.Action switch
                     {
                         "Start" => WDMethods.StartProg(programPath, winiumDriverPath),
+                        "StartChrome" => WebMethods.ChromeStart(step.Target?? ""),
+                        "StartFireFox" => WebMethods.FirefoxStart(step.Target ?? ""),
+                        "StartMicrosoftEdge" => WebMethods.MicrosoftEdgeStart(step.Target ?? ""),
                         "Click" => WDMethods.Click(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "ClickWeb" => WebMethods.ClickWeb(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
                         "SendKeys" => WDMethods.Sendkeys(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "SendKeysWeb" => WebMethods.SendkeysWeb(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
                         "DoubleClick" => WDMethods.DoubleClick(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
                         "RightClick" => WDMethods.RightClick(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "RightClickWeb" => WebMethods.RightClickWeb(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
                         "TextClear" => WDMethods.TextClear(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "SelectByTextWeb" => WebMethods.SelectByTextWeb(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "SelectByValueWeb" => WebMethods.SelectByValueWeb(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "DragAndDropWeb" => WebMethods.DragAndDropWeb(step.Target ?? "", step.TargetElement ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "DragAndDrop" => WDMethods.DragAndDrop(step.Target ?? "", step.TargetElement ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
                         "MoveToElement" => WDMethods.MoveToElement(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
                         "ScrollToElementAndClick" => WDMethods.ScrollToElementAndClick(step.Target ?? "", propType, step.Parameter ?? "", step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
                         "Stop" => WDMethods.Stop(),
@@ -477,7 +543,7 @@ namespace TestAutomationUI
                         WDMethods.Stop(); // Ha hiba történt, leállítjuk a Winium drivert                
                         break;
                     }
-                }                
+                }
                 stepsDataGrid.Items.Refresh();
             }
 
@@ -525,14 +591,90 @@ namespace TestAutomationUI
             finally
             {
                 _stopRequested = false;
-                WDMethods.Stop(); // <-- garantált driver leállítás itt
-                writelogtotext("finnaly ág");
+                if (WDMethods.IsRunning)
+                {
+                    writelogtotext("finally ág winium driver leállítás előtt");
+                    WDMethods.Stop();
+                }
+                if (WebMethods.IsRunningWEB)
+                {
+                    writelogtotext("finally ág web driver leállítás előtt");
+                    WebMethods.StopWeb();
+                }
             }
             StopSpinner();
         }
-        
+
+        private void InsertStep_Click(object sender, RoutedEventArgs e)
+        {
+            if (IntroOverlay.Visibility == Visibility.Visible)
+            {
+                IntroOverlay.Visibility = Visibility.Collapsed;
+                MainContentGrid.Visibility = Visibility.Visible;
+            }
+
+            // Ha nincs még egy lépés sem, sima hozzáadás
+            if (Steps.Count == 0)
+            {
+                AddStep_Click(sender, e); // már létező módszer, sima hozzáadást végez
+                return;
+            }
+
+            // Ha van lépés, de nincs kijelölve semmi
+            if (stepsDataGrid.SelectedIndex < 0)
+            {
+                CustomMessageBox.Show("Kérlek válassz ki egy lépést, amely után be szeretnéd szúrni az újat.");
+                return;
+            }
+
+            var addStepWindow = new AddStepWindow
+            {
+                Owner = this
+            };
+
+            var settingsWindow = new Settings
+            {
+                Owner = this
+            };
+
+            if (addStepWindow.ShowDialog() == true)
+            {
+                var newStep = new TestStep
+                {
+                    StepName = addStepWindow.StepName,
+                    Action = addStepWindow.Action,
+                    Target = addStepWindow.Target,
+                    TargetElement = addStepWindow.TargetElement,
+                    Property = addStepWindow.Property,
+                    Parameter = addStepWindow.Parameter,
+                    TimeoutSeconds = int.TryParse(addStepWindow.TimeoutText, out var timeout) ? timeout : (int?)null,
+                    StartTime = DateTime.Now,
+                    PrtScfolderpath = settingsWindow.ScreenshotFolderTextBoxSettings,
+                    TestName = addStepWindow.testNameTextBox.Text
+                };
+
+                if (string.IsNullOrEmpty(newStep.Action))
+                {
+                    CustomMessageBox.Show("Kérlek válassz metódust a listából.");
+                    return;
+                }
+
+                // Beszúrás a kiválasztott lépés után
+                int selectedIndex = stepsDataGrid.SelectedIndex;
+                Steps.Insert(selectedIndex + 1, newStep);
+
+                RefreshIndexes();
+                stepsDataGrid.Items.Refresh();
+            }
+        }
+
+
+
         private void DeleteStep_Click(object sender, RoutedEventArgs e)
         {
+            IntroOverlay.Visibility = Visibility.Collapsed;
+            MainContentGrid.Visibility = Visibility.Visible;
+
             // Ellenőrzés: ha a Steps üres, akkor ne mentsen
             if (Steps == null || !Steps.Any())
             {
@@ -549,6 +691,13 @@ namespace TestAutomationUI
 
         private void LoadTest_Click(object sender, RoutedEventArgs e)
         {
+
+            if (IntroOverlay.Visibility == Visibility.Visible)
+            {
+                IntroOverlay.Visibility = Visibility.Collapsed;
+                MainContentGrid.Visibility = Visibility.Visible;
+            }
+
             var addStepWindow = new AddStepWindow
             {
                 Owner = this
@@ -585,6 +734,7 @@ namespace TestAutomationUI
                             StepName = el.Attribute("StepName")?.Value ?? string.Empty,
                             Action = el.Attribute("Action")?.Value ?? string.Empty,
                             Target = el.Attribute("Target")?.Value ?? string.Empty,
+                            TargetElement = el.Attribute("TargetElement")?.Value ?? string.Empty,
                             Property = el.Attribute("Property")?.Value ?? string.Empty,
                             Parameter = el.Attribute("Parameter")?.Value ?? string.Empty,
                             Skip = bool.TryParse(el.Attribute("Skip")?.Value, out var skip) && skip,
@@ -606,6 +756,12 @@ namespace TestAutomationUI
 
         private void SaveTest_Click(object sender, RoutedEventArgs e)
         {
+
+            if (IntroOverlay.Visibility == Visibility.Visible)
+            {
+                IntroOverlay.Visibility = Visibility.Collapsed;
+                MainContentGrid.Visibility = Visibility.Visible;
+            }
             var addStepWindow = new AddStepWindow
             {
                 Owner = this
@@ -646,6 +802,7 @@ namespace TestAutomationUI
                                 new XAttribute("StepName", s.StepName ?? string.Empty),
                                 new XAttribute("Action", s.Action ?? string.Empty),
                                 new XAttribute("Target", s.Target ?? string.Empty),
+                                new XAttribute("TargetElement", s.TargetElement ?? string.Empty),
                                 new XAttribute("Property", s.Property ?? string.Empty),
                                 new XAttribute("Skip", s.Skip),
                                 new XAttribute("CanContinueOnError", s.CanContinueOnError),
@@ -669,6 +826,11 @@ namespace TestAutomationUI
 
         private void NewTest_Click(object sender, RoutedEventArgs e)
         {
+            if (IntroOverlay.Visibility == Visibility.Visible)
+            {
+                IntroOverlay.Visibility = Visibility.Collapsed;
+                MainContentGrid.Visibility = Visibility.Visible;
+            }
             var addStepWindow = new AddStepWindow
             {
                 Owner = this
@@ -688,7 +850,7 @@ namespace TestAutomationUI
             Steps.Clear();
             stepsDataGrid.Items.Refresh();
 
-            CustomMessageBox.Show("Új teszt kezdődött, minden mező törölve lett.", "Info");
+            CustomMessageBox.Show("Új teszt kezdődött.", "Info");
         }
 
         private Point startPoint;
@@ -792,5 +954,72 @@ namespace TestAutomationUI
             var settingsWindow = new Settings();
             settingsWindow.ShowDialog();
         }
+
+        // WinAPI: egérpozíció lekérése
+        [DllImport("user32.dll")]
+        static extern bool GetCursorPos(out POINT lpPoint);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct POINT
+        {
+            public int X;
+            public int Y;
+        }
+
+        private POINT GetCursorPosition()
+        {
+            GetCursorPos(out POINT point);
+            return point;
+        }
+
+
+        private async void ElementInspect_Click(object sender, RoutedEventArgs e)
+        {
+            CustomMessageBox.Show("3 másodpercen belül vidd az egeret az ellenőrizni kívánt elemre...", "Inspect indul");
+
+            await Task.Delay(3000);
+
+            POINT point = GetCursorPosition();
+            var element = AutomationElement.FromPoint(new System.Windows.Point(point.X, point.Y));
+
+            if (element != null)
+            {
+                string info =
+                    $"🖥️ Desktop elem adatai:\n" +
+                    $"Name: {element.Current.Name}\n" +
+                    $"ClassName: {element.Current.ClassName}\n" +
+                    $"AutomationId: {element.Current.AutomationId}\n" +
+                    $"ControlType: {element.Current.ControlType.ProgrammaticName}\n"+
+                    $"NID: {element.Current.ControlType.Id}\n"+
+                    $"NID: {element.Current.LabeledBy}\n"+
+                    $"FID: {element.Current.FrameworkId}";
+
+                CustomMessageBox.Show(info, "Inspect eredmény");              
+            }
+            else
+            {
+                CustomMessageBox.Show("Nem található elem az egér alatt.", "Hiba");              
+            }
+        }
+
+        private void WebElementInspect_Click(object sender, RoutedEventArgs e)
+        {
+            var settingsWindow = new Settings
+            {
+                Owner = this
+            };
+
+            string url = settingsWindow.webPathTextBox.Text;
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                MessageBox.Show("Kérlek, adj meg egy weboldal címet!", "Figyelem", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var inspectWindow = new ElementInfoWindow(url);
+            inspectWindow.Show();
+        }
+
+
     }
 }

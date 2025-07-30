@@ -33,6 +33,8 @@ namespace MainWindow
             var box = new CustomMessageBox(message, title, showCancel);
             if (owner != null)
                 box.Owner = owner;
+            box.Topmost = true;
+            box.Activate();
             box.ShowDialog();
             return box.Result;
         }
