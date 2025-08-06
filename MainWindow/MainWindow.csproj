@@ -29,6 +29,8 @@
     <None Remove="Resources\Icons\at.png" />
     <None Remove="Resources\Icons\at_icon.ico" />
     <None Remove="Resources\Icons\at_icon.png" />
+    <None Remove="Resources\Icons\copy-step-25_green.png" />
+    <None Remove="Resources\Icons\copy-step-25_white.png" />
     <None Remove="Resources\Icons\delete-list-item-25_green.png" />
     <None Remove="Resources\Icons\delete-list-item-25_white.png" />
     <None Remove="Resources\Icons\edit-list-25_green.png" />
@@ -95,6 +97,10 @@
     <None Remove="Resources\Icons\inspect-25_white.png" />
     <None Remove="Resources\Icons\new-item-25_green.png" />
     <None Remove="Resources\Icons\new-item-25_white.png" />
+    <None Remove="Resources\Icons\pause-test-25_green.png" />
+    <None Remove="Resources\Icons\pause-test-25_white.png" />
+    <None Remove="Resources\Icons\restart-test-25_green.png" />
+    <None Remove="Resources\Icons\restart-test-25_white.png" />
     <None Remove="Resources\Icons\save-list-25_green.png" />
     <None Remove="Resources\Icons\save-list-25_white.png" />
     <None Remove="Resources\Icons\setting-25_green.png" />
@@ -144,6 +150,8 @@
     <Resource Include="Resources\Icons\at_icon.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Resource>
+    <Resource Include="Resources\Icons\copy-step-25_green.png" />
+    <Resource Include="Resources\Icons\copy-step-25_white.png" />
     <Resource Include="Resources\Icons\delete-list-item-25_green.png" />
     <Resource Include="Resources\Icons\delete-list-item-25_white.png" />
     <Resource Include="Resources\Icons\edit-list-25_green.png" />
@@ -162,6 +170,10 @@
     </Resource>
     <Resource Include="Resources\Icons\new-item-25_green.png" />
     <Resource Include="Resources\Icons\new-item-25_white.png" />
+    <Resource Include="Resources\Icons\pause-test-25_green.png" />
+    <Resource Include="Resources\Icons\pause-test-25_white.png" />
+    <Resource Include="Resources\Icons\restart-test-25_green.png" />
+    <Resource Include="Resources\Icons\restart-test-25_white.png" />
     <Resource Include="Resources\Icons\save-list-25_green.png" />
     <Resource Include="Resources\Icons\save-list-25_white.png" />
     <Resource Include="Resources\Icons\setting-25_green.png" />

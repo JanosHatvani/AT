@@ -19,6 +19,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using System.Xml.Linq;
 using WDModules;
@@ -51,6 +52,8 @@ namespace TestAutomationUI
         public string Errortext { get; set; } = "";  // ÚJ MEZŐ
 
         private bool inspectModeActive = false;
+
+
     }
 
     public class IndexPlusOneConverter : IValueConverter
@@ -93,6 +96,8 @@ namespace TestAutomationUI
         bool hidden;
 
         private bool _stopRequested = false;
+        private bool _pauseRequested = false;
+        private TaskCompletionSource<bool> _pauseTaskSource;
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
@@ -279,6 +284,40 @@ namespace TestAutomationUI
             }
         }
 
+        //PauseResumeButton_Click
+        private void PauseResumeButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (IntroOverlay.Visibility == Visibility.Visible)
+            {
+                IntroOverlay.Visibility = Visibility.Collapsed;
+                MainContentGrid.Visibility = Visibility.Visible;
+            }
+
+            if (_pauseRequested)
+            {
+                // Resume
+                _pauseRequested = false;
+                _pauseTaskSource?.TrySetResult(true);
+                _pauseTaskSource = null;
+
+                CustomMessageBox.Show("A teszt folytatódik.", "Folytatás");
+            }
+            else if (WDMethods.IsRunning || WebMethods.IsRunningWEB)
+            {
+                // Pause
+                _pauseRequested = true;
+                _pauseTaskSource = null; // Reset, hogy ne legyen előző érték se
+                CustomMessageBox.Show("A teszt szüneteltetve lett.", "Szüneteltetés");
+            }
+            else
+            {
+                CustomMessageBox.Show("Nincs futó teszt, amelyet szüneteltetni lehetne.", "Figyelem");
+                PauseResumeButton.IsChecked = false;
+            }
+        }
+
+
+
         private void StopTest_click(object sender, RoutedEventArgs e)
         {
             if (IntroOverlay.Visibility == Visibility.Visible)
@@ -336,6 +375,17 @@ namespace TestAutomationUI
             }
         }
 
+        private async Task WaitIfPaused()
+        {
+            while (_pauseRequested)
+            {
+                if (_pauseTaskSource == null)
+                    _pauseTaskSource = new TaskCompletionSource<bool>();
+
+                await _pauseTaskSource.Task;
+            }
+        }
+
         private async void RunTest_Click(object sender, RoutedEventArgs e)
         {
             if (IntroOverlay.Visibility == Visibility.Visible)
@@ -385,7 +435,7 @@ namespace TestAutomationUI
                     this
                 );
 
-                if (result == true) // Igen
+                if (result == true) // Igen esetén!
                 {
                     stepsDataGrid.CancelEdit();
                 }
@@ -419,6 +469,8 @@ namespace TestAutomationUI
 
             foreach (var step in Steps)
             {
+                await WaitIfPaused();
+
                 int timeout = step.TimeoutSeconds.Value;
                 int effectiveTimeout = timeout;
                 writelogtotext("foreach kezdés");
@@ -603,6 +655,39 @@ namespace TestAutomationUI
                 }
             }
             StopSpinner();
+        }
+
+        private void CopyStep_Click(object sender, RoutedEventArgs e)
+        {
+            if (IntroOverlay.Visibility == Visibility.Visible)
+            {
+                IntroOverlay.Visibility = Visibility.Collapsed;
+                MainContentGrid.Visibility = Visibility.Visible;
+            }
+            // Ellenőrzés, hogy van-e kiválasztott lépés
+            if (stepsDataGrid.SelectedItem is TestStep selectedStep)
+            {
+                var newStep = new TestStep
+                {
+                    StepName = selectedStep.StepName + " - Másolat",
+                    Action = selectedStep.Action,
+                    Target = selectedStep.Target,
+                    TargetElement = selectedStep.TargetElement,
+                    Property = selectedStep.Property,
+                    Parameter = selectedStep.Parameter,
+                    TimeoutSeconds = selectedStep.TimeoutSeconds,
+                    PrtScfolderpath = selectedStep.PrtScfolderpath,
+                    TestName = selectedStep.TestName
+                };
+                Steps.Add(newStep);
+                RefreshIndexes();
+                stepsDataGrid.Items.Refresh();
+            }
+            else
+            {
+                CustomMessageBox.Show("Kérlek válassz ki egy lépést a másoláshoz.");
+            }
+
         }
 
         private void InsertStep_Click(object sender, RoutedEventArgs e)
@@ -989,10 +1074,19 @@ namespace TestAutomationUI
                     $"Name: {element.Current.Name}\n" +
                     $"ClassName: {element.Current.ClassName}\n" +
                     $"AutomationId: {element.Current.AutomationId}\n" +
-                    $"ControlType: {element.Current.ControlType.ProgrammaticName}\n"+
-                    $"NID: {element.Current.ControlType.Id}\n"+
-                    $"NID: {element.Current.LabeledBy}\n"+
-                    $"FID: {element.Current.FrameworkId}";
+                    $"ControlType: {element.Current.ControlType.ProgrammaticName}\n" +
+                    $"NID: {element.Current.ControlType.Id}\n" +
+                    $"FID: {element.Current.FrameworkId}\n" +
+                    $"ProcessId: {element.Current.ProcessId}\n" +
+                    $"BoundingRect: {element.Current.BoundingRectangle}\n" +
+                    $"IsEnabled: {element.Current.IsEnabled}\n" +
+                    $"IsOffscreen: {element.Current.IsOffscreen}\n" +
+                    $"IsKeyboardFocusable: {element.Current.IsKeyboardFocusable}\n" +
+                    $"HasKeyboardFocus: {element.Current.HasKeyboardFocus}\n" +
+                    $"AccessKey: {element.Current.AccessKey}\n" +
+                    $"HelpText: {element.Current.HelpText}\n" +
+                    $"ItemType: {element.Current.ItemType}\n" +
+                    $"NativeWindowHandle: {element.Current.NativeWindowHandle}";
 
                 CustomMessageBox.Show(info, "Inspect eredmény");              
             }

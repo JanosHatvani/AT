@@ -308,6 +308,30 @@
             </Setter>
         </Style>
 
+        <Style x:Key="copystepstyle" TargetType="Button">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Image x:Name="icon" Height="20" VerticalAlignment="Center"
+                                   Source="/Resources/Icons/copy-step-25_white.png" />
+                                <TextBlock Text="Lépés másolása" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/copy-step-25_white.png"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/copy-step-25_green.png"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="deletestepstyle" TargetType="Button">
                 <Setter Property="Template">
                     <Setter.Value>
@@ -404,7 +428,101 @@
                 </Setter>
             </Style>
 
-            <Style x:Key="teststopstyle" TargetType="Button">
+        <Style x:Key="testpauserestartstyle" TargetType="Button">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Image x:Name="icon" Height="20" VerticalAlignment="Center"
+                                   Source="/Resources/Icons/pause-test-25_white.png" />
+                                <TextBlock Text="Teszt pause/start" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/pause-test-25_white.png"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/pause-test-25_green.png"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PauseResumeButtonStyle" TargetType="ToggleButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="{TemplateBinding Background}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Image x:Name="icon" Height="20" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="label" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
+                            </StackPanel>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+
+                            <!-- ALAPÁLLAPOT: Nem szünetel -->
+                            <Trigger Property="IsChecked" Value="False">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/pause-test-25_white.png"/>
+                                <Setter TargetName="label" Property="Text" Value="Teszt szünet"/>
+                            </Trigger>
+
+                            <!-- SZÜNETEL: Restart ikon -->
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/restart-test-25_white.png"/>
+                                <Setter TargetName="label" Property="Text" Value="Teszt folytatás"/>
+                            </Trigger>
+
+                            <!-- Egér ráhúzás: PAUSE ikon esetén -->
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                    <Condition Property="IsChecked" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/pause-test-25_green.png"/>
+                            </MultiTrigger>
+
+                            <!-- Egér ráhúzás: RESTART ikon esetén -->
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                    <Condition Property="IsChecked" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/restart-test-25_green.png"/>
+                            </MultiTrigger>
+
+                            <!-- Gomb lenyomva: PAUSE -->
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsPressed" Value="True"/>
+                                    <Condition Property="IsChecked" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/pause-test-25_green.png"/>
+                            </MultiTrigger>
+
+                            <!-- Gomb lenyomva: RESTART -->
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsPressed" Value="True"/>
+                                    <Condition Property="IsChecked" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/restart-test-25_green.png"/>
+                            </MultiTrigger>
+
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+
+        <Style x:Key="teststopstyle" TargetType="Button">
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
@@ -957,8 +1075,6 @@
                                     <ToolTipService.ToolTip>
                                         <ToolTip Style="{StaticResource CustomToolTipStyle}" Content="Új lépés hozzáadása"/>
                                     </ToolTipService.ToolTip>
-
-
                                 </Button>
                             </ListViewItem>
 
@@ -967,6 +1083,20 @@
                                     <StackPanel Orientation="Horizontal">
                                         <Image Source="/Resources/Icons/edit-list-25_white.png" Height="20" VerticalAlignment="Center"/>
                                         <TextBlock Text="Lépés beszúrása"  Margin="15,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <ToolTipService.ToolTip>
+                                        <ToolTip Style="{StaticResource CustomToolTipStyle}" Content="Lépés beszúrása"/>
+                                    </ToolTipService.ToolTip>
+                                    
+                                </Button>
+                            </ListViewItem>
+
+                            <ListViewItem  x:Name="copytteststep" Height="30">
+                                <Button x:Name="copyteststepbutton" Style="{StaticResource copystepstyle}" Foreground="White" Click="CopyStep_Click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Source="/Resources/Icons/copy-step-25_white.png" Height="20" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Lépés másolása"  Margin="15,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
 
                                     <ToolTipService.ToolTip>
@@ -1036,6 +1166,22 @@
 
                                 </Button>
                             </ListViewItem>
+
+
+                            <ToggleButton x:Name="PauseResumeButton"
+                                          Click="PauseResumeButton_Click"
+                                          Height="30"
+                                          FontWeight="SemiBold"
+                                          FontSize="12"                                          
+                                          FontFamily="Century Gothic"
+                                          Style="{StaticResource PauseResumeButtonStyle}"
+                                          IsChecked="False">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Style="{StaticResource CustomToolTipStyle}" Content="A teszt folyamat szüneteltetése, folytatása."/>
+                                </ToolTipService.ToolTip>
+
+                            </ToggleButton>
+
 
                             <ListViewItem Height="30">
                                 <Button Style="{StaticResource teststopstyle}" Foreground="White" Click="StopTest_click" Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left">
