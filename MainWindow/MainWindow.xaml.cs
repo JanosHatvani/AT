@@ -114,7 +114,7 @@ namespace TestAutomationUI
             timer.Tick += Timer_Tick;
             pandelWidth = sidePanel.Width;
         }
-
+        
 
 
         private void Timer_Tick(object? sender, EventArgs e)
@@ -388,6 +388,31 @@ namespace TestAutomationUI
 
         private async void RunTest_Click(object sender, RoutedEventArgs e)
         {
+            if (Steps.Count > 0)
+            {
+                string firstAction = Steps[0].Action ?? "";
+
+                if (firstAction.Equals("Start", StringComparison.OrdinalIgnoreCase))
+                {
+                    bool hasWebAfter = Steps.Skip(1).Any(s => s.Action != null && s.Action.StartsWith("Web", StringComparison.OrdinalIgnoreCase));
+                    if (hasWebAfter)
+                    {
+                        CustomMessageBox.Show("A kezdő lépés Desktop programra vonatkozik, viszont a lépések között webes műveletet is megadtál. Kérlek ellenőrizd a megadott műveleteket.", "Hiba");
+                        return;
+                    }
+                }
+                else if (firstAction.StartsWith("WebStartChrome", StringComparison.OrdinalIgnoreCase) ||
+                         firstAction.StartsWith("WebStartMicrosoftEdge", StringComparison.OrdinalIgnoreCase))
+                {
+                    bool hasNonWebAfter = Steps.Skip(1).Any(s => s.Action != null && !s.Action.StartsWith("Web", StringComparison.OrdinalIgnoreCase));
+                    if (hasNonWebAfter)
+                    {
+                        CustomMessageBox.Show("A kezdő lépés webes tesztelésre vonatkozik, viszont a lépések között desktopra vonatkozó műveletet is megadtál. Kérlek ellenőrizd a megadott műveleteket.", "Hiba");
+                        return;
+                    }
+                }
+            }
+
             if (IntroOverlay.Visibility == Visibility.Visible)
             {
                 IntroOverlay.Visibility = Visibility.Collapsed;
@@ -399,20 +424,12 @@ namespace TestAutomationUI
                 step.Status = "";
                 step.Errortext = "";
                 step.Duration = 0;
-
             }
             stepsDataGrid.Items.Refresh();
 
-            var settingsWindow = new Settings
-            {
-                Owner = this
-            };
+            var settingsWindow = new Settings { Owner = this };
+            var addStepWindow = new AddStepWindow { Owner = this };
 
-            var addStepWindow = new AddStepWindow
-            {
-                Owner = this
-            };
-            
             WDMethods.CaptureScreenshots = !settingsWindow.FastMode;
 
             if (Steps == null || Steps.Count == 0)
@@ -426,27 +443,28 @@ namespace TestAutomationUI
                 CustomMessageBox.Show("Kérlek, adj meg egy érvényes számot a MaxWaitTime mezőben.");
                 return;
             }
+
             if (stepsDataGrid.CommitEdit(DataGridEditingUnit.Row, true))
             {
                 bool? result = CustomMessageBox.Show(
                     "A lépések valamelyike szerkesztés alatt áll.\nSzeretnéd megszakítani a szerkesztést?",
                     "Szerkesztés aktív",
-                    true,  // ez jelzi, hogy Igen/Nem gombokat jelenítsen meg
+                    true,
                     this
                 );
 
-                if (result == true) // Igen esetén!
+                if (result == true)
                 {
                     stepsDataGrid.CancelEdit();
                 }
-                else // Nem
+                else
                 {
                     if (WDMethods.IsRunning)
                     {
-                        CustomMessageBox.Show("A teszt már fut, kérlek állítsd le a futó tesztet.", "Futó teszt");                        
+                        CustomMessageBox.Show("A teszt már fut, kérlek állítsd le a futó tesztet.", "Futó teszt");
                         WDMethods.Stop();
                     }
-                   
+
                     if (WebMethods.IsRunningWEB)
                     {
                         CustomMessageBox.Show("A teszt már fut, kérlek állítsd le a futó tesztet.", "Futó teszt");
@@ -460,7 +478,6 @@ namespace TestAutomationUI
             string testNameMain = this.testnameTextBox.Text;
             string programPath = settingsWindow.programPathTextBox.Text;
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            
             string winiumDriverPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools");
             string prtscfolderpathMain = settingsWindow.screenshotFolderTextBox.Text;
             WDMethods.MaxWaitTime = maxWaitTime;
@@ -471,155 +488,130 @@ namespace TestAutomationUI
             {
                 await WaitIfPaused();
 
-                int timeout = step.TimeoutSeconds.Value;
-                int effectiveTimeout = timeout;
-                writelogtotext("foreach kezdés");
-
                 if (_stopRequested)
                 {
                     step.Status = "Megszakítva";
                     WDMethods.TakePrtsc(testNameMain, prtscfolderpathMain);
-                    writelogtotext("megszakítva");
                     break;
                 }
-
-                int actualstep = Steps.IndexOf(step) + 1;
-                actualstepTextBox.Text = actualstep.ToString();
 
                 if (step.Skip)
                 {
                     step.Status = "Átlépve";
-                    writelogtotext("átlépve");
                     continue;
                 }
-                var stopwatch = Stopwatch.StartNew();
 
-                try
+                PropertyTypes propType = PropertyTypes.Id;
+                if (!string.IsNullOrEmpty(step.Property))
                 {
-                    writelogtotext("try ág");
-
-                    if (!step.TimeoutSeconds.HasValue || step.TimeoutSeconds.Value <= 0)
+                    if (!Enum.TryParse(step.Property, out propType) || !Enum.IsDefined(typeof(PropertyTypes), propType))
                     {
-                        CustomMessageBox.Show($"A(z) \"{step.StepName}\" lépésnél nincs érvényes timeout beállítva.");
+                        step.Status = "HIBA";
+                        step.Errortext = $"Ismeretlen Property típus: {step.Property}";
+                        CustomMessageBox.Show($"\"{step.Property}\" A lépésnél ismeretlen property került megadásra.");
+                        stepsDataGrid.Items.Refresh();
                         continue;
                     }
-
-                    PropertyTypes propType = PropertyTypes.Id;
-
-                    if (!string.IsNullOrEmpty(step.Property))
-                    {
-                        if (!Enum.TryParse(step.Property, out propType) || !Enum.IsDefined(typeof(PropertyTypes), propType))
-                        {
-                            step.Status = "HIBA";
-                            step.Errortext = $"Ismeretlen Property típus: {step.Property}";
-                            CustomMessageBox.Show($"\"{step.Property}\" A lépésnél ismeretlen property került megadásra.");
-                            stepsDataGrid.Items.Refresh();
-                            writelogtotext("hiba stat property után");
-                            continue;
-                        }
-                    }
-
-                    Task task = step.Action switch
-                    {
-                        "Start" => WDMethods.StartProg(programPath, winiumDriverPath),
-                        "StartChrome" => WebMethods.ChromeStart(step.Target?? ""),
-                        "StartFireFox" => WebMethods.FirefoxStart(step.Target ?? ""),
-                        "StartMicrosoftEdge" => WebMethods.MicrosoftEdgeStart(step.Target ?? ""),
-                        "Click" => WDMethods.Click(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "ClickWeb" => WebMethods.ClickWeb(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "SendKeys" => WDMethods.Sendkeys(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "SendKeysWeb" => WebMethods.SendkeysWeb(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "DoubleClick" => WDMethods.DoubleClick(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "RightClick" => WDMethods.RightClick(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "RightClickWeb" => WebMethods.RightClickWeb(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "TextClear" => WDMethods.TextClear(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "SelectByTextWeb" => WebMethods.SelectByTextWeb(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "SelectByValueWeb" => WebMethods.SelectByValueWeb(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "DragAndDropWeb" => WebMethods.DragAndDropWeb(step.Target ?? "", step.TargetElement ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "DragAndDrop" => WDMethods.DragAndDrop(step.Target ?? "", step.TargetElement ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "MoveToElement" => WDMethods.MoveToElement(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "ScrollToElementAndClick" => WDMethods.ScrollToElementAndClick(step.Target ?? "", propType, step.Parameter ?? "", step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "Stop" => WDMethods.Stop(),
-                        _ => throw new Exception($"Ismeretlen művelet: {step.Action}")
-                    };
-
-                    writelogtotext("await task előtt");
-                    await task;
-                    writelogtotext("await task után, ok kép előtt");
-                    WDMethods.TakePrtsc(testNameMain, prtscfolderpathMain);
-                    stopwatch.Stop();
-                    writelogtotext("ok státusz előtt");
-                    step.Duration = Math.Round(stopwatch.Elapsed.TotalSeconds, 2);                        
-                    step.Status = "OK";
-                    writelogtotext("ok státusz után");
-                    
                 }
-                catch (Exception)
+
+                bool stepCompleted = false;
+
+                while (!stepCompleted)
                 {
-                    writelogtotext("catch ág");
-                    if (stopwatch.IsRunning)
+                    var stopwatch = Stopwatch.StartNew();
+                    try
+                    {
+                        if (!step.TimeoutSeconds.HasValue || step.TimeoutSeconds.Value <= 0)
+                        {
+                            CustomMessageBox.Show($"A(z) \"{step.StepName}\" lépésnél nincs érvényes timeout beállítva.");
+                            break;
+                        }
+
+                        Task task = step.Action switch
+                        {
+                            "Start" => WDMethods.StartProg(programPath, winiumDriverPath),
+                            "WebStartChrome" => WebMethods.ChromeStart(step.Target ?? ""),
+                            "WebStartFireFox" => WebMethods.FirefoxStart(step.Target ?? ""),
+                            "WebStartMicrosoftEdge" => WebMethods.MicrosoftEdgeStart(step.Target ?? ""),
+                            "Click" => WDMethods.Click(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                            "WebClick" => WebMethods.ClickWeb(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                            "SendKeys" => WDMethods.Sendkeys(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                            "WebSendKeys" => WebMethods.SendkeysWeb(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                            "DoubleClick" => WDMethods.DoubleClick(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                            "RightClick" => WDMethods.RightClick(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                            "WebRightClick" => WebMethods.RightClickWeb(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                            "TextClear" => WDMethods.TextClear(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                            "WebSelectByText" => WebMethods.SelectByTextWeb(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                            "WebSelectByValue" => WebMethods.SelectByValueWeb(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                            "WebDragAndDrop" => WebMethods.DragAndDropWeb(step.Target ?? "", step.TargetElement ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                            "DragAndDrop" => WDMethods.DragAndDrop(step.Target ?? "", step.TargetElement ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                            "MoveToElement" => WDMethods.MoveToElement(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                            "ScrollToElementAndClick" => WDMethods.ScrollToElementAndClick(step.Target ?? "", propType, step.Parameter ?? "", step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                            "Stop" => WDMethods.Stop(),
+                            _ => throw new Exception($"Ismeretlen művelet: {step.Action}")
+                        };
+
+                        await task;
+
                         stopwatch.Stop();
+                        step.Duration = Math.Round(stopwatch.Elapsed.TotalSeconds, 2);
+                        step.Status = "OK";
+                        WDMethods.TakePrtsc(testNameMain, prtscfolderpathMain);
 
-                    step.Duration = Math.Round(stopwatch.Elapsed.TotalSeconds, 2);  // <- TÉNYLEGES IDŐT MÉRÜNK                    
-
-                    if (step.CanContinueOnError)
-                    {
-                        writelogtotext("hiba de folytatva");
-                        step.Status = "HIBA, de folytatva";
-                        step.Errortext = $"Az element nem található: {step.Target}";
-                        stepsDataGrid.Items.Refresh(); // <-- EZ HIÁNYZOTT
-                        //writelogtotext("hiba de folytatva continue előtt");
-                        //await Task.Delay(300);
-                        continue;
+                        stepCompleted = true;
                     }
-                    else
+                    catch (Exception)
                     {
-                        writelogtotext("else ág hiba grid kezelés előtt");
+                        stopwatch.Stop();
+                        step.Duration = Math.Round(stopwatch.Elapsed.TotalSeconds, 2);
                         step.Status = "HIBA";
                         step.Errortext = $"Az element nem található: {step.Target}";
-                        writelogtotext("else ág hiba grid kezelés után");
+                        stepsDataGrid.Items.Refresh();
 
-                        CustomMessageBox.Show(
+                        if (step.CanContinueOnError)
+                        {
+                            step.Status = "HIBA, de folytatva";
+                            step.Errortext = $"Az element nem található: {step.Target}";
+                            stepsDataGrid.Items.Refresh();
+                            break;
+                        }
+
+                        bool? retry = CustomMessageBox.Show(
                             $"Hiba a(z) {step.Index}. lépésnél:\n\n" +
                             $"StepName: {step.StepName}\n" +
                             $"Action: {step.Action}\n" +
                             $"Target: {step.Target}\n" +
                             $"Parameter: {step.Parameter}\n" +
                             $"Property: {step.Property}\n\n" +
-                            $"Hibaüzenet: {step.Errortext}",
-                            "Hiba történt");
-                        writelogtotext("else ág hiba kép előtt");
-                        WDMethods.TakePrtsc(testNameMain, prtscfolderpathMain);
-                        writelogtotext("else ág hiba kép után");
-                        StopSpinner();
-                        WDMethods.Stop(); // Ha hiba történt, leállítjuk a Winium drivert                
-                        break;
+                            $"Hibaüzenet: {step.Errortext}\n\n" +
+                            "Szeretnéd újra lefuttatni ezt a lépést?",
+                            "Hiba történt",
+                            true,
+                            this
+                        );
+
+                        if (retry != true)
+                        {
+                            WDMethods.TakePrtsc(testNameMain, prtscfolderpathMain);
+                            StopSpinner();
+                            WDMethods.Stop();
+                            break;
+                        }
+                        // Ha Igen, a while ciklus újra futtatja a lépést
                     }
                 }
                 stepsDataGrid.Items.Refresh();
             }
 
-            // Eredmények kiértékelése
+            // Eredmények kiértékelése és naplózás marad változatlan
             int sikeres = Steps.Count(s => s.Status == "OK");
             int hibas = Steps.Count(s => s.Status == "HIBA");
             int atlepett = Steps.Count(s => s.Status == "Átlépve");
             int hibadefolytatva = Steps.Count(s => s.Status == "HIBA, de folytatva");
             int duration = (int)Steps.Sum(s => s.Duration);
-            writelogtotext("statisztika után");
 
-            //CustomMessageBox.Show(
-            //    $"A lépések lefutottak.\n\n" +
-            //    $"Összes lépés: {Steps.Count}\n" +
-            //    $"Összes idő: {duration} másodperc\n" +
-            //    $"Sikeres: {sikeres}\n" +
-            //    $"Hibás: {hibas}\n" +
-            //    $"Átlépett: {atlepett}\n" +
-            //    $"Hibára futott, de folytatásra került: {hibadefolytatva}\n",
-            //    "Teszt befejezve");
-
-            //Naplózás CSV fájlba
             try
-            {                
+            {
                 string logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"TestLog_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
 
                 using (var writer = new StreamWriter(logPath, false, Encoding.UTF8))
@@ -632,30 +624,20 @@ namespace TestAutomationUI
                 }
 
                 CustomMessageBox.Show($"Teszt futása befejeződött. Napló elmentve:\n{logPath}");
-                writelogtotext("naplózás try ág után");
- 
             }
             catch (Exception ex)
             {
-                writelogtotext("naplózás catch ág");
                 CustomMessageBox.Show($"A napló fájl mentése nem sikerült:\n{ex.Message}", "Hibanapló");
             }
             finally
             {
                 _stopRequested = false;
-                if (WDMethods.IsRunning)
-                {
-                    writelogtotext("finally ág winium driver leállítás előtt");
-                    WDMethods.Stop();
-                }
-                if (WebMethods.IsRunningWEB)
-                {
-                    writelogtotext("finally ág web driver leállítás előtt");
-                    WebMethods.StopWeb();
-                }
+                if (WDMethods.IsRunning) WDMethods.Stop();
+                if (WebMethods.IsRunningWEB) WebMethods.StopWeb();
             }
             StopSpinner();
         }
+
 
         private void CopyStep_Click(object sender, RoutedEventArgs e)
         {
