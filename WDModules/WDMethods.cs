@@ -107,6 +107,21 @@ namespace WDModules
             });
         }
 
+        public static void Pause()
+        {
+            int ms = 1000000;
+            if (!isRunning)
+            {
+                MessageBox.Show("A WdMethods nem fut. Kérlek, indítsd el először.");
+                return;
+            }
+
+            else
+            {
+                Thread.Sleep(ms);
+            }
+        }
+
         public static void TakePrtsc(string testName, string prtScfolderpath)
         {
             if (!CaptureScreenshots) return;
@@ -122,6 +137,7 @@ namespace WDModules
             screenshot.SaveAsFile(filename, ScreenshotImageFormat.Png);
         }
 
+        // --- ELEMENT KERESÉS ---
         private static IWebElement FindElement(string element, PropertyTypes elementType, int timeoutSeconds)
         {
             if (driver == null)
@@ -200,6 +216,8 @@ namespace WDModules
 
             action(elem);
         }
+
+        // --- ACTION METÓDUSOK ---
 
         public static Task StartProg(string programPath, string driverPath)
         {

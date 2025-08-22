@@ -124,6 +124,7 @@
   </ItemGroup>
 
   <ItemGroup>    
+    <ProjectReference Include="..\AppModules\AppModules.csproj" />    
     <ProjectReference Include="..\WDModules\WDModules.csproj" />
     <ProjectReference Include="..\WebModules\WebModules.csproj" />
   </ItemGroup>

@@ -36,6 +36,13 @@ namespace TestAutomationUI
                 screenshotFolderTextBox.Text = settings.ScreenshotFolder;
                 fastModeCheckBox.IsChecked = settings.FastMode;
                 programPathTextBox.Text = settings.ProgramPath; 
+                androidappactivity.Text = settings.AndroidAppActivity;
+                androidapppackage.Text = settings.AndroidAppPackage;
+                androiddevicename.Text = settings.AndroidDevicename;
+                androidplatformversion.Text = settings.AndroidPlatformVersion;
+                iosdevicename.Text = settings.IosDevicename;
+                iosplatformversion.Text = settings.IosPlatformVersion;
+                iosbundleid.Text = settings.IosBundleiID;
             }
         }
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
@@ -52,6 +59,13 @@ namespace TestAutomationUI
                 WEbPath = webPathTextBox.Text,
                 ScreenshotFolder = screenshotFolderTextBox.Text,
                 ProgramPath = programPathTextBox.Text,
+                AndroidDevicename = androiddevicename.Text,
+                AndroidAppActivity = androidappactivity.Text,
+                AndroidPlatformVersion = androidplatformversion.Text,
+                AndroidAppPackage = androidapppackage.Text,
+                IosDevicename = iosdevicename.Text,
+                IosPlatformVersion = iosplatformversion.Text,
+                IosBundleiID = iosbundleid.Text,
                 FastMode = fastModeCheckBox.IsChecked == true,
             };
 
@@ -80,8 +94,14 @@ namespace TestAutomationUI
             public bool FastMode { get; set; }
             public string ProgramPath { get; set; }
             public string WEbPath { get; set; }
+            public string IosDevicename { get; set; }
+            public string AndroidDevicename { get; set; }
+            public string IosPlatformVersion { get; set; }
+            public string AndroidPlatformVersion { get; set; }
+            public string IosBundleiID { get; set; }
+            public string AndroidAppActivity { get; set; }
+            public string AndroidAppPackage { get; set; }
+
         }
-
-
     }
 }

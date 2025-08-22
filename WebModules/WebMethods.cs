@@ -28,11 +28,13 @@ namespace WebModules
 
         private static IWebDriver driver;
 
+        // --- Driver meghatározás ---
         private static readonly string ToolsFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools");
         private static readonly string ChromeDriverPath = Path.Combine(ToolsFolder, "chromedriver.exe");
         private static readonly string EdgeDriverPath = Path.Combine(ToolsFolder, "msedgedriver.exe");
         private static readonly string FirefoxDriverPath = Path.Combine(ToolsFolder, "geckodriver.exe");
 
+        // --- Driver check ---
         private static bool CheckChromeDriverExists()
         {
             if (!File.Exists(ChromeDriverPath))
@@ -63,6 +65,7 @@ namespace WebModules
             return true;
         }
 
+        // --- WEB INDÍTÁS ---
         public static void StartChrome(string websitepath)
         {
             if (isRunningWEB)
@@ -80,7 +83,7 @@ namespace WebModules
                 var service = ChromeDriverService.CreateDefaultService(ToolsFolder);
                 service.HideCommandPromptWindow = true;
                 driver = new ChromeDriver(service, options);
-                
+
                 driver.Manage().Window.Maximize(); // A ChromeDriver nem támogatja a --start-maximized argumentumot, ezért itt használjuk a Manage().Window.Maximize() metódust.
                 isRunningWEB = true;
 
@@ -181,6 +184,20 @@ namespace WebModules
             });
         }
 
+        public static void Pause()
+        {
+            int ms = 1000000;
+            if (!isRunningWEB)
+            {
+                MessageBox.Show("A WebMethods nem fut. Kérlek, indítsd el először.");
+                return;
+            }
+
+            else
+            {
+                Thread.Sleep(ms);
+            }
+        }
 
         public static void SetDriver(IWebDriver webDriver)
         {
@@ -197,6 +214,7 @@ namespace WebModules
             }
         }
 
+        // --- ELEMENT KERESÉS ---
         private static By GetByLocator(string element, PropertyTypes elementType)
         {
             return elementType switch
@@ -245,7 +263,7 @@ namespace WebModules
         {
             return Task.Run(() =>
             {
-               StartChrome(websitepath);
+                StartChrome(websitepath);
             });
         }
 
@@ -265,6 +283,7 @@ namespace WebModules
             });
         }
 
+        // --- ACTION METÓDUSOK ---
         public static Task SendkeysWeb(string element, string value, PropertyTypes elementType, int timeoutSeconds)
         {
             if (string.IsNullOrEmpty(element) || string.IsNullOrEmpty(value))
@@ -535,4 +554,3 @@ namespace WebModules
         }
     }
 }
-

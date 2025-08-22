@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WDModules", "WDModules\WDMo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebModules", "WebModules\WebModules.csproj", "{90E9E152-EAF7-4BBE-89B4-5E0AA7DB5C4F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppModules", "AppModules\AppModules.csproj", "{9E83E163-CBF6-75F9-8181-74137454D199}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -47,6 +49,14 @@ Global
 		{90E9E152-EAF7-4BBE-89B4-5E0AA7DB5C4F}.Release|Any CPU.Build.0 = Release|Any CPU
 		{90E9E152-EAF7-4BBE-89B4-5E0AA7DB5C4F}.Release|x64.ActiveCfg = Release|x64
 		{90E9E152-EAF7-4BBE-89B4-5E0AA7DB5C4F}.Release|x64.Build.0 = Release|x64
+		{9E83E163-CBF6-75F9-8181-74137454D199}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9E83E163-CBF6-75F9-8181-74137454D199}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9E83E163-CBF6-75F9-8181-74137454D199}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9E83E163-CBF6-75F9-8181-74137454D199}.Debug|x64.Build.0 = Debug|Any CPU
+		{9E83E163-CBF6-75F9-8181-74137454D199}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9E83E163-CBF6-75F9-8181-74137454D199}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9E83E163-CBF6-75F9-8181-74137454D199}.Release|x64.ActiveCfg = Release|Any CPU
+		{9E83E163-CBF6-75F9-8181-74137454D199}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

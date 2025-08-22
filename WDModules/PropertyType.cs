@@ -9,7 +9,8 @@
         TagName,
         LinkText,
         CssSelector,
-        Xpath,      
+        Xpath,
+        Accessibilityid,
         PartialLinkText
     }
 }
