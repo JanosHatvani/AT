@@ -206,24 +206,24 @@
         </Style>
 
 
-        <Style x:Key="hamburgermenustlye" TargetType="local:HamburgerButton">
+        <Style x:Key="hamburgermenustlye" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="local:HamburgerButton">
+                    <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}">
                             <Image x:Name="icon" Width="25" Height="25" />
                         </Border>
 
                         <ControlTemplate.Triggers>
                             <!-- Menü NYITVA -->
-                            <Trigger Property="IsMenuOpen" Value="True">
+                            <Trigger Property="local:HamburgerButton.IsMenuOpen" Value="True">
                                 <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-flutter-25j.png" />
                             </Trigger>
 
                             <!-- Menü ZÁRVA -->
-                            <Trigger Property="IsMenuOpen" Value="False">
+                            <Trigger Property="local:HamburgerButton.IsMenuOpen" Value="False">
                                 <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/icons8-flutter-25b.png" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -231,7 +231,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
 
 
 
