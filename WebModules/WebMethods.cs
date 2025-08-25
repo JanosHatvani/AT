@@ -23,6 +23,7 @@ namespace WebModules
         public static double LastFindElementDuration { get; private set; } = 0;
         public static bool IsRunning => isRunning;
         public static bool IsRunningWEB => isRunningWEB;
+
         public static int MaxWaitTime { get; set; } = 20;
         public static string PrtScFolderPath { get; set; }
 
@@ -305,6 +306,15 @@ namespace WebModules
             });
         }
 
+        public static Task WebMoveToElement(string element, PropertyTypes elementType, int timeoutSeconds)
+        {
+            if (string.IsNullOrEmpty(element))
+                throw new ArgumentException("Nem került megadásra element.");
+            return Task.Run(() =>
+            {
+                PerformElementAction(element, elementType, elem => new Actions(driver).MoveToElement(elem).Perform(), timeoutSeconds);
+            });
+        }   
         public static Task ScrollToElementAndClickWeb(string element, string value, PropertyTypes elementType, int timeoutSeconds)
         {
             if (string.IsNullOrEmpty(element) || string.IsNullOrEmpty(value))

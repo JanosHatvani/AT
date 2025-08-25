@@ -122,24 +122,31 @@
              <TextBlock Text="Metódus lista:" Grid.Row="2" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
              <ComboBox x:Name="actionComboBox" Grid.Row="2" Grid.Column="1" Margin="5" Style="{StaticResource ModernComboBox}">
                 <ComboBoxItem Content="Start"/>
+                <ComboBoxItem Content="StartAndroidApp"/>
+                <ComboBoxItem Content="StartIosApp"/>
                 <ComboBoxItem Content="StartChrome"/>
                 <ComboBoxItem Content="StartFirefox"/>
                 <ComboBoxItem Content="StartMicrosoftEdge"/>
-                <ComboBoxItem Content="Stop"/>
-                <ComboBoxItem Content="StopWeb"/>                 
                 <ComboBoxItem Content="Click"/>
-                <ComboBoxItem Content="ClickWeb"/>
+                <ComboBoxItem Content="MobileClick"/>
+                <ComboBoxItem Content="WebClick"/>
+                <ComboBoxItem Content="SendKeys"/>
+                <ComboBoxItem Content="WebSendKeys"/>
+                <ComboBoxItem Content="MobileSendKeys"/>
                 <ComboBoxItem Content="DoubleClick"/>
                 <ComboBoxItem Content="DoubleClickWeb"/>
                 <ComboBoxItem Content="RightClick"/>
+                <ComboBoxItem Content="WebRightClick"/>
                 <ComboBoxItem Content="TextClear"/>
-                <ComboBoxItem Content="TextClearWeb"/>
-                <ComboBoxItem Content="SendKeys"/>
-                <ComboBoxItem Content="SendKeysWeb"/>
+                <ComboBoxItem Content="WebTextClear"/>
+                <ComboBoxItem Content="WebSelectByText"/>
+                <ComboBoxItem Content="WebSelectByValue"/>
                 <ComboBoxItem Content="DragAndDrop"/>
+                <ComboBoxItem Content="WebDragAndDrop"/>
                 <ComboBoxItem Content="MoveToElement"/>
+                <ComboBoxItem Content="WebMoveToElement"/>
                 <ComboBoxItem Content="ScrollToElementAndClick"/>
-                <ComboBoxItem Content="ScrollToElementAndClickWeb"/>
+                <ComboBoxItem Content="WebScrollToElementAndClick"/>                               
             </ComboBox>
 
             <TextBlock Text="Element:" Grid.Row="3" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>

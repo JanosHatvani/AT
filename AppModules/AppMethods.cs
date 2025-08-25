@@ -17,12 +17,12 @@ namespace AppModules
 
         private static AppiumDriver driver;
         private static bool isRunningMobile = false;
-
+        public static string testName { get; set; }
         public static bool IsRunningMobile => isRunningMobile;
         public static int MaxWaitTime { get; set; } = 20;
 
         // --- ANDROID INDÍTÁS ---
-        public static void StartAndroidApp(string deviceName, string platformVersion, string appPackage, string appActivity)
+        public static void StartAndroidApp(string deviceName, string platformVersion, string testname, string appPackage, string appActivity)
         {
             if (isRunningMobile)
             {
@@ -30,20 +30,23 @@ namespace AppModules
                 return;
             }
 
-            var options = new AppiumOptions();
-            options.PlatformName = "Android";
-            options.AutomationName = "UiAutomator2";
-
-            options.AddAdditionalOption("deviceName", deviceName);
-            options.AddAdditionalOption("platformVersion", platformVersion);
-            options.AddAdditionalOption("appPackage", appPackage);
-            options.AddAdditionalOption("appActivity", appActivity);
-            options.AddAdditionalOption("noReset", true);
-
             try
             {
+                // Először Appium szerver indítás
+                AppiumServerManager.StartAppiumServer();
+
+                var options = new AppiumOptions();
+                options.PlatformName = "Android";
+                options.AutomationName = testname;
+
+                options.AddAdditionalOption("deviceName", deviceName);
+                options.AddAdditionalOption("platformVersion", platformVersion);
+                options.AddAdditionalOption("appPackage", appPackage);
+                options.AddAdditionalOption("appActivity", appActivity);
+                options.AddAdditionalOption("noReset", true);
+
                 driver = new AndroidDriver(new Uri("http://127.0.0.1:4723/wd/hub"), options, TimeSpan.FromSeconds(MaxWaitTime));
-                isRunningMobile = true; // Csak itt állítjuk true-ra, ha sikerült
+                isRunningMobile = true;
             }
             catch (Exception ex)
             {
@@ -53,11 +56,12 @@ namespace AppModules
             }
         }
 
-        public static Task StartAndroidAppAsync(string deviceName, string platformVersion, string appPackage, string appActivity)
+
+        public static Task StartAndroidAppAsync(string deviceName, string platformVersion, string testname, string appPackage, string appActivity)
         {
             return Task.Run(() =>
             {
-                StartAndroidApp(deviceName, platformVersion, appPackage, appActivity);
+                StartAndroidApp(deviceName, platformVersion, testname, appPackage, appActivity);
             });
         }
 
@@ -71,17 +75,20 @@ namespace AppModules
                 return;
             }
 
-            var options = new AppiumOptions();
-            options.PlatformName = "iOS";
-            options.AutomationName = "XCUITest";
-
-            options.AddAdditionalOption("deviceName", deviceName);
-            options.AddAdditionalOption("platformVersion", platformVersion);
-            options.AddAdditionalOption("bundleId", bundleId);
-            options.AddAdditionalOption("noReset", true);
-
             try
             {
+                // Először indítsuk az Appium szervert
+                AppiumServerManager.StartAppiumServer();
+
+                var options = new AppiumOptions();
+                options.PlatformName = "iOS";
+                options.AutomationName = "XCUITest";
+
+                options.AddAdditionalOption("deviceName", deviceName);
+                options.AddAdditionalOption("platformVersion", platformVersion);
+                options.AddAdditionalOption("bundleId", bundleId);
+                options.AddAdditionalOption("noReset", true);
+
                 driver = new IOSDriver(new Uri("http://127.0.0.1:4723/wd/hub"), options, TimeSpan.FromSeconds(MaxWaitTime));
                 isRunningMobile = true;
             }
@@ -92,6 +99,7 @@ namespace AppModules
                 MessageBox.Show("Nem sikerült elindítani az iOS drivert: " + ex.Message);
             }
         }
+
 
         public static Task StartIOSAppAsync(string deviceName, string platformVersion, string bundleId)
         {
