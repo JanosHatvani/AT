@@ -4,8 +4,10 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using Microsoft.Web.WebView2.Wpf;
 using Microsoft.Win32;
+using OpenQA.Selenium.Appium;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Configuration;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -22,9 +24,16 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using System.Xml;
 using System.Xml.Linq;
 using WDModules;
 using WebModules;
+using OpenQA.Selenium;
+using System.Threading.Tasks;
+using OpenQA.Selenium.Appium;
+using OpenQA.Selenium.Appium.iOS;
+using OpenQA.Selenium.Appium.Enums;
+using OpenQA.Selenium.Remote;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using static TestAutomationUI.Settings;
 
@@ -1139,62 +1148,241 @@ namespace TestAutomationUI
         }
 
 
-        private async void ElementInspect_Click(object sender, RoutedEventArgs e)
+            private async void ElementInspect_Click(object sender, RoutedEventArgs e)
+            {
+                CustomMessageBox.Show("3 másodpercen belül vidd az egeret az ellenőrizni kívánt elemre...", "Inspect indul");
+
+                await Task.Delay(3000);
+
+                POINT point = GetCursorPosition();
+                var element = AutomationElement.FromPoint(new System.Windows.Point(point.X, point.Y));
+
+                if (element != null)
+                {
+                    string info =
+                        $"🖥️ Desktop elem adatai:\n" +
+                        $"Name: {element.Current.Name}\n" +
+                        $"ClassName: {element.Current.ClassName}\n" +
+                        $"AutomationId: {element.Current.AutomationId}\n" +
+                        $"ControlType: {element.Current.ControlType.ProgrammaticName}\n" +
+                        $"NID: {element.Current.ControlType.Id}\n" +
+                        $"FID: {element.Current.FrameworkId}\n" +
+                        $"ProcessId: {element.Current.ProcessId}\n" +
+                        $"BoundingRect: {element.Current.BoundingRectangle}\n" +
+                        $"IsEnabled: {element.Current.IsEnabled}\n" +
+                        $"IsOffscreen: {element.Current.IsOffscreen}\n" +
+                        $"IsKeyboardFocusable: {element.Current.IsKeyboardFocusable}\n" +
+                        $"HasKeyboardFocus: {element.Current.HasKeyboardFocus}\n" +
+                        $"AccessKey: {element.Current.AccessKey}\n" +
+                        $"HelpText: {element.Current.HelpText}\n" +
+                        $"ItemType: {element.Current.ItemType}\n" +
+                        $"NativeWindowHandle: {element.Current.NativeWindowHandle}";
+
+                    CustomMessageBox.Show(info, "Inspect eredmény");              
+                }
+                else
+                {
+                    CustomMessageBox.Show("Nem található elem az egér alatt.", "Hiba");              
+                }
+            }
+
+            private void WebElementInspect_Click(object sender, RoutedEventArgs e)
+            {
+                var settingsWindow = new Settings
+                {
+                    Owner = this
+                };
+
+                string url = settingsWindow.webPathTextBox.Text;
+                if (string.IsNullOrWhiteSpace(url))
+                {
+                    MessageBox.Show("Kérlek, adj meg egy weboldal címet!", "Figyelem", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var inspectWindow = new ElementInfoWindow(url);
+                inspectWindow.Show();
+            }
+
+        private async void AndroidInspect_Click(object sender, RoutedEventArgs e)
         {
-            CustomMessageBox.Show("3 másodpercen belül vidd az egeret az ellenőrizni kívánt elemre...", "Inspect indul");
+            CustomMessageBox.Show("3 másodpercen belül vidd az egeret az ellenőrizni kívánt elem fölé az emulátor ablakban...", "Android Inspect indul");
 
             await Task.Delay(3000);
 
-            POINT point = GetCursorPosition();
-            var element = AutomationElement.FromPoint(new System.Windows.Point(point.X, point.Y));
+            // 1. UI hierarchy dump
+            RunAdb("shell uiautomator dump /sdcard/ui.xml");
+            RunAdb("pull /sdcard/ui.xml ui.xml");
 
-            if (element != null)
+            // 2. Cursor pozíció
+            POINT point = GetCursorPosition();
+            int cursorX = point.X;
+            int cursorY = point.Y;
+
+            // 3. XML feldolgozása
+            XmlDocument doc = new XmlDocument();
+            doc.Load("ui.xml");
+
+            XmlNode targetNode = FindNodeByPoint(doc.DocumentElement, cursorX, cursorY);
+
+            if (targetNode != null)
             {
                 string info =
-                    $"🖥️ Desktop elem adatai:\n" +
-                    $"Name: {element.Current.Name}\n" +
-                    $"ClassName: {element.Current.ClassName}\n" +
-                    $"AutomationId: {element.Current.AutomationId}\n" +
-                    $"ControlType: {element.Current.ControlType.ProgrammaticName}\n" +
-                    $"NID: {element.Current.ControlType.Id}\n" +
-                    $"FID: {element.Current.FrameworkId}\n" +
-                    $"ProcessId: {element.Current.ProcessId}\n" +
-                    $"BoundingRect: {element.Current.BoundingRectangle}\n" +
-                    $"IsEnabled: {element.Current.IsEnabled}\n" +
-                    $"IsOffscreen: {element.Current.IsOffscreen}\n" +
-                    $"IsKeyboardFocusable: {element.Current.IsKeyboardFocusable}\n" +
-                    $"HasKeyboardFocus: {element.Current.HasKeyboardFocus}\n" +
-                    $"AccessKey: {element.Current.AccessKey}\n" +
-                    $"HelpText: {element.Current.HelpText}\n" +
-                    $"ItemType: {element.Current.ItemType}\n" +
-                    $"NativeWindowHandle: {element.Current.NativeWindowHandle}";
+                    $"📱 Android elem adatai:\n" +
+                    $"Text: {targetNode.Attributes?["text"]?.Value}\n" +
+                    $"ResourceId: {targetNode.Attributes?["resource-id"]?.Value}\n" +
+                    $"Class: {targetNode.Attributes?["class"]?.Value}\n" +
+                    $"Package: {targetNode.Attributes?["package"]?.Value}\n" +
+                    $"ContentDesc: {targetNode.Attributes?["content-desc"]?.Value}\n" +
+                    $"Bounds: {targetNode.Attributes?["bounds"]?.Value}\n" +
+                    $"Checkable: {targetNode.Attributes?["checkable"]?.Value}\n" +
+                    $"Clickable: {targetNode.Attributes?["clickable"]?.Value}\n" +
+                    $"Enabled: {targetNode.Attributes?["enabled"]?.Value}\n" +
+                    $"Focused: {targetNode.Attributes?["focused"]?.Value}\n" +
+                    $"Scrollable: {targetNode.Attributes?["scrollable"]?.Value}";
 
-                CustomMessageBox.Show(info, "Inspect eredmény");              
+                CustomMessageBox.Show(info, "Android Inspect eredmény");
             }
             else
             {
-                CustomMessageBox.Show("Nem található elem az egér alatt.", "Hiba");              
+                CustomMessageBox.Show("Nem található elem az egér alatt.", "Hiba");
             }
         }
 
-        private void WebElementInspect_Click(object sender, RoutedEventArgs e)
+        private XmlNode FindNodeByPoint(XmlNode node, int x, int y)
         {
-            var settingsWindow = new Settings
+            foreach (XmlNode child in node.ChildNodes)
             {
-                Owner = this
-            };
+                if (child.Name == "node")
+                {
+                    string bounds = child.Attributes?["bounds"]?.Value;
+                    if (!string.IsNullOrEmpty(bounds))
+                    {
+                        // bounds formátum: [x1,y1][x2,y2]
+                        var parts = bounds.Replace("[", "").Split(']');
+                        var xy1 = parts[0].Split(',');
+                        var xy2 = parts[1].Split(',');
 
-            string url = settingsWindow.webPathTextBox.Text;
-            if (string.IsNullOrWhiteSpace(url))
-            {
-                MessageBox.Show("Kérlek, adj meg egy weboldal címet!", "Figyelem", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+                        int x1 = int.Parse(xy1[0]);
+                        int y1 = int.Parse(xy1[1]);
+                        int x2 = int.Parse(xy2[0]);
+                        int y2 = int.Parse(xy2[1]);
+
+                        if (x >= x1 && x <= x2 && y >= y1 && y <= y2)
+                            return child;
+                    }
+
+                    var found = FindNodeByPoint(child, x, y);
+                    if (found != null) return found;
+                }
             }
+            return null;
+        }
 
-            var inspectWindow = new ElementInfoWindow(url);
-            inspectWindow.Show();
+        private void RunAdb(string args)
+        {
+            var proc = new Process();
+            proc.StartInfo.FileName = "adb";
+            proc.StartInfo.Arguments = args;
+            proc.StartInfo.UseShellExecute = false;
+            proc.StartInfo.RedirectStandardOutput = true;
+            proc.StartInfo.RedirectStandardError = true;
+            proc.Start();
+            proc.WaitForExit();
         }
 
 
+        private async void iOSInspect_Click(object sender, RoutedEventArgs e)
+        {
+            CustomMessageBox.Show("3 másodpercen belül vidd az egeret az iOS szimulátor ablakban az elem fölé...", "iOS Inspect indul");
+
+            await Task.Delay(3000);
+
+            try
+            {
+                var options = new AppiumOptions();
+                options.PlatformName = "iOS";
+                options.AutomationName = "XCUITest";
+
+                // Capabilities hozzáadása az új API szerint
+                options.AddAdditionalOption("deviceName", "iPhone 15 Pro");
+                options.AddAdditionalOption("platformVersion", "18.0");
+                options.AddAdditionalOption("bundleId", "com.example.myapp");
+                options.AddAdditionalOption("noReset", true);
+
+                // IOSDriver inicializálása (nem generic)
+                var driver = new IOSDriver(new Uri("http://127.0.0.1:4723/wd/hub"), options, TimeSpan.FromSeconds(120));
+
+                // UI hierarchia mentése
+                string xml = driver.PageSource;
+                File.WriteAllText("ios_ui.xml", xml);
+
+                // Screenshot mentése
+                var screenshot = driver.GetScreenshot();
+                File.WriteAllBytes("ios_screen.png", screenshot.AsByteArray);
+
+                // Cursor pozíció
+                POINT point = GetCursorPosition();
+                int cursorX = point.X;
+                int cursorY = point.Y;
+
+                XmlDocument doc = new XmlDocument();
+                doc.Load("ios_ui.xml");
+
+                XmlNode targetNode = FindNodeByPointiOS(doc.DocumentElement, cursorX, cursorY);
+
+                if (targetNode != null)
+                {
+                    string info =
+                        $"🍏 iOS elem adatai:\n" +
+                        $"Name: {targetNode.Attributes?["name"]?.Value}\n" +
+                        $"Label: {targetNode.Attributes?["label"]?.Value}\n" +
+                        $"Value: {targetNode.Attributes?["value"]?.Value}\n" +
+                        $"Type: {targetNode.Attributes?["type"]?.Value}\n" +
+                        $"Enabled: {targetNode.Attributes?["enabled"]?.Value}\n" +
+                        $"Rect: {targetNode.Attributes?["rect"]?.Value}";
+
+                    CustomMessageBox.Show(info, "iOS Inspect eredmény");
+                }
+                else
+                {
+                    CustomMessageBox.Show("Nem található elem az egér alatt.", "Hiba");
+                }
+
+                driver.Quit();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Hiba történt az iOS inspect során: " + ex.Message, "Hiba", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private XmlNode FindNodeByPointiOS(XmlNode node, int x, int y)
+        {
+            foreach (XmlNode child in node.ChildNodes)
+            {
+                if (child.Attributes != null)
+                {
+                    string rect = child.Attributes?["rect"]?.Value;
+                    if (!string.IsNullOrEmpty(rect))
+                    {
+                        var parts = rect.Replace("{", "").Replace("}", "").Split(',');
+                        int x1 = (int)double.Parse(parts[0].Split('=')[1], CultureInfo.InvariantCulture);
+                        int y1 = (int)double.Parse(parts[1].Split('=')[1], CultureInfo.InvariantCulture);
+                        int width = (int)double.Parse(parts[2].Split('=')[1], CultureInfo.InvariantCulture);
+                        int height = (int)double.Parse(parts[3].Split('=')[1], CultureInfo.InvariantCulture);
+                        int x2 = x1 + width;
+                        int y2 = y1 + height;
+
+                        if (x >= x1 && x <= x2 && y >= y1 && y <= y2)
+                            return child;
+                    }
+
+                    var found = FindNodeByPointiOS(child, x, y);
+                    if (found != null) return found;
+                }
+            }
+            return null;
+        }
     }
 }

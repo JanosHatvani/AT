@@ -617,6 +617,54 @@
             </Setter>
         </Style>
 
+        <Style x:Key="androidelementinspectstyle" TargetType="Button">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Image x:Name="icon" Height="20" VerticalAlignment="Center"
+                                   Source="/Resources/Icons/inspect-25_white.png" />
+                                <TextBlock Text="Android inspect" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/inspect-25_white.png"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/inspect-25_green.png"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ioselementinspectstyle" TargetType="Button">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Image x:Name="icon" Height="20" VerticalAlignment="Center"
+                                   Source="/Resources/Icons/inspect-25_white.png" />
+                                <TextBlock Text="IOS inspect" Margin="15,0,0,0" VerticalAlignment="Center" Foreground="White"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/inspect-25_white.png"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="icon" Property="Source" Value="/Resources/Icons/inspect-25_green.png"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="settingsstyle" TargetType="Button">
             <Setter Property="Template">
                 <Setter.Value>
@@ -1233,6 +1281,36 @@
                                     <StackPanel Orientation="Horizontal">
                                         <Image Source="/Resources/Icons/inspect-25_white.png" Height="20" VerticalAlignment="Center"/>
                                         <TextBlock Text="WEB inspect" Margin="15,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <ToolTipService.ToolTip>
+                                        <ToolTip Style="{StaticResource CustomToolTipStyle}" Content="Element inpsect segítség."/>
+                                    </ToolTipService.ToolTip>
+
+
+                                </Button>
+                            </ListViewItem>
+
+                            <ListViewItem Margin="0,0,0,0" Height="30">
+                                <Button  Style="{StaticResource androidelementinspectstyle}" Foreground="White"  Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left" Click="AndroidInspect_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Source="/Resources/Icons/inspect-25_white.png" Height="20" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Android inspect" Margin="15,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <ToolTipService.ToolTip>
+                                        <ToolTip Style="{StaticResource CustomToolTipStyle}" Content="Element inpsect segítség."/>
+                                    </ToolTipService.ToolTip>
+
+
+                                </Button>
+                            </ListViewItem>
+
+                            <ListViewItem Margin="0,0,0,0" Height="30">
+                                <Button  Style="{StaticResource ioselementinspectstyle}" Foreground="White"  Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Left" Click="iOSInspect_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Source="/Resources/Icons/inspect-25_white.png" Height="20" VerticalAlignment="Center"/>
+                                        <TextBlock Text="IOS inspect" Margin="15,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
 
                                     <ToolTipService.ToolTip>

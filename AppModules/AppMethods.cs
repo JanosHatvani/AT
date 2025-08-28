@@ -131,11 +131,11 @@ namespace AppModules
         {
             By by = elementType switch
             {
-                PropertyTypes.Id => By.Id(locator),
-                PropertyTypes.Xpath => By.XPath(locator),
+                PropertyTypes.Id => MobileBy.Id(locator),
+                PropertyTypes.Xpath => MobileBy.XPath(locator),
                 PropertyTypes.Accessibilityid => MobileBy.AccessibilityId(locator),
-                PropertyTypes.Name => By.Name(locator),
-                PropertyTypes.ClassName => By.ClassName(locator),
+                PropertyTypes.Name => MobileBy.Name(locator),
+                PropertyTypes.ClassName => MobileBy.ClassName(locator),
                 _ => throw new ArgumentException($"Ismeretlen lokátor típus: {elementType}")
             };
 
@@ -152,19 +152,34 @@ namespace AppModules
             switch (elementType)
             {
                 case PropertyTypes.Id:
-                    by = By.Id(element);
+                    by = MobileBy.Id(element);
                     break;
                 case PropertyTypes.Name:
-                    by = By.Name(element);
+                    by = MobileBy.Name(element);
                     break;
                 case PropertyTypes.ClassName:
-                    by = By.ClassName(element);
+                    by = MobileBy.ClassName(element);
                     break;
                 case PropertyTypes.TagName:
-                    by = By.TagName(element);
+                    by = MobileBy.TagName(element);
                     break;
                 case PropertyTypes.Xpath:
-                    by = By.XPath(element);
+                    by = MobileBy.XPath(element);
+                    break;
+                case PropertyTypes.Accessibilityid:
+                    by = MobileBy.AccessibilityId(element);
+                    break;
+                case PropertyTypes.IosClassChain:
+                    by = MobileBy.IosClassChain(element);
+                    break;
+                case PropertyTypes.IosNSPredicate:
+                    by = MobileBy.IosNSPredicate(element);
+                    break;
+                case PropertyTypes.AndroidDataMatcher:
+                    by = MobileBy.AndroidDataMatcher(element);
+                    break;
+                case PropertyTypes.AndroidViewMatcher:
+                    by = MobileBy.AndroidViewMatcher(element);
                     break;
                 default:
                     throw new NotSupportedException($"Nem támogatott property típus: {elementType}");

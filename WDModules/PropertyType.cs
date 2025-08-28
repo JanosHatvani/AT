@@ -9,6 +9,10 @@
         TagName,
         LinkText,
         CssSelector,
+        IosClassChain,
+        IosNSPredicate,
+        AndroidDataMatcher,
+        AndroidViewMatcher,
         Xpath,
         Accessibilityid,
         PartialLinkText
