@@ -23,6 +23,7 @@ namespace TestAutomationUI
 
         public string ProgramPath => programPathTextBox.Text;
         public string Webpath => webPathTextBox.Text;
+        public string AppiumInspectorF => appiumInspectorfolder.Text;
 
         private void LoadSettings()
         {
@@ -35,7 +36,7 @@ namespace TestAutomationUI
                 waitTimeText.Text = settings.WaitTime;
                 screenshotFolderTextBox.Text = settings.ScreenshotFolder;
                 fastModeCheckBox.IsChecked = settings.FastMode;
-                programPathTextBox.Text = settings.ProgramPath; 
+                programPathTextBox.Text = settings.ProgramPath;
                 androidappactivity.Text = settings.AndroidAppActivity;
                 androidapppackage.Text = settings.AndroidAppPackage;
                 androiddevicename.Text = settings.AndroidDevicename;
@@ -43,6 +44,7 @@ namespace TestAutomationUI
                 iosdevicename.Text = settings.IosDevicename;
                 iosplatformversion.Text = settings.IosPlatformVersion;
                 iosbundleid.Text = settings.IosBundleiID;
+                appiumInspectorfolder.Text = settings.AppiumInspector;
             }
         }
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
@@ -66,6 +68,7 @@ namespace TestAutomationUI
                 IosDevicename = iosdevicename.Text,
                 IosPlatformVersion = iosplatformversion.Text,
                 IosBundleiID = iosbundleid.Text,
+                AppiumInspector = appiumInspectorfolder.Text,
                 FastMode = fastModeCheckBox.IsChecked == true,
             };
 
@@ -84,11 +87,16 @@ namespace TestAutomationUI
         private void SettingsClose_Click(object sender, RoutedEventArgs e)
         {
             Close();
-        } 
+        }
+
+        public void SaveSettingsFromOutside()
+        {
+            SaveSettings();
+        }
 
         public class SettingsModel
         {
-            public string TestNameText {  get; set; }
+            public string TestNameText { get; set; }
             public string WaitTime { get; set; }
             public string ScreenshotFolder { get; set; }
             public bool FastMode { get; set; }
@@ -101,6 +109,7 @@ namespace TestAutomationUI
             public string IosBundleiID { get; set; }
             public string AndroidAppActivity { get; set; }
             public string AndroidAppPackage { get; set; }
+            public string AppiumInspector { get; set; }
 
         }
     }

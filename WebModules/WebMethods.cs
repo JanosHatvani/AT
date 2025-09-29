@@ -255,10 +255,20 @@ namespace WebModules
             if (!Directory.Exists(prtScfolderpath))
                 Directory.CreateDirectory(prtScfolderpath);
 
-            var screenshot = ((ITakesScreenshot)driver).GetScreenshot();
-            var filename = Path.Combine(prtScfolderpath, $"{testName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
-            screenshot.SaveAsFile(filename, ScreenshotImageFormat.Png);
+            try
+            {
+                var screenshot = ((ITakesScreenshot)driver).GetScreenshot();
+                var filename = Path.Combine(prtScfolderpath, $"{testName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+
+                // Mentés byte tömbként, így nem kell a ScreenshotImageFormat
+                File.WriteAllBytes(filename, screenshot.AsByteArray);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Screenshot mentése sikertelen: {ex.Message}");
+            }
         }
+
 
         public static Task ChromeStart(string websitepath)
         {

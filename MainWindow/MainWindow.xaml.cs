@@ -304,13 +304,24 @@ namespace TestAutomationUI
             {
                 WDMethods.Stop();
                 StopSpinner();
-                CustomMessageBox.Show("Teszt megszakítva és a driver leállítva.", "Megszakítás");
+                CustomMessageBox.Show("Teszt megszakítva és a driver leállítva. Desktop!", "Megszakítás");
             }
             if (WebMethods.IsRunningWEB)
             {
                 WebMethods.StopWeb();
                 StopSpinner();
-                CustomMessageBox.Show("Teszt megszakítva és a driver leállítva.", "Megszakítás");
+                CustomMessageBox.Show("Teszt megszakítva és a driver leállítva. Web!", "Megszakítás");
+            }
+            else
+            {
+                CustomMessageBox.Show("A driver nem fut, nincs mit leállítani.", "Figyelem");
+            }
+
+            if (AppMethods.IsRunningMobile)
+            {
+                AppMethods.StopMobile();
+                StopSpinner();
+                CustomMessageBox.Show("Teszt megszakítva és a driver leállítva. App!", "Megszakítás");
             }
             else
             {
@@ -347,6 +358,34 @@ namespace TestAutomationUI
             }
         }
 
+        private void TakeScreenshotForRunningDriver(string testName, string folderPath)
+        {
+            // Elsőként mobil drivert ellenőrizzük
+            if (AppMethods.IsRunningMobile)
+            {
+                AppMethods.TakePrtsc(testName, folderPath);
+                return;
+            }
+
+            // Ha WebDriver fut
+            if (WebMethods.IsRunningWEB)
+            {
+                WebMethods.TakePrtsc(testName, folderPath);
+                return;
+            }
+
+            // Ha Winium fut
+            if (WDMethods.IsRunning)
+            {
+                WDMethods.TakePrtsc(testName, folderPath);
+                return;
+            }
+
+            // Ha egyik sem fut, csak logoljuk
+            Console.WriteLine("Screenshot készítés sikertelen: nincs futó driver.");
+        }
+
+
         private async void RunTest_Click(object sender, RoutedEventArgs e)
         {
             if (IntroOverlay.Visibility == Visibility.Visible)
@@ -373,7 +412,7 @@ namespace TestAutomationUI
             {
                 Owner = this
             };
-            
+
             WDMethods.CaptureScreenshots = !settingsWindow.FastMode;
 
             if (Steps == null || Steps.Count == 0)
@@ -404,10 +443,10 @@ namespace TestAutomationUI
                 {
                     if (WDMethods.IsRunning)
                     {
-                        CustomMessageBox.Show("A teszt már fut, kérlek állítsd le a futó tesztet.", "Futó teszt");                        
+                        CustomMessageBox.Show("A teszt már fut, kérlek állítsd le a futó tesztet.", "Futó teszt");
                         WDMethods.Stop();
                     }
-                   
+
                     if (WebMethods.IsRunningWEB)
                     {
                         CustomMessageBox.Show("A teszt már fut, kérlek állítsd le a futó tesztet.", "Futó teszt");
@@ -420,7 +459,7 @@ namespace TestAutomationUI
 
             string testNameMain = this.testnameTextBox.Text;
             string programPath = settingsWindow.programPathTextBox.Text;
-            string baseDir = AppDomain.CurrentDomain.BaseDirectory;                       
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string winiumDriverPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools");
             string prtscfolderpathMain = settingsWindow.screenshotFolderTextBox.Text;
             string deviceName = settingsWindow.androiddevicename.Text;
@@ -433,6 +472,11 @@ namespace TestAutomationUI
             string bundleId = settingsWindow.iosbundleid.Text;
             WDMethods.MaxWaitTime = maxWaitTime;
 
+            if (prtscfolderpathMain == null)
+            {
+                CustomMessageBox.Show("Kérlek adj meg egy elérési utat a kép mentéshez!");
+            }
+
             StartSpinner();
 
             foreach (var step in Steps)
@@ -441,10 +485,12 @@ namespace TestAutomationUI
                 int effectiveTimeout = timeout;
                 writelogtotext("foreach kezdés");
 
+
+
                 if (_stopRequested)
                 {
                     step.Status = "Megszakítva";
-                    WDMethods.TakePrtsc(testNameMain, prtscfolderpathMain);
+                    TakeScreenshotForRunningDriver(testNameMain, prtscfolderpathMain);
                     writelogtotext("megszakítva");
                     break;
                 }
@@ -489,8 +535,8 @@ namespace TestAutomationUI
                     {
                         "Start" => WDMethods.StartProg(programPath, winiumDriverPath),
                         "StartAndroidApp" => AppMethods.StartAndroidAppAsync(deviceName, platformVersionandroid, testNameMain, appPackage, appActivity),
-                        "StartIosApp" => AppMethods.StartIOSAppAsync(deviceName, platformVersionios, bundleId),                        
-                        "StartChrome" => WebMethods.ChromeStart(step.Target?? ""),
+                        "StartIosApp" => AppMethods.StartIOSAppAsync(deviceName, platformVersionios, bundleId),
+                        "StartChrome" => WebMethods.ChromeStart(step.Target ?? ""),
                         "StartFireFox" => WebMethods.FirefoxStart(step.Target ?? ""),
                         "StartMicrosoftEdge" => WebMethods.MicrosoftEdgeStart(step.Target ?? ""),
                         "Click" => WDMethods.Click(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
@@ -512,7 +558,7 @@ namespace TestAutomationUI
                         "MoveToElement" => WDMethods.MoveToElement(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
                         "WebMoveToElement" => WDMethods.MoveToElement(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
                         "ScrollToElementAndClick" => WDMethods.ScrollToElementAndClick(step.Target ?? "", propType, step.Parameter ?? "", step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "WebScrollToElementAndClick" => WebMethods.ScrollToElementAndClickWeb(step.Target ?? "", step.Parameter ?? "", propType,  step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "WebScrollToElementAndClick" => WebMethods.ScrollToElementAndClickWeb(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
                         "Stop" => WDMethods.Stop(),
                         _ => throw new Exception($"Ismeretlen művelet: {step.Action}")
                     };
@@ -520,13 +566,13 @@ namespace TestAutomationUI
                     writelogtotext("await task előtt");
                     await task;
                     writelogtotext("await task után, ok kép előtt");
-                    WDMethods.TakePrtsc(testNameMain, prtscfolderpathMain);
+                    TakeScreenshotForRunningDriver(testNameMain, prtscfolderpathMain);
                     stopwatch.Stop();
                     writelogtotext("ok státusz előtt");
-                    step.Duration = Math.Round(stopwatch.Elapsed.TotalSeconds, 2);                        
+                    step.Duration = Math.Round(stopwatch.Elapsed.TotalSeconds, 2);
                     step.Status = "OK";
                     writelogtotext("ok státusz után");
-                    
+
                 }
                 catch (Exception)
                 {
@@ -563,7 +609,7 @@ namespace TestAutomationUI
                             $"Hibaüzenet: {step.Errortext}",
                             "Hiba történt");
                         writelogtotext("else ág hiba kép előtt");
-                        WDMethods.TakePrtsc(testNameMain, prtscfolderpathMain);
+                        TakeScreenshotForRunningDriver(testNameMain, prtscfolderpathMain);
                         writelogtotext("else ág hiba kép után");
                         StopSpinner();
                         WDMethods.Stop(); // Ha hiba történt, leállítjuk a Winium drivert                
@@ -593,7 +639,7 @@ namespace TestAutomationUI
 
             //Naplózás CSV fájlba
             try
-            {                
+            {
                 string logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), $"TestLog_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
 
                 using (var writer = new StreamWriter(logPath, false, Encoding.UTF8))
@@ -607,7 +653,7 @@ namespace TestAutomationUI
 
                 CustomMessageBox.Show($"Teszt futása befejeződött. Napló elmentve:\n{logPath}");
                 writelogtotext("naplózás try ág után");
- 
+
             }
             catch (Exception ex)
             {
@@ -660,7 +706,7 @@ namespace TestAutomationUI
         //    }
         //}
 
-       private void CopyStep_Click(object sender, RoutedEventArgs e)
+        private void CopyStep_Click(object sender, RoutedEventArgs e)
         {
             if (IntroOverlay.Visibility == Visibility.Visible)
             {
@@ -752,7 +798,7 @@ namespace TestAutomationUI
             }
             // Ellenőrzés, hogy van-e futó teszt
             if (_pauseRequested)
-            {                 
+            {
                 CustomMessageBox.Show("A teszt már szüneteltetve van.", "Figyelem");
                 return;
             }
@@ -1148,61 +1194,61 @@ namespace TestAutomationUI
         }
 
 
-            private async void ElementInspect_Click(object sender, RoutedEventArgs e)
+        private async void ElementInspect_Click(object sender, RoutedEventArgs e)
+        {
+            CustomMessageBox.Show("3 másodpercen belül vidd az egeret az ellenőrizni kívánt elemre...", "Inspect indul");
+
+            await Task.Delay(3000);
+
+            POINT point = GetCursorPosition();
+            var element = AutomationElement.FromPoint(new System.Windows.Point(point.X, point.Y));
+
+            if (element != null)
             {
-                CustomMessageBox.Show("3 másodpercen belül vidd az egeret az ellenőrizni kívánt elemre...", "Inspect indul");
+                string info =
+                    $"🖥️ Desktop elem adatai:\n" +
+                    $"Name: {element.Current.Name}\n" +
+                    $"ClassName: {element.Current.ClassName}\n" +
+                    $"AutomationId: {element.Current.AutomationId}\n" +
+                    $"ControlType: {element.Current.ControlType.ProgrammaticName}\n" +
+                    $"NID: {element.Current.ControlType.Id}\n" +
+                    $"FID: {element.Current.FrameworkId}\n" +
+                    $"ProcessId: {element.Current.ProcessId}\n" +
+                    $"BoundingRect: {element.Current.BoundingRectangle}\n" +
+                    $"IsEnabled: {element.Current.IsEnabled}\n" +
+                    $"IsOffscreen: {element.Current.IsOffscreen}\n" +
+                    $"IsKeyboardFocusable: {element.Current.IsKeyboardFocusable}\n" +
+                    $"HasKeyboardFocus: {element.Current.HasKeyboardFocus}\n" +
+                    $"AccessKey: {element.Current.AccessKey}\n" +
+                    $"HelpText: {element.Current.HelpText}\n" +
+                    $"ItemType: {element.Current.ItemType}\n" +
+                    $"NativeWindowHandle: {element.Current.NativeWindowHandle}";
 
-                await Task.Delay(3000);
+                CustomMessageBox.Show(info, "Inspect eredmény");
+            }
+            else
+            {
+                CustomMessageBox.Show("Nem található elem az egér alatt.", "Hiba");
+            }
+        }
 
-                POINT point = GetCursorPosition();
-                var element = AutomationElement.FromPoint(new System.Windows.Point(point.X, point.Y));
+        private void WebElementInspect_Click(object sender, RoutedEventArgs e)
+        {
+            var settingsWindow = new Settings
+            {
+                Owner = this
+            };
 
-                if (element != null)
-                {
-                    string info =
-                        $"🖥️ Desktop elem adatai:\n" +
-                        $"Name: {element.Current.Name}\n" +
-                        $"ClassName: {element.Current.ClassName}\n" +
-                        $"AutomationId: {element.Current.AutomationId}\n" +
-                        $"ControlType: {element.Current.ControlType.ProgrammaticName}\n" +
-                        $"NID: {element.Current.ControlType.Id}\n" +
-                        $"FID: {element.Current.FrameworkId}\n" +
-                        $"ProcessId: {element.Current.ProcessId}\n" +
-                        $"BoundingRect: {element.Current.BoundingRectangle}\n" +
-                        $"IsEnabled: {element.Current.IsEnabled}\n" +
-                        $"IsOffscreen: {element.Current.IsOffscreen}\n" +
-                        $"IsKeyboardFocusable: {element.Current.IsKeyboardFocusable}\n" +
-                        $"HasKeyboardFocus: {element.Current.HasKeyboardFocus}\n" +
-                        $"AccessKey: {element.Current.AccessKey}\n" +
-                        $"HelpText: {element.Current.HelpText}\n" +
-                        $"ItemType: {element.Current.ItemType}\n" +
-                        $"NativeWindowHandle: {element.Current.NativeWindowHandle}";
-
-                    CustomMessageBox.Show(info, "Inspect eredmény");              
-                }
-                else
-                {
-                    CustomMessageBox.Show("Nem található elem az egér alatt.", "Hiba");              
-                }
+            string url = settingsWindow.webPathTextBox.Text;
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                MessageBox.Show("Kérlek, adj meg egy weboldal címet!", "Figyelem", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
             }
 
-            private void WebElementInspect_Click(object sender, RoutedEventArgs e)
-            {
-                var settingsWindow = new Settings
-                {
-                    Owner = this
-                };
-
-                string url = settingsWindow.webPathTextBox.Text;
-                if (string.IsNullOrWhiteSpace(url))
-                {
-                    MessageBox.Show("Kérlek, adj meg egy weboldal címet!", "Figyelem", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
-                var inspectWindow = new ElementInfoWindow(url);
-                inspectWindow.Show();
-            }
+            var inspectWindow = new ElementInfoWindow(url);
+            inspectWindow.Show();
+        }
 
         private async void AndroidInspect_Click(object sender, RoutedEventArgs e)
         {

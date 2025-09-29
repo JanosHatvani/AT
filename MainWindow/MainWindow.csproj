@@ -137,6 +137,7 @@
     <PackageReference Include="Appium.WebDriver" Version="8.0.0" />
     <PackageReference Include="LiveCharts.Wpf" Version="0.9.7" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3351.48" />
+    <PackageReference Include="Selenium.WebDriver" Version="4.29.0" />
     <PackageReference Include="WebView2.Runtime.X64" Version="138.0.3351.109" />
   </ItemGroup>
 

@@ -6,10 +6,11 @@ using OpenQA.Selenium.Support.UI;
 using System.Windows.Forms;
 using System.Xml.Linq;
 using WDModules;
+using AppModules;
 using static OpenQA.Selenium.BiDi.Modules.BrowsingContext.Locator;
 using static System.Net.Mime.MediaTypeNames;
 
-namespace AppModules
+namespace TestAutomationUI
 
 {
     public class AppMethods
@@ -19,7 +20,10 @@ namespace AppModules
         private static bool isRunningMobile = false;
         public static string testName { get; set; }
         public static bool IsRunningMobile => isRunningMobile;
+        public static bool CaptureScreenshots { get; set; } // Fast mode default érték
         public static int MaxWaitTime { get; set; } = 20;
+
+
 
         // --- ANDROID INDÍTÁS ---
         public static void StartAndroidApp(string deviceName, string platformVersion, string testname, string appPackage, string appActivity)
@@ -46,7 +50,7 @@ namespace AppModules
                 options.AddAdditionalOption("noReset", true);
 
                 driver = new AndroidDriver(new Uri("http://127.0.0.1:4723/wd/hub"), options, TimeSpan.FromSeconds(MaxWaitTime));
-                isRunningMobile = true;
+
             }
             catch (Exception ex)
             {
@@ -125,6 +129,31 @@ namespace AppModules
                 isRunningMobile = false;
             }
         }
+
+        public static void TakePrtsc(string testName, string prtScfolderpath)
+        {
+            if (!CaptureScreenshots) return;
+
+            if (string.IsNullOrWhiteSpace(prtScfolderpath) || string.IsNullOrWhiteSpace(testName))
+                return;
+
+            if (!Directory.Exists(prtScfolderpath))
+                Directory.CreateDirectory(prtScfolderpath);
+
+            try
+            {
+                var screenshot = ((ITakesScreenshot)driver).GetScreenshot();
+                var filename = Path.Combine(prtScfolderpath, $"{testName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+
+                // Mentés byte tömbként, így nem kell a ScreenshotImageFormat
+                File.WriteAllBytes(filename, screenshot.AsByteArray);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Screenshot mentése sikertelen: {ex.Message}");
+            }
+        }
+
 
         // --- ELEMENT KERESÉS ---
         private static IWebElement FindElement(string locator, PropertyTypes elementType, int timeoutSeconds)
@@ -206,7 +235,7 @@ namespace AppModules
             {
                 PerformElementAction(locator, elementType, elem => elem.SendKeys(text), timeoutSeconds);
             });
-            
+
         }
 
         public static Task MobileClear(string locator, PropertyTypes elementType, int timeoutSeconds)

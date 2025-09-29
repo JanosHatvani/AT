@@ -114,13 +114,13 @@
             <!-- HEADER TOP MEZŐK -->
             <TextBlock Text="Teszt név:" Grid.Row="0" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
             <TextBox x:Name="testNameTextBox" Grid.Row="0" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
- 
+
             <!-- HEADER BOTTOM MEZŐK -->
             <TextBlock Text="Lépés neve:" Grid.Row="1" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
             <TextBox x:Name="stepNameTextBox" Grid.Row="1" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
 
-             <TextBlock Text="Metódus lista:" Grid.Row="2" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
-             <ComboBox x:Name="actionComboBox" Grid.Row="2" Grid.Column="1" Margin="5" Style="{StaticResource ModernComboBox}">
+            <TextBlock Text="Metódus lista:" Grid.Row="2" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+            <ComboBox x:Name="actionComboBox" Grid.Row="2" Grid.Column="1" Margin="5" Style="{StaticResource ModernComboBox}">
                 <ComboBoxItem Content="Start"/>
                 <ComboBoxItem Content="StartAndroidApp"/>
                 <ComboBoxItem Content="StartIosApp"/>
@@ -146,7 +146,7 @@
                 <ComboBoxItem Content="MoveToElement"/>
                 <ComboBoxItem Content="WebMoveToElement"/>
                 <ComboBoxItem Content="ScrollToElementAndClick"/>
-                <ComboBoxItem Content="WebScrollToElementAndClick"/>                               
+                <ComboBoxItem Content="WebScrollToElementAndClick"/>
             </ComboBox>
 
             <TextBlock Text="Element:" Grid.Row="3" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
@@ -161,18 +161,23 @@
                 <ComboBoxItem Content="CssSelector"/>
                 <ComboBoxItem Content="ClassName"/>
                 <ComboBoxItem Content="LinkText"/>
+                <ComboBoxItem Content="IosNSPredicate"/>
+                <ComboBoxItem Content="IosClassChain"/>
                 <ComboBoxItem Content="TagName"/>
+                <ComboBoxItem Content="Accessibilityid"/>
+                <ComboBoxItem Content="AndroidViewMatcher"/>
+                <ComboBoxItem Content="AndroidDataMatcher"/>
                 <ComboBoxItem Content="Xpath"/>
                 <ComboBoxItem Content="PartialLinkText"/>
             </ComboBox>
 
-                <TextBlock Text="Paraméter:" Grid.Row="8" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
-                <TextBox x:Name="parametersTextBox" Grid.Row="8" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
+            <TextBlock Text="Paraméter:" Grid.Row="8" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+            <TextBox x:Name="parametersTextBox" Grid.Row="8" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
 
-                <TextBlock Text="Timeout (mp):" Grid.Row="9" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
-                <TextBox x:Name="timeoutTextBox" Grid.Row="9" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
-   
-            
+            <TextBlock Text="Timeout (mp):" Grid.Row="9" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+            <TextBox x:Name="timeoutTextBox" Grid.Row="9" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
+
+
             <StackPanel Grid.Row="11" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="Hozzáad"
                         Margin="5"
