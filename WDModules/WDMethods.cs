@@ -30,7 +30,7 @@ namespace WDModules
 
         // Új metódus a fast mode kezelésére
 
-        public static void Start(string appPath, string winiumDriverDirectory)
+        public static void Start(string appPath, string winiumDriverDirectory, int maxwaittimeWD)
         {
             if (isRunning)
             {
@@ -47,7 +47,7 @@ namespace WDModules
             try
             {
                 service.Start();
-                driver = new WiniumDriver(service, options, TimeSpan.FromSeconds(MaxWaitTime));
+                driver = new WiniumDriver(service, options, TimeSpan.FromSeconds(maxwaittimeWD));
                 isRunning = true;  // Csak itt állítjuk true-ra, ha sikeresen elindult
             }
             catch (Exception ex)
@@ -219,11 +219,11 @@ namespace WDModules
 
         // --- ACTION METÓDUSOK ---
 
-        public static Task StartProg(string programPath, string driverPath)
+        public static Task StartProg(string programPath, string driverPath, int maxwaittimeWD)
         {
             return Task.Run(() =>
             {
-                Start(programPath, driverPath);
+                Start(programPath, driverPath, maxwaittimeWD);
             });
         }
 

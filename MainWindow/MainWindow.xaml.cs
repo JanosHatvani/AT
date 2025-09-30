@@ -4,7 +4,12 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using Microsoft.Web.WebView2.Wpf;
 using Microsoft.Win32;
+using OpenQA.Selenium;
 using OpenQA.Selenium.Appium;
+using OpenQA.Selenium.Appium;
+using OpenQA.Selenium.Appium.Enums;
+using OpenQA.Selenium.Appium.iOS;
+using OpenQA.Selenium.Remote;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Configuration;
@@ -16,6 +21,8 @@ using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -28,12 +35,6 @@ using System.Xml;
 using System.Xml.Linq;
 using WDModules;
 using WebModules;
-using OpenQA.Selenium;
-using System.Threading.Tasks;
-using OpenQA.Selenium.Appium;
-using OpenQA.Selenium.Appium.iOS;
-using OpenQA.Selenium.Appium.Enums;
-using OpenQA.Selenium.Remote;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using static TestAutomationUI.Settings;
 
@@ -443,14 +444,19 @@ namespace TestAutomationUI
                 {
                     if (WDMethods.IsRunning)
                     {
-                        CustomMessageBox.Show("A teszt már fut, kérlek állítsd le a futó tesztet.", "Futó teszt");
+                        CustomMessageBox.Show("A teszt már fut, kérlek állítsd le a futó tesztet.", "Desktop Futó teszt");
                         WDMethods.Stop();
                     }
 
                     if (WebMethods.IsRunningWEB)
                     {
-                        CustomMessageBox.Show("A teszt már fut, kérlek állítsd le a futó tesztet.", "Futó teszt");
+                        CustomMessageBox.Show("A teszt már fut, kérlek állítsd le a futó tesztet.", "Web Futó teszt");
                         WebMethods.StopWeb();
+                    }
+                    if(AppMethods.IsRunningMobile)
+                    {
+                        CustomMessageBox.Show("A teszt már fut, kérlek állítsd le a futó tesztet.", "Mobil Futó teszt");
+                        AppMethods.StopMobile();
                     }
                     _stopRequested = true;
                     stopwatch?.Stop();
@@ -470,6 +476,7 @@ namespace TestAutomationUI
             string appPackage = settingsWindow.androidapppackage.Text;
             string appActivity = settingsWindow.androidappactivity.Text;
             string bundleId = settingsWindow.iosbundleid.Text;
+            int maxwaittime = settingsWindow.MaxWaitTimeSettings != null ? int.Parse(settingsWindow.MaxWaitTimeSettings) : 20;
             WDMethods.MaxWaitTime = maxWaitTime;
 
             if (prtscfolderpathMain == null)
@@ -482,10 +489,7 @@ namespace TestAutomationUI
             foreach (var step in Steps)
             {
                 int timeout = step.TimeoutSeconds.Value;
-                int effectiveTimeout = timeout;
                 writelogtotext("foreach kezdés");
-
-
 
                 if (_stopRequested)
                 {
@@ -533,32 +537,32 @@ namespace TestAutomationUI
 
                     Task task = step.Action switch
                     {
-                        "Start" => WDMethods.StartProg(programPath, winiumDriverPath),
-                        "StartAndroidApp" => AppMethods.StartAndroidAppAsync(deviceName, platformVersionandroid, testNameMain, appPackage, appActivity),
-                        "StartIosApp" => AppMethods.StartIOSAppAsync(deviceName, platformVersionios, bundleId),
-                        "StartChrome" => WebMethods.ChromeStart(step.Target ?? ""),
-                        "StartFireFox" => WebMethods.FirefoxStart(step.Target ?? ""),
-                        "StartMicrosoftEdge" => WebMethods.MicrosoftEdgeStart(step.Target ?? ""),
-                        "Click" => WDMethods.Click(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "MobileClick" => AppMethods.MobileClick(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "WebClick" => WebMethods.ClickWeb(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "SendKeys" => WDMethods.Sendkeys(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "WebSendKeys" => WebMethods.SendkeysWeb(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "MobileSendKeys" => AppMethods.MobileSendKeys(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "DoubleClick" => WDMethods.DoubleClick(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "WebDoubleClick" => WebMethods.DoubleClickWeb(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "RightClick" => WDMethods.RightClick(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "WebRightClick" => WebMethods.RightClickWeb(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "TextClear" => WDMethods.TextClear(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "WebTextClear" => WebMethods.TextClearWeb(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "WebSelectByText" => WebMethods.SelectByTextWeb(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "WebSelectByValue" => WebMethods.SelectByValueWeb(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "WebDragAndDrop" => WebMethods.DragAndDropWeb(step.Target ?? "", step.TargetElement ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "DragAndDrop" => WDMethods.DragAndDrop(step.Target ?? "", step.TargetElement ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "MoveToElement" => WDMethods.MoveToElement(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "WebMoveToElement" => WDMethods.MoveToElement(step.Target ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "ScrollToElementAndClick" => WDMethods.ScrollToElementAndClick(step.Target ?? "", propType, step.Parameter ?? "", step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
-                        "WebScrollToElementAndClick" => WebMethods.ScrollToElementAndClickWeb(step.Target ?? "", step.Parameter ?? "", propType, step.TimeoutSeconds ?? WDMethods.MaxWaitTime),
+                        "Start" => WDMethods.StartProg(programPath, winiumDriverPath, maxwaittime),
+                        "StartAndroidApp" => AppMethods.StartAndroidAppAsync(deviceName, platformVersionandroid, testNameMain, appPackage, appActivity, maxwaittime),
+                        "StartIosApp" => AppMethods.StartIOSAppAsync(deviceName, platformVersionios, bundleId, maxwaittime),
+                        "StartChrome" => WebMethods.ChromeStart(step.Target ?? "",maxwaittime),
+                        "StartFireFox" => WebMethods.FirefoxStart(step.Target ?? "", maxwaittime),
+                        "StartMicrosoftEdge" => WebMethods.MicrosoftEdgeStart(step.Target ?? "", maxwaittime),
+                        "Click" => WDMethods.Click(step.Target ?? "", propType, timeout),
+                        "MobileClick" => AppMethods.MobileClick(step.Target ?? "", propType, timeout),
+                        "WebClick" => WebMethods.ClickWeb(step.Target ?? "", propType, timeout),
+                        "SendKeys" => WDMethods.Sendkeys(step.Target ?? "", step.Parameter ?? "", propType, timeout),
+                        "WebSendKeys" => WebMethods.SendkeysWeb(step.Target ?? "", step.Parameter ?? "", propType, timeout),
+                        "MobileSendKeys" => AppMethods.MobileSendKeys(step.Target ?? "", step.Parameter ?? "", propType, timeout),
+                        "DoubleClick" => WDMethods.DoubleClick(step.Target ?? "", propType, timeout),
+                        "WebDoubleClick" => WebMethods.DoubleClickWeb(step.Target ?? "", propType, timeout),
+                        "RightClick" => WDMethods.RightClick(step.Target ?? "", propType, timeout),
+                        "WebRightClick" => WebMethods.RightClickWeb(step.Target ?? "", propType, timeout),
+                        "TextClear" => WDMethods.TextClear(step.Target ?? "", propType, timeout),
+                        "WebTextClear" => WebMethods.TextClearWeb(step.Target ?? "", propType, timeout),
+                        "WebSelectByText" => WebMethods.SelectByTextWeb(step.Target ?? "", step.Parameter ?? "", propType, timeout),
+                        "WebSelectByValue" => WebMethods.SelectByValueWeb(step.Target ?? "", step.Parameter ?? "", propType, timeout),
+                        "WebDragAndDrop" => WebMethods.DragAndDropWeb(step.Target ?? "", step.TargetElement ?? "", propType, timeout),
+                        "DragAndDrop" => WDMethods.DragAndDrop(step.Target ?? "", step.TargetElement ?? "", propType, timeout),
+                        "MoveToElement" => WDMethods.MoveToElement(step.Target ?? "", propType, timeout),
+                        "WebMoveToElement" => WDMethods.MoveToElement(step.Target ?? "", propType, timeout),
+                        "ScrollToElementAndClick" => WDMethods.ScrollToElementAndClick(step.Target ?? "", propType, step.Parameter ?? "", timeout),
+                        "WebScrollToElementAndClick" => WebMethods.ScrollToElementAndClickWeb(step.Target ?? "", step.Parameter ?? "", propType, timeout),
                         "Stop" => WDMethods.Stop(),
                         _ => throw new Exception($"Ismeretlen művelet: {step.Action}")
                     };

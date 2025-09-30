@@ -5,6 +5,7 @@ using OpenQA.Selenium.Firefox;
 using OpenQA.Selenium.Interactions;
 using OpenQA.Selenium.Support.UI;
 using OpenQA.Selenium.Winium;
+using System;
 using System.IO;
 using WDModules;
 
@@ -67,7 +68,7 @@ namespace WebModules
         }
 
         // --- WEB INDÍTÁS ---
-        public static void StartChrome(string websitepath)
+        public static void StartChrome(string websitepath, int maxwaittimeWEB)
         {
             if (isRunningWEB)
             {
@@ -83,7 +84,7 @@ namespace WebModules
                 var options = new ChromeOptions();
                 var service = ChromeDriverService.CreateDefaultService(ToolsFolder);
                 service.HideCommandPromptWindow = true;
-                driver = new ChromeDriver(service, options);
+                driver = new ChromeDriver(service, options, TimeSpan.FromSeconds(maxwaittimeWEB));
 
                 driver.Manage().Window.Maximize(); // A ChromeDriver nem támogatja a --start-maximized argumentumot, ezért itt használjuk a Manage().Window.Maximize() metódust.
                 isRunningWEB = true;
@@ -101,7 +102,7 @@ namespace WebModules
             }
         }
 
-        public static void StartFirefox(string websitepath)
+        public static void StartFirefox(string websitepath, int maxwaittimeWEB)
         {
             if (isRunningWEB)
             {
@@ -115,7 +116,7 @@ namespace WebModules
 
                 var options = new FirefoxOptions();
                 var service = FirefoxDriverService.CreateDefaultService(ToolsFolder);
-                driver = new FirefoxDriver(service, options);
+                driver = new FirefoxDriver(service, options, TimeSpan.FromSeconds(maxwaittimeWEB));
                 service.HideCommandPromptWindow = true;
                 options.AddArgument("--start-maximized");
                 isRunningWEB = true;
@@ -131,7 +132,7 @@ namespace WebModules
             }
         }
 
-        public static void StartMicrosoftEdge(string websitepath)
+        public static void StartMicrosoftEdge(string websitepath, int maxwaittimeWEB)
         {
             if (isRunningWEB)
             {
@@ -145,7 +146,7 @@ namespace WebModules
 
                 var options = new EdgeOptions();
                 var service = EdgeDriverService.CreateDefaultService(ToolsFolder);
-                driver = new EdgeDriver(service, options);
+                driver = new EdgeDriver(service, options, TimeSpan.FromSeconds(maxwaittimeWEB));
                 service.HideCommandPromptWindow = true;
                 driver.Manage().Window.Maximize(); // Az EdgeDriver nem támogatja a --start-maximized argumentumot, ezért itt használjuk a Manage().Window.Maximize() metódust.
                 // options.AddArgument("--start-maximized");
@@ -270,27 +271,27 @@ namespace WebModules
         }
 
 
-        public static Task ChromeStart(string websitepath)
+        public static Task ChromeStart(string websitepath, int maxwaittimeWEB)
         {
             return Task.Run(() =>
             {
-                StartChrome(websitepath);
+                StartChrome(websitepath, maxwaittimeWEB);
             });
         }
 
-        public static Task FirefoxStart(string websitepath)
+        public static Task FirefoxStart(string websitepath, int maxwaittimeWEB)
         {
             return Task.Run(() =>
             {
-                StartFirefox(websitepath);
+                StartFirefox(websitepath, maxwaittimeWEB);
             });
         }
 
-        public static Task MicrosoftEdgeStart(string websitepath)
+        public static Task MicrosoftEdgeStart(string websitepath, int maxwaittimeWEB)
         {
             return Task.Run(() =>
             {
-                StartMicrosoftEdge(websitepath);
+                StartMicrosoftEdge(websitepath, maxwaittimeWEB);
             });
         }
 

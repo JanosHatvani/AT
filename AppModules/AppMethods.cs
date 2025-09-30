@@ -1,12 +1,16 @@
-﻿using OpenQA.Selenium;
+﻿using AppModules;
+using OpenQA.Selenium;
 using OpenQA.Selenium.Appium;
 using OpenQA.Selenium.Appium.Android;
+using OpenQA.Selenium.Appium.Interactions;
 using OpenQA.Selenium.Appium.iOS;
+
+using OpenQA.Selenium.Interactions;
 using OpenQA.Selenium.Support.UI;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml.Linq;
 using WDModules;
-using AppModules;
 using static OpenQA.Selenium.BiDi.Modules.BrowsingContext.Locator;
 using static System.Net.Mime.MediaTypeNames;
 
@@ -26,7 +30,7 @@ namespace TestAutomationUI
 
 
         // --- ANDROID INDÍTÁS ---
-        public static void StartAndroidApp(string deviceName, string platformVersion, string testname, string appPackage, string appActivity)
+        public static void StartAndroidApp(string deviceName, string platformVersion, string testname, string appPackage, string appActivity, int maxwaittimeMobil)
         {
             if (isRunningMobile)
             {
@@ -49,7 +53,7 @@ namespace TestAutomationUI
                 options.AddAdditionalOption("appActivity", appActivity);
                 options.AddAdditionalOption("noReset", true);
 
-                driver = new AndroidDriver(new Uri("http://127.0.0.1:4723/wd/hub"), options, TimeSpan.FromSeconds(MaxWaitTime));
+                driver = new AndroidDriver(new Uri("http://127.0.0.1:4723/wd/hub"), options, TimeSpan.FromSeconds(maxwaittimeMobil));
 
             }
             catch (Exception ex)
@@ -61,17 +65,17 @@ namespace TestAutomationUI
         }
 
 
-        public static Task StartAndroidAppAsync(string deviceName, string platformVersion, string testname, string appPackage, string appActivity)
+        public static Task StartAndroidAppAsync(string deviceName, string platformVersion, string testname, string appPackage, string appActivity, int maxwaittimeMobil)
         {
             return Task.Run(() =>
             {
-                StartAndroidApp(deviceName, platformVersion, testname, appPackage, appActivity);
+                StartAndroidApp(deviceName, platformVersion, testname, appPackage, appActivity, maxwaittimeMobil);
             });
         }
 
 
         // --- IOS INDÍTÁS ---
-        public static void StartIOSApp(string deviceName, string platformVersion, string bundleId)
+        public static void StartIOSApp(string deviceName, string platformVersion, string bundleId, int maxwaittimeMobil)
         {
             if (isRunningMobile)
             {
@@ -93,7 +97,7 @@ namespace TestAutomationUI
                 options.AddAdditionalOption("bundleId", bundleId);
                 options.AddAdditionalOption("noReset", true);
 
-                driver = new IOSDriver(new Uri("http://127.0.0.1:4723/wd/hub"), options, TimeSpan.FromSeconds(MaxWaitTime));
+                driver = new IOSDriver(new Uri("http://127.0.0.1:4723/wd/hub"), options, TimeSpan.FromSeconds(maxwaittimeMobil));
                 isRunningMobile = true;
             }
             catch (Exception ex)
@@ -105,11 +109,11 @@ namespace TestAutomationUI
         }
 
 
-        public static Task StartIOSAppAsync(string deviceName, string platformVersion, string bundleId)
+        public static Task StartIOSAppAsync(string deviceName, string platformVersion, string bundleId, int maxwaittimeMobil)
         {
             return Task.Run(() =>
             {
-                StartIOSApp(deviceName, platformVersion, bundleId);
+                StartIOSApp(deviceName, platformVersion, bundleId, maxwaittimeMobil);
             });
         }
 
@@ -262,30 +266,66 @@ namespace TestAutomationUI
             catch { return false; }
         }
 
-        public static Task MobileScrolltoelementandClick(string locator, PropertyTypes elementType, string name, int timeoutSeconds)
+        public static Task MobileScrollToElementAndClick(string locator, PropertyTypes elementType, string name, int timeoutSeconds, int maxScrollAttempts = 5)
         {
             return Task.Run(() =>
             {
                 var parent = FindElement(locator, elementType, timeoutSeconds);
+                IWebElement elementToClick = null;
+                bool clicked = false;
+                int attempts = 0;
 
-                // Megkeressük a kívánt elemet a parent alatt
-                var elementToClick = parent.FindElement(By.Name(name));
-
-                // Görgetés Appiumban: JavaScript vagy TouchAction
-                try
+                while (!clicked && attempts < maxScrollAttempts)
                 {
-                    // Példa JavaScript görgetésre (ha WebView):
-                    IJavaScriptExecutor js = (IJavaScriptExecutor)driver;
-                    js.ExecuteScript("arguments[0].scrollIntoView(true);", elementToClick);
-                }
-                catch
-                {
-                    // Ha nem webview, akkor Appium TouchAction
-                    // new TouchAction(driver).Press(...).MoveTo(...).Release().Perform();
+                    try
+                    {
+                        elementToClick = parent.FindElement(By.Name(name));
+
+                        if (elementToClick.Displayed)
+                        {
+                            elementToClick.Click();
+                            clicked = true;
+                            break;
+                        }
+                    }
+                    catch { }
+
+                    try
+                    {
+                        // WebView görgetés
+                        if (driver is IJavaScriptExecutor js)
+                        {
+                            js.ExecuteScript("arguments[0].scrollIntoView(true);", elementToClick);
+                            Task.Delay(200).Wait();
+                        }
+                    }
+                    catch
+                    {
+                        // Natív görgetés PointerInputDevice + ActionSequence
+                        var touchScreen = new OpenQA.Selenium.Appium.Interactions.PointerInputDevice(PointerKind.Touch);
+                        var actions = new ActionSequence(touchScreen, 0);
+
+                        int startX = parent.Location.X + parent.Size.Width / 2;
+                        int startY = parent.Location.Y + parent.Size.Height / 2;
+                        int endX = startX;
+                        int endY = startY - 300; // swipe felfelé
+
+                        actions.AddAction(touchScreen.CreatePointerMove(CoordinateOrigin.Viewport, startX, startY, TimeSpan.Zero));
+                        actions.AddAction(touchScreen.CreatePointerDown(PointerButton.TouchContact));
+                        actions.AddAction(touchScreen.CreatePointerMove(CoordinateOrigin.Viewport, endX, endY, TimeSpan.FromMilliseconds(500)));
+                        actions.AddAction(touchScreen.CreatePointerUp(PointerButton.TouchContact));
+
+                        driver.PerformActions(new[] { actions });
+                    }
+
+                    Task.Delay(500).Wait();
+                    attempts++;
                 }
 
-                // Kattintás
-                elementToClick.Click();
+                if (!clicked)
+                {
+                    throw new Exception($"Az elem '{name}' nem található vagy nem látható a görgetések után.");
+                }
             });
         }
 
