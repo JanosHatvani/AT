@@ -20,11 +20,8 @@ namespace WDModules
         public static WiniumDriverService service { get; private set; }
         public static string prtScfolderpath { get; set; }
         public static string testName { get; set; }
-        public static int MaxWaitTime { get; set; }
         public static bool CaptureScreenshots { get; set; } // Fast mode default érték
-
         private static bool isRunning = false;
-
         public static double LastFindElementDuration { get; private set; } = 0;
         public static bool IsRunning => isRunning;
 

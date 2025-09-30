@@ -25,9 +25,6 @@ namespace TestAutomationUI
         public static string testName { get; set; }
         public static bool IsRunningMobile => isRunningMobile;
         public static bool CaptureScreenshots { get; set; } // Fast mode default érték
-        public static int MaxWaitTime { get; set; } = 20;
-
-
 
         // --- ANDROID INDÍTÁS ---
         public static void StartAndroidApp(string deviceName, string platformVersion, string testname, string appPackage, string appActivity, int maxwaittimeMobil)

@@ -25,7 +25,6 @@ namespace WebModules
         public static bool IsRunning => isRunning;
         public static bool IsRunningWEB => isRunningWEB;
 
-        public static int MaxWaitTime { get; set; } = 20;
         public static string PrtScFolderPath { get; set; }
 
         private static IWebDriver driver;

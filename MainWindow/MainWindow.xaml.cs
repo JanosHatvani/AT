@@ -477,7 +477,6 @@ namespace TestAutomationUI
             string appActivity = settingsWindow.androidappactivity.Text;
             string bundleId = settingsWindow.iosbundleid.Text;
             int maxwaittime = settingsWindow.MaxWaitTimeSettings != null ? int.Parse(settingsWindow.MaxWaitTimeSettings) : 20;
-            WDMethods.MaxWaitTime = maxWaitTime;
 
             if (prtscfolderpathMain == null)
             {
