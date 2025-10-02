@@ -136,7 +136,7 @@ namespace TestAutomationUI
             }
         }
 
-        // --- ELEMENT KERESÉS ---
+        // --- ELEMENT KERESÉS --- kérdés, hogy van további param, ami alapján lehet keresni?
         private static IWebElement FindElement(string locator, PropertyTypes elementType, int timeoutSeconds)
         {
             By by = elementType switch
