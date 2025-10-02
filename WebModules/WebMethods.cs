@@ -7,15 +7,88 @@ using OpenQA.Selenium.Support.UI;
 using OpenQA.Selenium.Winium;
 using System;
 using System.IO;
+using System.Text.RegularExpressions;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
 using WDModules;
-
 
 namespace WebModules
 {
+    // --- VERZIÓELLENŐRZŐ ---
+    public static class DriverValidator
+    {
+        private static int GetMajorVersionFromFile(string exePath)
+        {
+            if (!File.Exists(exePath)) return -1;
+            var versionInfo = FileVersionInfo.GetVersionInfo(exePath).FileVersion;
+            var match = Regex.Match(versionInfo, @"^\d+");
+            return match.Success ? int.Parse(match.Value) : -1; 
+        }
+
+        private static int GetDriverMajorVersion(string driverPath, string driverName)
+        {
+            if (!File.Exists(driverPath)) return -1;
+
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = driverPath,
+                    Arguments = "--version",
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            process.Start();
+            string output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+
+            var match = Regex.Match(output, $@"{driverName}\s+(\d+)");
+            return match.Success ? int.Parse(match.Groups[1].Value) : -1;
+        }
+
+        public static bool Validate(string browserExePath, string driverPath, string driverName)
+        {
+            try
+            {
+                int browserMajor = GetMajorVersionFromFile(browserExePath);
+                int driverMajor = GetDriverMajorVersion(driverPath, driverName);
+
+                if (browserMajor == -1 || driverMajor == -1)
+                {
+                    MessageBox.Show($"{driverName} ellenőrzés sikertelen (nem található verziószám).");
+                    return false;
+                }
+
+                if (browserMajor != driverMajor)
+                {
+                    MessageBox.Show($"Verzió eltérés! {driverName}: {driverMajor}, Böngésző: {browserMajor}.\n\n" +
+                        "Töltsd le a megfelelő drivert az alábbi oldalakról:\n" +
+                        "https://googlechromelabs.github.io/chrome-for-testing/\n" +
+                        "https://github.com/dreamshao/chromedriver\n\n" +
+                        "Letöltést követően másold a Tools mappába."
+);
+
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"{driverName} ellenőrzés közben hiba: {ex.Message}");
+                return false;
+            }
+        }
+    }
+
+    // --- WEBMETHODS ---
     public class WebMethods
     {
-
-
         public static string prtScfolderpath { get; set; }
         public static string testName { get; set; }
         public static bool CaptureScreenshots { get; set; } // Fast mode default érték
@@ -26,8 +99,7 @@ namespace WebModules
         public static bool IsRunningWEB => isRunningWEB;
 
         public static string PrtScFolderPath { get; set; }
-
-        private static IWebDriver driver;
+        public static IWebDriver driver;
 
         // --- Driver meghatározás ---
         private static readonly string ToolsFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools");
@@ -35,36 +107,10 @@ namespace WebModules
         private static readonly string EdgeDriverPath = Path.Combine(ToolsFolder, "msedgedriver.exe");
         private static readonly string FirefoxDriverPath = Path.Combine(ToolsFolder, "geckodriver.exe");
 
-        // --- Driver check ---
-        private static bool CheckChromeDriverExists()
-        {
-            if (!File.Exists(ChromeDriverPath))
-            {
-                MessageBox.Show("A Chrome driver (chromedriver.exe) nem található a Tools mappában.");
-                return false;
-            }
-            return true;
-        }
-
-        private static bool CheckEdgeDriverExists()
-        {
-            if (!File.Exists(EdgeDriverPath))
-            {
-                MessageBox.Show("Az Edge driver (msedgedriver.exe) nem található a Tools mappában.");
-                return false;
-            }
-            return true;
-        }
-
-        private static bool CheckFirefoxDriverExists()
-        {
-            if (!File.Exists(FirefoxDriverPath))
-            {
-                MessageBox.Show("A Firefox driver (geckodriver.exe) nem található a Tools mappában.");
-                return false;
-            }
-            return true;
-        }
+        // --- Browser exe path ---
+        private static readonly string ChromeExePath = @"C:\Program Files\Google\Chrome\Application\chrome.exe";
+        private static readonly string EdgeExePath = @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe";
+        private static readonly string FirefoxExePath = @"C:\Program Files\Mozilla Firefox\firefox.exe";
 
         // --- WEB INDÍTÁS ---
         public static void StartChrome(string websitepath, int maxwaittimeWEB)
@@ -77,20 +123,19 @@ namespace WebModules
 
             try
             {
+                if (!File.Exists(ChromeDriverPath)) { MessageBox.Show("Hiányzik a chromedriver.exe!"); return; }
 
-                if (!CheckChromeDriverExists()) return;
+                if (!DriverValidator.Validate(ChromeExePath, ChromeDriverPath, "ChromeDriver")) return;
 
                 var options = new ChromeOptions();
                 var service = ChromeDriverService.CreateDefaultService(ToolsFolder);
                 service.HideCommandPromptWindow = true;
                 driver = new ChromeDriver(service, options, TimeSpan.FromSeconds(maxwaittimeWEB));
 
-                driver.Manage().Window.Maximize(); // A ChromeDriver nem támogatja a --start-maximized argumentumot, ezért itt használjuk a Manage().Window.Maximize() metódust.
+                driver.Manage().Window.Maximize();
                 isRunningWEB = true;
-
                 driver.Navigate().GoToUrl(websitepath);
-                Thread.Sleep(1000); // Várakozás, hogy a Chrome betöltődjön
-
+                Thread.Sleep(1000);
             }
             catch (Exception ex)
             {
@@ -111,7 +156,9 @@ namespace WebModules
 
             try
             {
-                if (!CheckFirefoxDriverExists()) return;
+                if (!File.Exists(FirefoxDriverPath)) { MessageBox.Show("Hiányzik a geckodriver.exe!"); return; }
+
+                if (!DriverValidator.Validate(FirefoxExePath, FirefoxDriverPath, "geckodriver")) return;
 
                 var options = new FirefoxOptions();
                 var service = FirefoxDriverService.CreateDefaultService(ToolsFolder);
@@ -141,14 +188,15 @@ namespace WebModules
 
             try
             {
-                if (!CheckEdgeDriverExists()) return;
+                if (!File.Exists(EdgeDriverPath)) { MessageBox.Show("Hiányzik a msedgedriver.exe!"); return; }
+
+                if (!DriverValidator.Validate(EdgeExePath, EdgeDriverPath, "MSEdgeDriver")) return;
 
                 var options = new EdgeOptions();
                 var service = EdgeDriverService.CreateDefaultService(ToolsFolder);
                 driver = new EdgeDriver(service, options, TimeSpan.FromSeconds(maxwaittimeWEB));
                 service.HideCommandPromptWindow = true;
-                driver.Manage().Window.Maximize(); // Az EdgeDriver nem támogatja a --start-maximized argumentumot, ezért itt használjuk a Manage().Window.Maximize() metódust.
-                // options.AddArgument("--start-maximized");
+                driver.Manage().Window.Maximize();
                 isRunningWEB = true;
 
                 driver.Navigate().GoToUrl(websitepath);
@@ -245,29 +293,29 @@ namespace WebModules
             action(elem);
         }
 
-        public static void TakePrtsc(string testName, string prtScfolderpath)
-        {
-            if (!CaptureScreenshots) return;
+        //public static void TakePrtsc(string testName, string prtScfolderpath)
+        //{
+        //    if (!CaptureScreenshots) return;
 
-            if (string.IsNullOrWhiteSpace(prtScfolderpath) || string.IsNullOrWhiteSpace(testName))
-                return;
+        //    if (string.IsNullOrWhiteSpace(prtScfolderpath) || string.IsNullOrWhiteSpace(testName))
+        //        return;
 
-            if (!Directory.Exists(prtScfolderpath))
-                Directory.CreateDirectory(prtScfolderpath);
+        //    if (!Directory.Exists(prtScfolderpath))
+        //        Directory.CreateDirectory(prtScfolderpath);
 
-            try
-            {
-                var screenshot = ((ITakesScreenshot)driver).GetScreenshot();
-                var filename = Path.Combine(prtScfolderpath, $"{testName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+        //    try
+        //    {
+        //        var screenshot = ((ITakesScreenshot)driver).GetScreenshot();
+        //        var filename = Path.Combine(prtScfolderpath, $"{testName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
 
-                // Mentés byte tömbként, így nem kell a ScreenshotImageFormat
-                File.WriteAllBytes(filename, screenshot.AsByteArray);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Screenshot mentése sikertelen: {ex.Message}");
-            }
-        }
+        //        // Mentés byte tömbként, így nem kell a ScreenshotImageFormat
+        //        File.WriteAllBytes(filename, screenshot.AsByteArray);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Console.WriteLine($"Screenshot mentése sikertelen: {ex.Message}");
+        //    }
+        //}
 
 
         public static Task ChromeStart(string websitepath, int maxwaittimeWEB)
@@ -324,7 +372,7 @@ namespace WebModules
             {
                 PerformElementAction(element, elementType, elem => new Actions(driver).MoveToElement(elem).Perform(), timeoutSeconds);
             });
-        }   
+        }
         public static Task ScrollToElementAndClickWeb(string element, string value, PropertyTypes elementType, int timeoutSeconds)
         {
             if (string.IsNullOrEmpty(element) || string.IsNullOrEmpty(value))

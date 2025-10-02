@@ -119,20 +119,20 @@ namespace WDModules
             }
         }
 
-        public static void TakePrtsc(string testName, string prtScfolderpath)
-        {
-            if (!CaptureScreenshots) return;
+        //public static void TakePrtsc(string testName, string prtScfolderpath)
+        //{
+        //    if (!CaptureScreenshots) return;
 
-            if (string.IsNullOrWhiteSpace(prtScfolderpath) || string.IsNullOrWhiteSpace(testName))
-                return;
+        //    if (string.IsNullOrWhiteSpace(prtScfolderpath) || string.IsNullOrWhiteSpace(testName))
+        //        return;
 
-            if (!Directory.Exists(prtScfolderpath))
-                Directory.CreateDirectory(prtScfolderpath);
+        //    if (!Directory.Exists(prtScfolderpath))
+        //        Directory.CreateDirectory(prtScfolderpath);
 
-            var screenshot = ((ITakesScreenshot)driver).GetScreenshot();
-            var filename = Path.Combine(prtScfolderpath, $"{testName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
-            screenshot.SaveAsFile(filename, ScreenshotImageFormat.Png);
-        }
+        //    var screenshot = ((ITakesScreenshot)driver).GetScreenshot();
+        //    var filename = Path.Combine(prtScfolderpath, $"{testName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+        //    screenshot.SaveAsFile(filename, ScreenshotImageFormat.Png);
+        //}
 
         // --- ELEMENT KERESÉS ---
         private static IWebElement FindElement(string element, PropertyTypes elementType, int timeoutSeconds)

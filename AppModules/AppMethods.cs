@@ -4,27 +4,25 @@ using OpenQA.Selenium.Appium;
 using OpenQA.Selenium.Appium.Android;
 using OpenQA.Selenium.Appium.Interactions;
 using OpenQA.Selenium.Appium.iOS;
-
 using OpenQA.Selenium.Interactions;
 using OpenQA.Selenium.Support.UI;
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Xml.Linq;
 using WDModules;
-using static OpenQA.Selenium.BiDi.Modules.BrowsingContext.Locator;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace TestAutomationUI
-
 {
     public class AppMethods
     {
-
-        private static AppiumDriver driver;
+        public static AppiumDriver driver;
         private static bool isRunningMobile = false;
         public static string testName { get; set; }
         public static bool IsRunningMobile => isRunningMobile;
-        public static bool CaptureScreenshots { get; set; } // Fast mode default érték
+        public static bool CaptureScreenshots { get; set; }
 
         // --- ANDROID INDÍTÁS ---
         public static void StartAndroidApp(string deviceName, string platformVersion, string testname, string appPackage, string appActivity, int maxwaittimeMobil)
@@ -37,21 +35,27 @@ namespace TestAutomationUI
 
             try
             {
-                // Először Appium szerver indítás
                 AppiumServerManager.StartAppiumServer();
 
                 var options = new AppiumOptions();
                 options.PlatformName = "Android";
                 options.AutomationName = testname;
-
                 options.AddAdditionalOption("deviceName", deviceName);
                 options.AddAdditionalOption("platformVersion", platformVersion);
                 options.AddAdditionalOption("appPackage", appPackage);
                 options.AddAdditionalOption("appActivity", appActivity);
                 options.AddAdditionalOption("noReset", true);
+                options.AddAdditionalOption("autoGrantPermissions", true);
+                options.AddAdditionalOption("appWaitActivity", appActivity);
 
                 driver = new AndroidDriver(new Uri("http://127.0.0.1:4723/wd/hub"), options, TimeSpan.FromSeconds(maxwaittimeMobil));
+                isRunningMobile = true;
 
+                ////Korábbi appium verzióhoz kellett, Csak a konkrét AndroidDriver-en hívjuk a LaunchApp-t 
+                //if (driver is AndroidDriver androidDriver)
+                //{
+                //    androidDriver.LaunchApp();
+                //}
             }
             catch (Exception ex)
             {
@@ -61,7 +65,6 @@ namespace TestAutomationUI
             }
         }
 
-
         public static Task StartAndroidAppAsync(string deviceName, string platformVersion, string testname, string appPackage, string appActivity, int maxwaittimeMobil)
         {
             return Task.Run(() =>
@@ -69,7 +72,6 @@ namespace TestAutomationUI
                 StartAndroidApp(deviceName, platformVersion, testname, appPackage, appActivity, maxwaittimeMobil);
             });
         }
-
 
         // --- IOS INDÍTÁS ---
         public static void StartIOSApp(string deviceName, string platformVersion, string bundleId, int maxwaittimeMobil)
@@ -82,20 +84,25 @@ namespace TestAutomationUI
 
             try
             {
-                // Először indítsuk az Appium szervert
                 AppiumServerManager.StartAppiumServer();
 
                 var options = new AppiumOptions();
                 options.PlatformName = "iOS";
                 options.AutomationName = "XCUITest";
-
                 options.AddAdditionalOption("deviceName", deviceName);
                 options.AddAdditionalOption("platformVersion", platformVersion);
                 options.AddAdditionalOption("bundleId", bundleId);
                 options.AddAdditionalOption("noReset", true);
+                options.AddAdditionalOption("autoGrantPermissions", true);
 
                 driver = new IOSDriver(new Uri("http://127.0.0.1:4723/wd/hub"), options, TimeSpan.FromSeconds(maxwaittimeMobil));
                 isRunningMobile = true;
+
+                ////Korábbi appium verzióhoz kellett, csak a konkrét IOSDriver-en hívjuk a LaunchApp-t
+                //if (driver is IOSDriver iosDriver)
+                //{
+                //    iosDriver.LaunchApp();
+                //}
             }
             catch (Exception ex)
             {
@@ -105,7 +112,6 @@ namespace TestAutomationUI
             }
         }
 
-
         public static Task StartIOSAppAsync(string deviceName, string platformVersion, string bundleId, int maxwaittimeMobil)
         {
             return Task.Run(() =>
@@ -113,7 +119,6 @@ namespace TestAutomationUI
                 StartIOSApp(deviceName, platformVersion, bundleId, maxwaittimeMobil);
             });
         }
-
 
         // --- STOP ---
         public static void StopMobile()
@@ -130,31 +135,6 @@ namespace TestAutomationUI
                 isRunningMobile = false;
             }
         }
-
-        public static void TakePrtsc(string testName, string prtScfolderpath)
-        {
-            if (!CaptureScreenshots) return;
-
-            if (string.IsNullOrWhiteSpace(prtScfolderpath) || string.IsNullOrWhiteSpace(testName))
-                return;
-
-            if (!Directory.Exists(prtScfolderpath))
-                Directory.CreateDirectory(prtScfolderpath);
-
-            try
-            {
-                var screenshot = ((ITakesScreenshot)driver).GetScreenshot();
-                var filename = Path.Combine(prtScfolderpath, $"{testName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
-
-                // Mentés byte tömbként, így nem kell a ScreenshotImageFormat
-                File.WriteAllBytes(filename, screenshot.AsByteArray);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Screenshot mentése sikertelen: {ex.Message}");
-            }
-        }
-
 
         // --- ELEMENT KERESÉS ---
         private static IWebElement FindElement(string locator, PropertyTypes elementType, int timeoutSeconds)
@@ -178,94 +158,47 @@ namespace TestAutomationUI
             if (driver == null)
                 throw new InvalidOperationException("A driver nincs inicializálva.");
 
-            By by;
-            switch (elementType)
+            By by = elementType switch
             {
-                case PropertyTypes.Id:
-                    by = MobileBy.Id(element);
-                    break;
-                case PropertyTypes.Name:
-                    by = MobileBy.Name(element);
-                    break;
-                case PropertyTypes.ClassName:
-                    by = MobileBy.ClassName(element);
-                    break;
-                case PropertyTypes.TagName:
-                    by = MobileBy.TagName(element);
-                    break;
-                case PropertyTypes.Xpath:
-                    by = MobileBy.XPath(element);
-                    break;
-                case PropertyTypes.Accessibilityid:
-                    by = MobileBy.AccessibilityId(element);
-                    break;
-                case PropertyTypes.IosClassChain:
-                    by = MobileBy.IosClassChain(element);
-                    break;
-                case PropertyTypes.IosNSPredicate:
-                    by = MobileBy.IosNSPredicate(element);
-                    break;
-                case PropertyTypes.AndroidDataMatcher:
-                    by = MobileBy.AndroidDataMatcher(element);
-                    break;
-                case PropertyTypes.AndroidViewMatcher:
-                    by = MobileBy.AndroidViewMatcher(element);
-                    break;
-                default:
-                    throw new NotSupportedException($"Nem támogatott property típus: {elementType}");
-            }
+                PropertyTypes.Id => MobileBy.Id(element),
+                PropertyTypes.Name => MobileBy.Name(element),
+                PropertyTypes.ClassName => MobileBy.ClassName(element),
+                PropertyTypes.TagName => MobileBy.TagName(element),
+                PropertyTypes.Xpath => MobileBy.XPath(element),
+                PropertyTypes.Accessibilityid => MobileBy.AccessibilityId(element),
+                PropertyTypes.IosClassChain => MobileBy.IosClassChain(element),
+                PropertyTypes.IosNSPredicate => MobileBy.IosNSPredicate(element),
+                PropertyTypes.AndroidDataMatcher => MobileBy.AndroidDataMatcher(element),
+                PropertyTypes.AndroidViewMatcher => MobileBy.AndroidViewMatcher(element),
+                _ => throw new NotSupportedException($"Nem támogatott property típus: {elementType}")
+            };
 
             var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds));
             var elem = wait.Until(drv => drv.FindElement(by));
-
             action(elem);
         }
 
         // --- ACTION METÓDUSOK ---
-        public static Task MobileClick(string locator, PropertyTypes elementType, int timeoutSeconds)
-        {
-            return Task.Run(() =>
-            {
-                PerformElementAction(locator, elementType, elem => elem.Click(), timeoutSeconds);
-            });
-        }
+        public static Task MobileClick(string locator, PropertyTypes elementType, int timeoutSeconds) =>
+            Task.Run(() => PerformElementAction(locator, elementType, elem => elem.Click(), timeoutSeconds));
 
-        public static Task MobileSendKeys(string locator, string text, PropertyTypes elementType, int timeoutSeconds)
-        {
-            return Task.Run(() =>
-            {
-                PerformElementAction(locator, elementType, elem => elem.SendKeys(text), timeoutSeconds);
-            });
+        public static Task MobileSendKeys(string locator, string text, PropertyTypes elementType, int timeoutSeconds) =>
+            Task.Run(() => PerformElementAction(locator, elementType, elem => elem.SendKeys(text), timeoutSeconds));
 
-        }
+        public static Task MobileClear(string locator, PropertyTypes elementType, int timeoutSeconds) =>
+            Task.Run(() => PerformElementAction(locator, elementType, elem => elem.Clear(), timeoutSeconds));
 
-        public static Task MobileClear(string locator, PropertyTypes elementType, int timeoutSeconds)
-        {
-            return Task.Run(() =>
-            {
-                PerformElementAction(locator, elementType, elem => elem.Clear(), timeoutSeconds);
-            });
-        }
-
-        public static string MobileGetText(string locator, PropertyTypes elementType, int timeoutSeconds)
-        {
-            var elem = FindElement(locator, elementType, timeoutSeconds);
-            return elem.Text;
-        }
+        public static string MobileGetText(string locator, PropertyTypes elementType, int timeoutSeconds) =>
+            FindElement(locator, elementType, timeoutSeconds).Text;
 
         public static bool MobileWaitForElementVisible(string locator, PropertyTypes elementType, int timeoutSeconds)
         {
-            try
-            {
-                var elem = FindElement(locator, elementType, timeoutSeconds);
-                return elem.Displayed;
-            }
+            try { return FindElement(locator, elementType, timeoutSeconds).Displayed; }
             catch { return false; }
         }
 
-        public static Task MobileScrollToElementAndClick(string locator, PropertyTypes elementType, string name, int timeoutSeconds, int maxScrollAttempts = 5)
-        {
-            return Task.Run(() =>
+        public static Task MobileScrollToElementAndClick(string locator, PropertyTypes elementType, string name, int timeoutSeconds, int maxScrollAttempts = 5) =>
+            Task.Run(() =>
             {
                 var parent = FindElement(locator, elementType, timeoutSeconds);
                 IWebElement elementToClick = null;
@@ -277,7 +210,6 @@ namespace TestAutomationUI
                     try
                     {
                         elementToClick = parent.FindElement(By.Name(name));
-
                         if (elementToClick.Displayed)
                         {
                             elementToClick.Click();
@@ -289,7 +221,6 @@ namespace TestAutomationUI
 
                     try
                     {
-                        // WebView görgetés
                         if (driver is IJavaScriptExecutor js)
                         {
                             js.ExecuteScript("arguments[0].scrollIntoView(true);", elementToClick);
@@ -298,14 +229,12 @@ namespace TestAutomationUI
                     }
                     catch
                     {
-                        // Natív görgetés PointerInputDevice + ActionSequence
                         var touchScreen = new OpenQA.Selenium.Appium.Interactions.PointerInputDevice(PointerKind.Touch);
                         var actions = new ActionSequence(touchScreen, 0);
-
                         int startX = parent.Location.X + parent.Size.Width / 2;
                         int startY = parent.Location.Y + parent.Size.Height / 2;
                         int endX = startX;
-                        int endY = startY - 300; // swipe felfelé
+                        int endY = startY - 300;
 
                         actions.AddAction(touchScreen.CreatePointerMove(CoordinateOrigin.Viewport, startX, startY, TimeSpan.Zero));
                         actions.AddAction(touchScreen.CreatePointerDown(PointerButton.TouchContact));
@@ -320,12 +249,7 @@ namespace TestAutomationUI
                 }
 
                 if (!clicked)
-                {
                     throw new Exception($"Az elem '{name}' nem található vagy nem látható a görgetések után.");
-                }
             });
-        }
-
     }
-
 }

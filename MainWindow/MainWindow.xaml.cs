@@ -1,28 +1,15 @@
-﻿using AppModules;
-using MainWindow;
-using Microsoft.Web.WebView2.Core;
-using Microsoft.Web.WebView2.WinForms;
-using Microsoft.Web.WebView2.Wpf;
+﻿using MainWindow;
 using Microsoft.Win32;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Appium;
-using OpenQA.Selenium.Appium;
-using OpenQA.Selenium.Appium.Enums;
 using OpenQA.Selenium.Appium.iOS;
-using OpenQA.Selenium.Remote;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Configuration;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.IO.Packaging;
-using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -35,8 +22,6 @@ using System.Xml;
 using System.Xml.Linq;
 using WDModules;
 using WebModules;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using static TestAutomationUI.Settings;
 
 namespace TestAutomationUI
 {
@@ -359,32 +344,101 @@ namespace TestAutomationUI
             }
         }
 
-        private void TakeScreenshotForRunningDriver(string testName, string folderPath)
+        private async Task TakeScreenshotForRunningDriver(string testName, string screenshotFolderPath)
         {
-            // Elsőként mobil drivert ellenőrizzük
-            if (AppMethods.IsRunningMobile)
+            try
             {
-                AppMethods.TakePrtsc(testName, folderPath);
-                return;
-            }
+                // Ellenőrizzük, hogy készülhet-e kép
+                if (!WDMethods.CaptureScreenshots)
+                {
+                    writelogtotext("CaptureScreenshots flag false, kép nem készül.");
+                    return;
+                }
 
-            // Ha WebDriver fut
-            if (WebMethods.IsRunningWEB)
+                if (string.IsNullOrWhiteSpace(screenshotFolderPath))
+                {
+                    writelogtotext("Screenshot mappa nem lett megadva.");
+                    return;
+                }
+
+                // Mappa létrehozása, ha nem létezik
+                if (!Directory.Exists(screenshotFolderPath))
+                {
+                    Directory.CreateDirectory(screenshotFolderPath);
+                    writelogtotext($"Screenshot mappa létrehozva: {screenshotFolderPath}");
+                }
+
+                //fájlnév meghatározása
+                string safefileName = string.Join("_", testName.Split(Path.GetInvalidFileNameChars()));
+                string filename = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+                string screenshotFile = Path.Combine(screenshotFolderPath, $"{safefileName}_{filename}.png");
+                
+
+                bool screenshotTaken = false;
+
+                // Desktop (WDMethods) driver
+                if (WDMethods.driver != null)
+                {
+                    try
+                    {
+                        writelogtotext("WDMethods driver screenshot kezdés.");
+                        var screenshot = ((ITakesScreenshot)WDMethods.driver).GetScreenshot();
+                        File.WriteAllBytes(screenshotFile, screenshot.AsByteArray);
+                        writelogtotext($"WDMethods screenshot elmentve: {screenshotFile}");
+                        screenshotTaken = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        writelogtotext($"WDMethods screenshot hiba: {ex.Message}");
+                    }
+                }
+
+                // Web driver
+                if (!screenshotTaken && WebMethods.driver != null)
+                {
+                    try
+                    {
+                        writelogtotext("WebMethods driver screenshot kezdés.");
+                        var screenshot = ((ITakesScreenshot)WebMethods.driver).GetScreenshot();
+                        File.WriteAllBytes(screenshotFile, screenshot.AsByteArray);
+                        writelogtotext($"WebMethods screenshot elmentve: {screenshotFile}");
+                        screenshotTaken = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        writelogtotext($"WebMethods screenshot hiba: {ex.Message}");
+                    }
+                }
+
+                // Mobile (Appium) driver
+                if (!screenshotTaken && AppMethods.driver != null)
+                {
+                    try
+                    {
+                        writelogtotext("AppMethods driver screenshot kezdés.");
+                        var screenshot = ((ITakesScreenshot)AppMethods.driver).GetScreenshot();
+                        File.WriteAllBytes(screenshotFile, screenshot.AsByteArray);
+                        writelogtotext($"AppMethods screenshot elmentve: {screenshotFile}");
+                        screenshotTaken = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        writelogtotext($"AppMethods screenshot hiba: {ex.Message}");
+                    }
+                }
+
+                if (!screenshotTaken)
+                {
+                    writelogtotext("Nincs elérhető driver a screenshot készítéséhez.");
+                }
+            }
+            catch (Exception ex)
             {
-                WebMethods.TakePrtsc(testName, folderPath);
-                return;
+                writelogtotext($"TakeScreenshotForRunningDriver végső hiba: {ex.Message}");
             }
-
-            // Ha Winium fut
-            if (WDMethods.IsRunning)
-            {
-                WDMethods.TakePrtsc(testName, folderPath);
-                return;
-            }
-
-            // Ha egyik sem fut, csak logoljuk
-            Console.WriteLine("Screenshot készítés sikertelen: nincs futó driver.");
         }
+
+
 
 
         private async void RunTest_Click(object sender, RoutedEventArgs e)
@@ -493,7 +547,7 @@ namespace TestAutomationUI
                 if (_stopRequested)
                 {
                     step.Status = "Megszakítva";
-                    TakeScreenshotForRunningDriver(testNameMain, prtscfolderpathMain);
+                    await TakeScreenshotForRunningDriver(testNameMain, prtscfolderpathMain);
                     writelogtotext("megszakítva");
                     break;
                 }
@@ -569,7 +623,7 @@ namespace TestAutomationUI
                     writelogtotext("await task előtt");
                     await task;
                     writelogtotext("await task után, ok kép előtt");
-                    TakeScreenshotForRunningDriver(testNameMain, prtscfolderpathMain);
+                    await TakeScreenshotForRunningDriver(testNameMain, prtscfolderpathMain);
                     stopwatch.Stop();
                     writelogtotext("ok státusz előtt");
                     step.Duration = Math.Round(stopwatch.Elapsed.TotalSeconds, 2);
@@ -612,7 +666,7 @@ namespace TestAutomationUI
                             $"Hibaüzenet: {step.Errortext}",
                             "Hiba történt");
                         writelogtotext("else ág hiba kép előtt");
-                        TakeScreenshotForRunningDriver(testNameMain, prtscfolderpathMain);
+                        await TakeScreenshotForRunningDriver(testNameMain, prtscfolderpathMain);
                         writelogtotext("else ág hiba kép után");
                         StopSpinner();
                         WDMethods.Stop(); // Ha hiba történt, leállítjuk a Winium drivert                
