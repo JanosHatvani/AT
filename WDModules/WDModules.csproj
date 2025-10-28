@@ -29,7 +29,6 @@
     <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
     <PackageReference Include="Winium-Elements.Desktop" Version="0.3.0" />
     <PackageReference Include="Winium-WebDriver" Version="0.1.2" />
-    <PackageReference Include="Winium.Cruciatus" Version="2.10.0" />
   </ItemGroup>
 
   <ItemGroup>

@@ -16,6 +16,7 @@ using WDModules;
 
 namespace WebModules
 {
+    #region version check
     // --- VERZIÓELLENŐRZŐ ---
     public static class DriverValidator
     {
@@ -85,10 +86,11 @@ namespace WebModules
             }
         }
     }
+    #endregion
 
-    // --- WEBMETHODS ---
     public class WebMethods
     {
+        #region Webstart, Stop
         public static string prtScfolderpath { get; set; }
         public static string testName { get; set; }
         public static bool CaptureScreenshots { get; set; } // Fast mode default érték
@@ -262,7 +264,9 @@ namespace WebModules
                 CaptureScreenshots = true; // Alapértelmezett érték
             }
         }
+        #endregion
 
+        #region element sreach, action, methods
         // --- ELEMENT KERESÉS ---
         private static By GetByLocator(string element, PropertyTypes elementType)
         {
@@ -292,31 +296,6 @@ namespace WebModules
             var elem = FindElement(element, elementType, timeoutSeconds);
             action(elem);
         }
-
-        //public static void TakePrtsc(string testName, string prtScfolderpath)
-        //{
-        //    if (!CaptureScreenshots) return;
-
-        //    if (string.IsNullOrWhiteSpace(prtScfolderpath) || string.IsNullOrWhiteSpace(testName))
-        //        return;
-
-        //    if (!Directory.Exists(prtScfolderpath))
-        //        Directory.CreateDirectory(prtScfolderpath);
-
-        //    try
-        //    {
-        //        var screenshot = ((ITakesScreenshot)driver).GetScreenshot();
-        //        var filename = Path.Combine(prtScfolderpath, $"{testName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
-
-        //        // Mentés byte tömbként, így nem kell a ScreenshotImageFormat
-        //        File.WriteAllBytes(filename, screenshot.AsByteArray);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Console.WriteLine($"Screenshot mentése sikertelen: {ex.Message}");
-        //    }
-        //}
-
 
         public static Task ChromeStart(string websitepath, int maxwaittimeWEB)
         {
@@ -621,4 +600,5 @@ namespace WebModules
             });
         }
     }
+    #endregion
 }

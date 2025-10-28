@@ -591,6 +591,7 @@ namespace TestAutomationUI
                     Task task = step.Action switch
                     {
                         "Start" => WDMethods.StartProg(programPath, winiumDriverPath, maxwaittime),
+                        "StartServiceOnly" => WDMethods.StartServOnly(programPath, step.Target ?? "",maxWaitTime),
                         "StartAndroidApp" => AppMethods.StartAndroidAppAsync(deviceName, platformVersionandroid, testNameMain, appPackage, appActivity, maxwaittime),
                         "StartIosApp" => AppMethods.StartIOSAppAsync(deviceName, platformVersionios, bundleId, maxwaittime),
                         "StartChrome" => WebMethods.ChromeStart(step.Target ?? "",maxwaittime),

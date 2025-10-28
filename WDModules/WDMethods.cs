@@ -5,6 +5,7 @@ using OpenQA.Selenium.Winium;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -16,6 +17,7 @@ namespace WDModules
 {
     public class WDMethods
     {
+        #region driver start, stop, pause, program start
         public static WiniumDriver driver { get; private set; }
         public static WiniumDriverService service { get; private set; }
         public static string prtScfolderpath { get; set; }
@@ -119,21 +121,79 @@ namespace WDModules
             }
         }
 
-        //public static void TakePrtsc(string testName, string prtScfolderpath)
-        //{
-        //    if (!CaptureScreenshots) return;
+        public static Task StartProg(string programPath, string driverPath, int maxwaittimeWD)
+        {
+            return Task.Run(() =>
+            {
+                Start(programPath, driverPath, maxwaittimeWD);
+            });
+        }
+#endregion
 
-        //    if (string.IsNullOrWhiteSpace(prtScfolderpath) || string.IsNullOrWhiteSpace(testName))
-        //        return;
+        #region service start, program start nélkül
 
-        //    if (!Directory.Exists(prtScfolderpath))
-        //        Directory.CreateDirectory(prtScfolderpath);
+        public static void StartServiceOnly(string winiumDriverDirectory, string windowName, int maxwaittimeWD )
+        {
+            if (isRunning)
+            {
+                MessageBox.Show("A driver már fut. Kérlek, állítsd le először.");
+                return;
+            }
 
-        //    var screenshot = ((ITakesScreenshot)driver).GetScreenshot();
-        //    var filename = Path.Combine(prtScfolderpath, $"{testName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
-        //    screenshot.SaveAsFile(filename, ScreenshotImageFormat.Png);
-        //}
+            try
+            {
+                // --- 1️⃣ Winium service indítása ---
+                service = WiniumDriverService.CreateDesktopService(winiumDriverDirectory);
+                service.Port = 9999;
+                service.HideCommandPromptWindow = true;
+                service.SuppressInitialDiagnosticInformation = true;
+                service.Start();
 
+                // --- 2️⃣ Attach mód előkészítése ---
+                var handle = GetWindowHandle(windowName);
+                if (handle == IntPtr.Zero)
+                    throw new Exception($"Nem található ablak ezzel a névvel: {windowName}");
+
+                // DesktopOptions beállítása a régi API szerint
+                var options = new DesktopOptions();
+                options.ApplicationPath = "Root";  // Nem indít új appot
+                options.Arguments = $"--appTopLevelWindow={handle.ToString("x")}"; // Ez az attach kulcs
+
+                // --- 3️⃣ Driver példány létrehozása URI-val ---
+                var driverUrl = new Uri("http://localhost:9999");
+                driver = new WiniumDriver(driverUrl, options, TimeSpan.FromSeconds(maxwaittimeWD));
+
+                isRunning = true;
+            }
+            catch (Exception ex)
+            {
+                service?.Dispose();
+                service = null;
+                driver = null;
+                isRunning = false;
+                MessageBox.Show("Nem sikerült csatlakozni a futó programhoz: " + ex.Message);
+            }
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+
+        private static IntPtr GetWindowHandle(string windowName)
+        {
+            return FindWindow(null, windowName);
+        }
+
+        public static Task StartServOnly(string programPath, string driverPath, int maxwaittimeWD)
+        {
+            return Task.Run(() =>
+            {
+                StartServiceOnly(programPath, driverPath, maxwaittimeWD);
+            });
+        }
+
+        #endregion
+
+        #region element search, action, methods
         // --- ELEMENT KERESÉS ---
         private static IWebElement FindElement(string element, PropertyTypes elementType, int timeoutSeconds)
         {
@@ -216,13 +276,7 @@ namespace WDModules
 
         // --- ACTION METÓDUSOK ---
 
-        public static Task StartProg(string programPath, string driverPath, int maxwaittimeWD)
-        {
-            return Task.Run(() =>
-            {
-                Start(programPath, driverPath, maxwaittimeWD);
-            });
-        }
+
 
         public static Task Click(string element, PropertyTypes elementType, int timeoutSeconds)
         {
@@ -420,4 +474,5 @@ namespace WDModules
         }
 
     }
+    #endregion
 }

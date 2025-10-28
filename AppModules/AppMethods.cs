@@ -18,6 +18,7 @@ namespace TestAutomationUI
 {
     public class AppMethods
     {
+        #region app start, stop and driver init
         public static AppiumDriver driver;
         private static bool isRunningMobile = false;
         public static string testName { get; set; }
@@ -135,7 +136,9 @@ namespace TestAutomationUI
                 isRunningMobile = false;
             }
         }
+        #endregion
 
+        #region element search, action, methods
         // --- ELEMENT KERESÉS --- kérdés, hogy van további param, ami alapján lehet keresni?
         private static IWebElement FindElement(string locator, PropertyTypes elementType, int timeoutSeconds)
         {
@@ -252,4 +255,5 @@ namespace TestAutomationUI
                     throw new Exception($"Az elem '{name}' nem található vagy nem látható a görgetések után.");
             });
     }
+    #endregion
 }

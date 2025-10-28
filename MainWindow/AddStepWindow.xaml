@@ -122,6 +122,7 @@
             <TextBlock Text="Metódus lista:" Grid.Row="2" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
             <ComboBox x:Name="actionComboBox" Grid.Row="2" Grid.Column="1" Margin="5" Style="{StaticResource ModernComboBox}">
                 <ComboBoxItem Content="Start"/>
+                <ComboBoxItem Content="StartServiceOnly"/>
                 <ComboBoxItem Content="StartAndroidApp"/>
                 <ComboBoxItem Content="StartIosApp"/>
                 <ComboBoxItem Content="StartChrome"/>
