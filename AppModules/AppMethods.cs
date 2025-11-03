@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using WDModules;
 
+
 namespace TestAutomationUI
 {
     public class AppMethods
@@ -24,118 +25,142 @@ namespace TestAutomationUI
         public static string testName { get; set; }
         public static bool IsRunningMobile => isRunningMobile;
         public static bool CaptureScreenshots { get; set; }
+        private static Process? displayProcess;
 
-        // --- ANDROID INDÍTÁS ---
-        public static void StartAndroidApp(string deviceName, string platformVersion, string testname, string appPackage, string appActivity, int maxwaittimeMobil)
+        public static async Task StartAndroidAppAsync(string deviceName, string appPackage)
         {
-            if (isRunningMobile)
-            {
-                MessageBox.Show("Az Android driver már fut. Kérlek, állítsd le először.");
-                return;
-            }
+            Console.WriteLine($"📱 Android app indítása: {appPackage} ({deviceName})");
 
             try
             {
-                AppiumServerManager.StartAppiumServer();
+                // 1️⃣ Indítsd el az Android appot ADB-n keresztül
+                await RunAdbCommandAsync(deviceName, $"shell monkey -p {appPackage} -c android.intent.category.LAUNCHER 1");
 
-                var options = new AppiumOptions();
-                options.PlatformName = "Android";
-                options.AutomationName = testname;
-                options.AddAdditionalOption("deviceName", deviceName);
-                options.AddAdditionalOption("platformVersion", platformVersion);
-                options.AddAdditionalOption("appPackage", appPackage);
-                options.AddAdditionalOption("appActivity", appActivity);
-                options.AddAdditionalOption("noReset", true);
-                options.AddAdditionalOption("autoGrantPermissions", true);
-                options.AddAdditionalOption("appWaitActivity", appActivity);
-
-                driver = new AndroidDriver(new Uri("http://127.0.0.1:4723/wd/hub"), options, TimeSpan.FromSeconds(maxwaittimeMobil));
-                isRunningMobile = true;
-
-                ////Korábbi appium verzióhoz kellett, Csak a konkrét AndroidDriver-en hívjuk a LaunchApp-t 
-                //if (driver is AndroidDriver androidDriver)
-                //{
-                //    androidDriver.LaunchApp();
-                //}
+                // 2️⃣ Nyisd meg a WPF megjelenítő ablakot
+                StartDisplayUI(deviceName, "Android");
             }
             catch (Exception ex)
             {
-                driver = null;
-                isRunningMobile = false;
-                MessageBox.Show("Nem sikerült elindítani az Android drivert: " + ex.Message);
+                MessageBox.Show($"Hiba az Android app indításakor: {ex.Message}");
             }
         }
 
-        public static Task StartAndroidAppAsync(string deviceName, string platformVersion, string testname, string appPackage, string appActivity, int maxwaittimeMobil)
+        public static async Task StartIOSAppAsync(string deviceName, string bundleId)
         {
-            return Task.Run(() =>
-            {
-                StartAndroidApp(deviceName, platformVersion, testname, appPackage, appActivity, maxwaittimeMobil);
-            });
-        }
-
-        // --- IOS INDÍTÁS ---
-        public static void StartIOSApp(string deviceName, string platformVersion, string bundleId, int maxwaittimeMobil)
-        {
-            if (isRunningMobile)
-            {
-                MessageBox.Show("Az iOS driver már fut. Kérlek, állítsd le először.");
-                return;
-            }
+            Console.WriteLine($"🍏 iOS app indítása: {bundleId} ({deviceName})");
 
             try
             {
-                AppiumServerManager.StartAppiumServer();
+                // 1️⃣ Indítsd el az iOS appot (itt Appium vagy Xcode parancs jöhet)
+                await Task.Run(() =>
+                {
+                    // Példa dummy hívás helyett Appium start parancsot tehetünk ide
+                    Console.WriteLine($"ios-deploy --id {deviceName} --bundle {bundleId}");
+                });
 
-                var options = new AppiumOptions();
-                options.PlatformName = "iOS";
-                options.AutomationName = "XCUITest";
-                options.AddAdditionalOption("deviceName", deviceName);
-                options.AddAdditionalOption("platformVersion", platformVersion);
-                options.AddAdditionalOption("bundleId", bundleId);
-                options.AddAdditionalOption("noReset", true);
-                options.AddAdditionalOption("autoGrantPermissions", true);
-
-                driver = new IOSDriver(new Uri("http://127.0.0.1:4723/wd/hub"), options, TimeSpan.FromSeconds(maxwaittimeMobil));
-                isRunningMobile = true;
-
-                ////Korábbi appium verzióhoz kellett, csak a konkrét IOSDriver-en hívjuk a LaunchApp-t
-                //if (driver is IOSDriver iosDriver)
-                //{
-                //    iosDriver.LaunchApp();
-                //}
+                // 2️⃣ Nyisd meg a WPF megjelenítő ablakot
+                StartDisplayUI(deviceName, "iOS");
             }
             catch (Exception ex)
             {
-                driver = null;
-                isRunningMobile = false;
-                MessageBox.Show("Nem sikerült elindítani az iOS drivert: " + ex.Message);
+                MessageBox.Show($"Hiba az iOS app indításakor: {ex.Message}");
             }
         }
 
-        public static Task StartIOSAppAsync(string deviceName, string platformVersion, string bundleId, int maxwaittimeMobil)
-        {
-            return Task.Run(() =>
-            {
-                StartIOSApp(deviceName, platformVersion, bundleId, maxwaittimeMobil);
-            });
-        }
-
-        // --- STOP ---
         public static void StopMobile()
         {
-            if (!isRunningMobile) return;
+            Console.WriteLine("🛑 Mobil app és megjelenítő leállítása...");
 
             try
             {
-                driver?.Quit();
-                driver = null;
+                // 1️⃣ Zárjuk be a megjelenítőt
+                if (displayProcess != null && !displayProcess.HasExited)
+                {
+                    displayProcess.Kill();
+                    displayProcess.Dispose();
+                    displayProcess = null;
+                }
+
+                // 2️⃣ (Opcionálisan) Zárjuk be a mobil appot is
+                RunAdbCommandAsync(null, "shell am force-stop com.your.app.package");
             }
-            finally
+            catch (Exception ex)
             {
-                isRunningMobile = false;
+                MessageBox.Show($"Hiba a leállításkor: {ex.Message}");
             }
         }
+
+        private static void StartDisplayUI(string deviceName, string platform)
+        {
+            try
+            {
+                string exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "AppDisplayUI.exe");
+                if (!File.Exists(exePath))
+                {
+                    throw new FileNotFoundException($"Nem található a WPF megjelenítő: {exePath}");
+                }
+
+                // 3️⃣ Indítsd el külön folyamatként
+                displayProcess = Process.Start(new ProcessStartInfo
+                {
+                    FileName = exePath,
+                    Arguments = $"--device \"{deviceName}\" --platform \"{platform}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = false
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Nem sikerült megnyitni az AppDisplay ablakot: {ex.Message}");
+            }
+        }
+
+        private static async Task RunAdbCommandAsync(string? deviceName, string command)
+        {
+            await Task.Run(() =>
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "adb",
+                    Arguments = $"{(deviceName != null ? $"-s {deviceName} " : "")}{command}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using (Process proc = Process.Start(psi)!)
+                {
+                    string output = proc.StandardOutput.ReadToEnd();
+                    string error = proc.StandardError.ReadToEnd();
+                    proc.WaitForExit();
+
+                    if (!string.IsNullOrEmpty(error))
+                        Console.WriteLine($"ADB hiba: {error}");
+                    else
+                        Console.WriteLine($"ADB válasz: {output}");
+                }
+            });
+        }
+    
+
+        //public static Task StartAndroidAppAsync(string deviceName, string platformVersion, string testname, string appPackage, string appActivity, int maxwaittimeMobil)
+        //{
+        //    return Task.Run(() =>
+        //    {
+        //        StartAndroidApp(deviceName, platformVersion, testname, appPackage, appActivity, maxwaittimeMobil);
+        //    });
+        //}
+
+
+        //public static Task StartIOSAppAsync(string deviceName, string platformVersion, string bundleId, int maxwaittimeMobil)
+        //{
+        //    return Task.Run(() =>
+        //    {
+        //        StartIOSApp(deviceName, platformVersion, bundleId, maxwaittimeMobil);
+        //    });
+        //}
+
         #endregion
 
         #region element search, action, methods

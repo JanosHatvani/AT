@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebModules", "WebModules\We
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppModules", "AppModules\AppModules.csproj", "{9E83E163-CBF6-75F9-8181-74137454D199}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppDisplayUI", "AppDisplayUI\AppDisplayUI.csproj", "{9E646E3D-337A-45A7-9D75-380AF68597A0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -57,6 +59,14 @@ Global
 		{9E83E163-CBF6-75F9-8181-74137454D199}.Release|Any CPU.Build.0 = Release|Any CPU
 		{9E83E163-CBF6-75F9-8181-74137454D199}.Release|x64.ActiveCfg = Release|Any CPU
 		{9E83E163-CBF6-75F9-8181-74137454D199}.Release|x64.Build.0 = Release|Any CPU
+		{9E646E3D-337A-45A7-9D75-380AF68597A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9E646E3D-337A-45A7-9D75-380AF68597A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9E646E3D-337A-45A7-9D75-380AF68597A0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9E646E3D-337A-45A7-9D75-380AF68597A0}.Debug|x64.Build.0 = Debug|Any CPU
+		{9E646E3D-337A-45A7-9D75-380AF68597A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9E646E3D-337A-45A7-9D75-380AF68597A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9E646E3D-337A-45A7-9D75-380AF68597A0}.Release|x64.ActiveCfg = Release|Any CPU
+		{9E646E3D-337A-45A7-9D75-380AF68597A0}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

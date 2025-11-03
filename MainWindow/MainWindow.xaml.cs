@@ -592,8 +592,8 @@ namespace TestAutomationUI
                     {
                         "Start" => WDMethods.StartProg(programPath, winiumDriverPath, maxwaittime),
                         "StartServiceOnly" => WDMethods.StartServOnly(programPath, step.Target ?? "",maxWaitTime),
-                        "StartAndroidApp" => AppMethods.StartAndroidAppAsync(deviceName, platformVersionandroid, testNameMain, appPackage, appActivity, maxwaittime),
-                        "StartIosApp" => AppMethods.StartIOSAppAsync(deviceName, platformVersionios, bundleId, maxwaittime),
+                        "StartAndroidApp" => AppMethods.StartAndroidAppAsync(deviceName, appPackage),
+                        "StartIosApp" => AppMethods.StartIOSAppAsync(deviceName, bundleId),
                         "StartChrome" => WebMethods.ChromeStart(step.Target ?? "",maxwaittime),
                         "StartFireFox" => WebMethods.FirefoxStart(step.Target ?? "", maxwaittime),
                         "StartMicrosoftEdge" => WebMethods.MicrosoftEdgeStart(step.Target ?? "", maxwaittime),
