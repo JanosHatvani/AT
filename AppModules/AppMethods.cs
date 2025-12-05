@@ -2,283 +2,290 @@
 using OpenQA.Selenium;
 using OpenQA.Selenium.Appium;
 using OpenQA.Selenium.Appium.Android;
-using OpenQA.Selenium.Appium.Interactions;
 using OpenQA.Selenium.Appium.iOS;
-using OpenQA.Selenium.Interactions;
 using OpenQA.Selenium.Support.UI;
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using WDModules;
-
 
 namespace TestAutomationUI
 {
     public class AppMethods
     {
-        #region app start, stop and driver init
         public static AppiumDriver driver;
-        private static bool isRunningMobile = false;
-        public static string testName { get; set; }
-        public static bool IsRunningMobile => isRunningMobile;
-        public static bool CaptureScreenshots { get; set; }
-        private static Process? displayProcess;
+        public static bool IsRunningMobile { get; private set; }
 
-        public static async Task StartAndroidAppAsync(string deviceName, string appPackage)
+        #region ANDROID SDK PATH KEZELÉS 
+
+        public static string GetAndroidSdkPath()
         {
-            Console.WriteLine($"📱 Android app indítása: {appPackage} ({deviceName})");
+            var sdkRoot = Environment.GetEnvironmentVariable("ANDROID_SDK_ROOT");
 
+            if (string.IsNullOrWhiteSpace(sdkRoot))
+                sdkRoot = Environment.GetEnvironmentVariable("ANDROID_HOME");
+
+            if (string.IsNullOrWhiteSpace(sdkRoot))
+                throw new Exception("ANDROID_SDK_ROOT vagy ANDROID_HOME nincs beállítva!");
+
+            return sdkRoot;
+        }
+
+        public static string GetEmulatorPath()
+        {
+            return Path.Combine(GetAndroidSdkPath(), "emulator", "emulator.exe");
+        }
+
+        public static string GetAdbPath()
+        {
+            return Path.Combine(GetAndroidSdkPath(), "platform-tools", "adb.exe");
+        }
+
+        #endregion
+
+
+        #region ANDROID EMULÁTOR INDÍTÁS  + MEGERŐSÍTÉS
+
+        public static async Task<bool> StartAndroidEmulator(string avdName)
+        {
+            var confirm = MessageBox.Show(
+                $"El szeretnéd indítani ezt az Android emulátort?\n\n{avdName}",
+                "Emulátor indítása",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (confirm != DialogResult.Yes)
+                return false;
+
+            string emulatorPath;
             try
             {
-                // 1️⃣ Indítsd el az Android appot ADB-n keresztül
-                await RunAdbCommandAsync(deviceName, $"shell monkey -p {appPackage} -c android.intent.category.LAUNCHER 1");
-
-                // 2️⃣ Nyisd meg a WPF megjelenítő ablakot
-                StartDisplayUI(deviceName, "Android");
+                emulatorPath = GetEmulatorPath();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Hiba az Android app indításakor: {ex.Message}");
+                MessageBox.Show(ex.Message);
+                return false;
             }
+
+            if (!File.Exists(emulatorPath))
+            {
+                MessageBox.Show("emulator.exe nem található:\n" + emulatorPath);
+                return false;
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = emulatorPath,
+                Arguments = $"-avd {avdName}",
+                UseShellExecute = false,
+                CreateNoWindow = false
+            });
+
+            // várunk míg az ADB látja
+            for (int i = 0; i < 60; i++)
+            {
+                string devices = RunAdb("devices");
+                if (devices.Contains("device") && !devices.Contains("offline"))
+                    return true;
+
+                await Task.Delay(2000);
+            }
+
+            MessageBox.Show("Az Android emulátor nem indult el időben!");
+            return false;
         }
+
+        #endregion
+
+
+        #region ANDROID APP INDÍTÁS 
+
+        public static async Task StartAndroidAppAsync(string deviceName, string appPackage, string appActivity, string avdName)
+        {
+            IsRunningMobile = true;
+
+            bool emulatorReady = await StartAndroidEmulator(avdName);
+            if (!emulatorReady) return;
+
+            bool installed = InstallApkWithConfirm( @"C:\TesztApp\app-debug.apk", appPackage);   // ← EZT BEÁLLÍTHATJUK SETTINGS-BŐL IS
+
+
+            if (!installed)
+            {
+                MessageBox.Show("Az alkalmazás nem lett telepítve!");
+                return;
+            }
+
+            AppiumServerManager.StartAppiumServer();
+
+            var caps = new AppiumOptions();
+            caps.PlatformName = "Android";
+            caps.AddAdditionalAppiumOption("deviceName", deviceName);
+            caps.AddAdditionalAppiumOption("automationName", "UiAutomator2");
+            caps.AddAdditionalAppiumOption("appPackage", appPackage);
+            caps.AddAdditionalAppiumOption("appActivity", appActivity);
+
+            driver = new AndroidDriver(
+                new Uri("http://127.0.0.1:4723/"),
+                caps,
+                TimeSpan.FromMinutes(2));
+
+            StartDisplayUI(deviceName, "Android");
+        }
+
+        #endregion
+
+
+        #region IOS APP INDÍTÁS 
 
         public static async Task StartIOSAppAsync(string deviceName, string bundleId)
         {
-            Console.WriteLine($"🍏 iOS app indítása: {bundleId} ({deviceName})");
+            IsRunningMobile = true;
 
-            try
-            {
-                // 1️⃣ Indítsd el az iOS appot (itt Appium vagy Xcode parancs jöhet)
-                await Task.Run(() =>
-                {
-                    // Példa dummy hívás helyett Appium start parancsot tehetünk ide
-                    Console.WriteLine($"ios-deploy --id {deviceName} --bundle {bundleId}");
-                });
+            AppiumServerManager.StartAppiumServer();
 
-                // 2️⃣ Nyisd meg a WPF megjelenítő ablakot
-                StartDisplayUI(deviceName, "iOS");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Hiba az iOS app indításakor: {ex.Message}");
-            }
+            var caps = new AppiumOptions();
+            caps.PlatformName = "iOS";
+            caps.AddAdditionalAppiumOption("deviceName", deviceName);
+            caps.AddAdditionalAppiumOption("bundleId", bundleId);
+            caps.AddAdditionalAppiumOption("automationName", "XCUITest");
+
+            driver = new IOSDriver(
+                new Uri("http://127.0.0.1:4723/"),
+                caps,
+                TimeSpan.FromMinutes(2));
+
+            StartDisplayUI(deviceName, "iOS");
         }
 
         public static void StopMobile()
         {
-            Console.WriteLine("🛑 Mobil app és megjelenítő leállítása...");
-
             try
             {
-                // 1️⃣ Zárjuk be a megjelenítőt
-                if (displayProcess != null && !displayProcess.HasExited)
-                {
-                    displayProcess.Kill();
-                    displayProcess.Dispose();
-                    displayProcess = null;
-                }
+                driver?.Quit();
+                driver?.Dispose();
+            }
+            catch { }
 
-                // 2️⃣ (Opcionálisan) Zárjuk be a mobil appot is
-                RunAdbCommandAsync(null, "shell am force-stop com.your.app.package");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Hiba a leállításkor: {ex.Message}");
-            }
+            IsRunningMobile = false;
         }
-
-        private static void StartDisplayUI(string deviceName, string platform)
-        {
-            try
-            {
-                string exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "AppDisplayUI.exe");
-                if (!File.Exists(exePath))
-                {
-                    throw new FileNotFoundException($"Nem található a WPF megjelenítő: {exePath}");
-                }
-
-                // 3️⃣ Indítsd el külön folyamatként
-                displayProcess = Process.Start(new ProcessStartInfo
-                {
-                    FileName = exePath,
-                    Arguments = $"--device \"{deviceName}\" --platform \"{platform}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = false
-                });
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Nem sikerült megnyitni az AppDisplay ablakot: {ex.Message}");
-            }
-        }
-
-        private static async Task RunAdbCommandAsync(string? deviceName, string command)
-        {
-            await Task.Run(() =>
-            {
-                ProcessStartInfo psi = new ProcessStartInfo
-                {
-                    FileName = "adb",
-                    Arguments = $"{(deviceName != null ? $"-s {deviceName} " : "")}{command}",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                using (Process proc = Process.Start(psi)!)
-                {
-                    string output = proc.StandardOutput.ReadToEnd();
-                    string error = proc.StandardError.ReadToEnd();
-                    proc.WaitForExit();
-
-                    if (!string.IsNullOrEmpty(error))
-                        Console.WriteLine($"ADB hiba: {error}");
-                    else
-                        Console.WriteLine($"ADB válasz: {output}");
-                }
-            });
-        }
-    
-
-        //public static Task StartAndroidAppAsync(string deviceName, string platformVersion, string testname, string appPackage, string appActivity, int maxwaittimeMobil)
-        //{
-        //    return Task.Run(() =>
-        //    {
-        //        StartAndroidApp(deviceName, platformVersion, testname, appPackage, appActivity, maxwaittimeMobil);
-        //    });
-        //}
-
-
-        //public static Task StartIOSAppAsync(string deviceName, string platformVersion, string bundleId, int maxwaittimeMobil)
-        //{
-        //    return Task.Run(() =>
-        //    {
-        //        StartIOSApp(deviceName, platformVersion, bundleId, maxwaittimeMobil);
-        //    });
-        //}
 
         #endregion
 
-        #region element search, action, methods
-        // --- ELEMENT KERESÉS --- kérdés, hogy van további param, ami alapján lehet keresni?
-        private static IWebElement FindElement(string locator, PropertyTypes elementType, int timeoutSeconds)
+
+        #region MOBIL ACTIONS 
+
+        private static IWebElement FindElement(string locator, PropertyTypes type, int timeout)
         {
-            By by = elementType switch
+            By by = type switch
             {
                 PropertyTypes.Id => MobileBy.Id(locator),
                 PropertyTypes.Xpath => MobileBy.XPath(locator),
                 PropertyTypes.Accessibilityid => MobileBy.AccessibilityId(locator),
                 PropertyTypes.Name => MobileBy.Name(locator),
                 PropertyTypes.ClassName => MobileBy.ClassName(locator),
-                _ => throw new ArgumentException($"Ismeretlen lokátor típus: {elementType}")
+                _ => throw new ArgumentException("Ismeretlen locator")
             };
 
-            var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds));
-            return wait.Until(drv => drv.FindElement(by));
+            return new WebDriverWait(driver, TimeSpan.FromSeconds(timeout))
+                .Until(drv => drv.FindElement(by));
         }
 
-        private static void PerformElementAction(string element, PropertyTypes elementType, Action<IWebElement> action, int timeoutSeconds)
-        {
-            if (driver == null)
-                throw new InvalidOperationException("A driver nincs inicializálva.");
+        public static Task MobileClick(string locator, PropertyTypes type, int timeout) =>
+            Task.Run(() => FindElement(locator, type, timeout).Click());
 
-            By by = elementType switch
+        public static Task MobileSendKeys(string locator, string text, PropertyTypes type, int timeout) =>
+            Task.Run(() => FindElement(locator, type, timeout).SendKeys(text));
+
+        #endregion
+
+
+        #region ADB ✅ TELJES PATH-ON FUT
+
+        public static string RunAdb(string command)
+        {
+            string adbPath;
+            try
             {
-                PropertyTypes.Id => MobileBy.Id(element),
-                PropertyTypes.Name => MobileBy.Name(element),
-                PropertyTypes.ClassName => MobileBy.ClassName(element),
-                PropertyTypes.TagName => MobileBy.TagName(element),
-                PropertyTypes.Xpath => MobileBy.XPath(element),
-                PropertyTypes.Accessibilityid => MobileBy.AccessibilityId(element),
-                PropertyTypes.IosClassChain => MobileBy.IosClassChain(element),
-                PropertyTypes.IosNSPredicate => MobileBy.IosNSPredicate(element),
-                PropertyTypes.AndroidDataMatcher => MobileBy.AndroidDataMatcher(element),
-                PropertyTypes.AndroidViewMatcher => MobileBy.AndroidViewMatcher(element),
-                _ => throw new NotSupportedException($"Nem támogatott property típus: {elementType}")
+                adbPath = GetAdbPath();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+                return string.Empty;
+            }
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = adbPath,
+                Arguments = command,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
 
-            var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds));
-            var elem = wait.Until(drv => drv.FindElement(by));
-            action(elem);
+            using var p = Process.Start(psi);
+            return p.StandardOutput.ReadToEnd();
         }
 
-        // --- ACTION METÓDUSOK ---
-        public static Task MobileClick(string locator, PropertyTypes elementType, int timeoutSeconds) =>
-            Task.Run(() => PerformElementAction(locator, elementType, elem => elem.Click(), timeoutSeconds));
-
-        public static Task MobileSendKeys(string locator, string text, PropertyTypes elementType, int timeoutSeconds) =>
-            Task.Run(() => PerformElementAction(locator, elementType, elem => elem.SendKeys(text), timeoutSeconds));
-
-        public static Task MobileClear(string locator, PropertyTypes elementType, int timeoutSeconds) =>
-            Task.Run(() => PerformElementAction(locator, elementType, elem => elem.Clear(), timeoutSeconds));
-
-        public static string MobileGetText(string locator, PropertyTypes elementType, int timeoutSeconds) =>
-            FindElement(locator, elementType, timeoutSeconds).Text;
-
-        public static bool MobileWaitForElementVisible(string locator, PropertyTypes elementType, int timeoutSeconds)
+        public static bool IsAppInstalled(string packageName)
         {
-            try { return FindElement(locator, elementType, timeoutSeconds).Displayed; }
-            catch { return false; }
+            string result = RunAdb("shell pm list packages");
+            return result.Contains(packageName);
         }
 
-        public static Task MobileScrollToElementAndClick(string locator, PropertyTypes elementType, string name, int timeoutSeconds, int maxScrollAttempts = 5) =>
-            Task.Run(() =>
-            {
-                var parent = FindElement(locator, elementType, timeoutSeconds);
-                IWebElement elementToClick = null;
-                bool clicked = false;
-                int attempts = 0;
+        public static bool InstallApkWithConfirm(string apkPath, string packageName)
+        {
+            if (IsAppInstalled(packageName))
+                return true;
 
-                while (!clicked && attempts < maxScrollAttempts)
+            var confirm = MessageBox.Show(
+                "Az alkalmazás nincs telepítve az emulátorra.\n\nTelepítsem most?",
+                "APK telepítés",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (confirm != DialogResult.Yes)
+                return false;
+
+            if (!File.Exists(apkPath))
+            {
+                MessageBox.Show("Az APK nem található:\n" + apkPath);
+                return false;
+            }
+
+            RunAdb($"install \"{apkPath}\"");
+
+            // újra ellenőrizzük
+            return IsAppInstalled(packageName);
+        }
+
+
+        #endregion
+
+
+        #region DISPLAY UI 
+
+        public static void StartDisplayUI(string deviceName, string platform)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
                 {
-                    try
-                    {
-                        elementToClick = parent.FindElement(By.Name(name));
-                        if (elementToClick.Displayed)
-                        {
-                            elementToClick.Click();
-                            clicked = true;
-                            break;
-                        }
-                    }
-                    catch { }
+                    FileName = "AppDisplayUI.exe",
+                    Arguments = $"--device \"{deviceName}\" --platform \"{platform}\"",
+                    UseShellExecute = false
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Nem sikerült megnyitni a kijelzőt:\n" + ex.Message);
+            }
+        }
 
-                    try
-                    {
-                        if (driver is IJavaScriptExecutor js)
-                        {
-                            js.ExecuteScript("arguments[0].scrollIntoView(true);", elementToClick);
-                            Task.Delay(200).Wait();
-                        }
-                    }
-                    catch
-                    {
-                        var touchScreen = new OpenQA.Selenium.Appium.Interactions.PointerInputDevice(PointerKind.Touch);
-                        var actions = new ActionSequence(touchScreen, 0);
-                        int startX = parent.Location.X + parent.Size.Width / 2;
-                        int startY = parent.Location.Y + parent.Size.Height / 2;
-                        int endX = startX;
-                        int endY = startY - 300;
-
-                        actions.AddAction(touchScreen.CreatePointerMove(CoordinateOrigin.Viewport, startX, startY, TimeSpan.Zero));
-                        actions.AddAction(touchScreen.CreatePointerDown(PointerButton.TouchContact));
-                        actions.AddAction(touchScreen.CreatePointerMove(CoordinateOrigin.Viewport, endX, endY, TimeSpan.FromMilliseconds(500)));
-                        actions.AddAction(touchScreen.CreatePointerUp(PointerButton.TouchContact));
-
-                        driver.PerformActions(new[] { actions });
-                    }
-
-                    Task.Delay(500).Wait();
-                    attempts++;
-                }
-
-                if (!clicked)
-                    throw new Exception($"Az elem '{name}' nem található vagy nem látható a görgetések után.");
-            });
+        #endregion
     }
-    #endregion
 }

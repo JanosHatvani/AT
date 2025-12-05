@@ -9,30 +9,22 @@ namespace TestAutomationUI
 {
     public static class DeviceDisplayManager
     {
-        private static Process runningProcess;
-        private static bool isRunning;
+        public static bool isRunningAndroid;
+        public static bool isRunningIos;
+        public static Process? runningProcess;
 
-        /// <summary>
-        /// Elindítja az Android app kijelző megjelenítését WPF Image controlon keresztül.
-        /// </summary>
         public static async Task StartAndroidDisplayAsync(string deviceId, Image displayImage)
         {
-            if (isRunning)
-                return;
-            
-            isRunning = true;
+            if (isRunningAndroid) return;
+            isRunningAndroid = true;
 
             await Task.Run(async () =>
             {
-                try
+                while (isRunningAndroid)
                 {
-
-                    while (isRunning)
+                    try
                     {
                         string tempFile = Path.Combine(Path.GetTempPath(), "device_screen.png");
-
-                        // ADB screenshot (ha kell élőben)
-                        // RunAdbCommand($"exec-out screencap -p > \"{tempFile}\"");
 
                         if (File.Exists(tempFile))
                         {
@@ -42,49 +34,28 @@ namespace TestAutomationUI
                             });
                         }
 
-                        await Task.Delay(1000); // 1 mp frissítés
+                        await Task.Delay(1000);
                     }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[DeviceDisplayManager] Error: {ex.Message}");
+                    catch { }
                 }
             });
         }
 
-        /// <summary>
-        /// iOS app kijelző kezelése (ugyanígy, WPF-kompatibilisen).
-        /// </summary>
         public static async Task StartIosDisplayAsync(string deviceId, Image displayImage)
         {
-            if (isRunning)
-                return;
-
-            isRunning = true;
+            if (isRunningIos) return;
+            isRunningIos = true;
 
             await Task.Run(async () =>
             {
-                while (isRunning)
+                while (isRunningIos)
                 {
-                    // TODO: Ide jön az iOS screenshot/frissítés logika
                     await Task.Delay(1000);
                 }
             });
         }
 
-        public static void StopDisplay()
-        {
-            isRunning = false;
-
-            try
-            {
-                if (runningProcess != null && !runningProcess.HasExited)
-                {
-                    runningProcess.Kill();
-                    runningProcess.Dispose();
-                }
-            }
-            catch { }
-        }
+        public static void StopDisplayAndroid() => isRunningAndroid = false;
+        public static void StopDisplayIos() => isRunningIos = false;
     }
 }

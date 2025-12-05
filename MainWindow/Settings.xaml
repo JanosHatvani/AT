@@ -122,6 +122,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
 
             </Grid.RowDefinitions>
 
@@ -152,16 +153,38 @@
             <TextBox x:Name="androidappactivity" Grid.Row="10" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
             <TextBlock Text="Android appPackage:" Grid.Row="11" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
             <TextBox x:Name="androidapppackage" Grid.Row="11" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
+            <TextBlock Text="Android path:" Grid.Row="12" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+            <TextBox x:Name="androidpath" Grid.Row="12" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
 
-            <TextBlock Text="AppiumInspector:" Grid.Row="12" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
-            <TextBox x:Name="appiumInspectorfolder" Grid.Row="12" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
+
+            <TextBlock Text="AppiumInspector:" Grid.Row="13" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+            <TextBox x:Name="appiumInspectorfolder" Grid.Row="13" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
+
+            <TextBlock Text="Emulator telefon:" Grid.Row="14" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
+            <ComboBox x:Name="emulatortelefoncombobox" Grid.Row="14" Grid.Column="1" Margin="5" Style="{StaticResource ModernComboBox}">
+                <ComboBoxItem Content="Pixel_7_API_34"/>
+                <ComboBoxItem Content="Pixel_7_Pro_API_34"/>
+                <ComboBoxItem Content="Pixel_6_API_33"/>
+                <ComboBoxItem Content="Nexus_5X_API_23"/>
+                <ComboBoxItem Content="Nexus_6_API_25"/>
+                <ComboBoxItem Content="iPhone 15 Pro"/>
+                <ComboBoxItem Content="iPhone 15"/>
+                <ComboBoxItem Content="iPhone 15 Plus"/>
+                <ComboBoxItem Content="iPhone 14 Pro"/>
+                <ComboBoxItem Content="iPhone 13"/>
+                <ComboBoxItem Content="iPhone SE (3rd generation)"/>
+                <ComboBoxItem Content="iPad Pro (12.9-inch) (6th generation)"/>
+                <ComboBoxItem Content="Pixel_5_API_33"/>
+                <ComboBoxItem Content="Pixel_4_API_30"/>
+                <ComboBoxItem Content="Tablet_10_API_34"/>
+            </ComboBox>
 
             <TextBlock Text="Képek mentés mappa:" Grid.Row="3" Grid.Column="0" Margin="5" Style="{StaticResource ModernTextBlock}"/>
             <TextBox x:Name="screenshotFolderTextBox" Grid.Row="3" Grid.Column="1" Margin="5" Style="{StaticResource ModernTextBox}"/>
 
-            <CheckBox x:Name="fastModeCheckBox" Content="Gyors üzemmód" Grid.Row="13" Grid.Column="0" Margin="5" VerticalAlignment="Center" Style="{StaticResource CheckBox}"/>
+            <CheckBox x:Name="fastModeCheckBox" Content="Gyors üzemmód" Grid.Row="15" Grid.Column="0" Margin="5" VerticalAlignment="Center" Style="{StaticResource CheckBox}"/>
 
-            <StackPanel Grid.Row="14" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+            <StackPanel Grid.Row="15" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="Mentés"
                         Margin="5"
                         Padding="20"

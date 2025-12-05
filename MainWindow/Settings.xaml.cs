@@ -41,6 +41,7 @@ namespace TestAutomationUI
                 androidapppackage.Text = settings.AndroidAppPackage;
                 androiddevicename.Text = settings.AndroidDevicename;
                 androidplatformversion.Text = settings.AndroidPlatformVersion;
+                androidpath.Text = settings.AndroidAppPath;
                 iosdevicename.Text = settings.IosDevicename;
                 iosplatformversion.Text = settings.IosPlatformVersion;
                 iosbundleid.Text = settings.IosBundleiID;
@@ -68,6 +69,7 @@ namespace TestAutomationUI
                 IosDevicename = iosdevicename.Text,
                 IosPlatformVersion = iosplatformversion.Text,
                 IosBundleiID = iosbundleid.Text,
+                AndroidAppPath = androidpath.Text,
                 AppiumInspector = appiumInspectorfolder.Text,
                 FastMode = fastModeCheckBox.IsChecked == true,
             };
@@ -104,6 +106,7 @@ namespace TestAutomationUI
             public string WEbPath { get; set; }
             public string IosDevicename { get; set; }
             public string AndroidDevicename { get; set; }
+            public string AndroidAppPath { get; set; }
             public string IosPlatformVersion { get; set; }
             public string AndroidPlatformVersion { get; set; }
             public string IosBundleiID { get; set; }

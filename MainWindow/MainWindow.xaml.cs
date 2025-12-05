@@ -438,9 +438,6 @@ namespace TestAutomationUI
             }
         }
 
-
-
-
         private async void RunTest_Click(object sender, RoutedEventArgs e)
         {
             if (IntroOverlay.Visibility == Visibility.Visible)
@@ -530,6 +527,7 @@ namespace TestAutomationUI
             string appPackage = settingsWindow.androidapppackage.Text;
             string appActivity = settingsWindow.androidappactivity.Text;
             string bundleId = settingsWindow.iosbundleid.Text;
+            string emulatortelefon = settingsWindow.emulatortelefoncombobox.Text;
             int maxwaittime = settingsWindow.MaxWaitTimeSettings != null ? int.Parse(settingsWindow.MaxWaitTimeSettings) : 20;
 
             if (prtscfolderpathMain == null)
@@ -592,7 +590,7 @@ namespace TestAutomationUI
                     {
                         "Start" => WDMethods.StartProg(programPath, winiumDriverPath, maxwaittime),
                         "StartServiceOnly" => WDMethods.StartServOnly(programPath, step.Target ?? "",maxWaitTime),
-                        "StartAndroidApp" => AppMethods.StartAndroidAppAsync(deviceName, appPackage),
+                        "StartAndroidApp" => AppMethods.StartAndroidAppAsync(deviceName, appPackage, appActivity, emulatortelefon),
                         "StartIosApp" => AppMethods.StartIOSAppAsync(deviceName, bundleId),
                         "StartChrome" => WebMethods.ChromeStart(step.Target ?? "",maxwaittime),
                         "StartFireFox" => WebMethods.FirefoxStart(step.Target ?? "", maxwaittime),
@@ -1310,23 +1308,75 @@ namespace TestAutomationUI
 
         private async void AndroidInspect_Click(object sender, RoutedEventArgs e)
         {
-            CustomMessageBox.Show("3 másodpercen belül vidd az egeret az ellenőrizni kívánt elem fölé az emulátor ablakban...", "Android Inspect indul");
+
+            var settingsWindow = new Settings
+            {
+                Owner = this
+            };
+
+            string deviceId = settingsWindow.androiddevicename.Text; // vagy a settingsből olvasd
+            string apkPath = settingsWindow.androidpath.Text; //fel kell venni
+            string packageName = settingsWindow.androidapppackage.Text; // módosítsd a valós package-re
+            string mainActivity = settingsWindow.androidappactivity.Text; // módosítsd ha más
+            string platform = settingsWindow.androidplatformversion.Text;
+
+            try
+            {
+                // telepítés, ha nincs fent
+                EnsureAppInstalled(deviceId, apkPath, packageName);
+
+                // app indítása
+                RunAdb($"-s {deviceId} shell am start -n {packageName}/{mainActivity}");
+                await Task.Delay(2000); // kis várakozás az induláshoz
+
+                // preview ablak megnyitása (AppDisplayUI)
+                AppMethods.StartDisplayUI(deviceId, platform);
+
+                // 4️⃣ Külön inspect gomb
+                var result = MessageBox.Show("Megjelenik az előnézet. Indulhat az Inspect?", "Android Inspect", MessageBoxButton.YesNo);
+                if (result == MessageBoxResult.Yes)
+                {
+                    await RunAndroidInspect(deviceId);
+                }
+            }
+            catch (Exception ex)
+            {
+                CustomMessageBox.Show($"Hiba történt: {ex.Message}", "Hiba");
+            }
+        }
+
+        private void EnsureAppInstalled(string deviceId, string apkPath, string packageName)
+        {
+            try
+            {
+                string output = RunAdb($"-s {deviceId} shell pm list packages {packageName}");
+                if (!output.Contains(packageName))
+                {
+                    CustomMessageBox.Show($"Az app nincs telepítve, telepítés folyamatban...\n{apkPath}", "APK telepítése");
+                    RunAdb($"-s {deviceId} install -r \"{apkPath}\"");
+                }
+            }
+            catch (Exception ex)
+            {
+                CustomMessageBox.Show($"Nem sikerült telepíteni az APK-t: {ex.Message}", "Hiba");
+            }
+        }
+
+        private async Task RunAndroidInspect(string deviceId)
+        {
+            CustomMessageBox.Show("3 másodpercen belül vidd az egeret az ellenőrizni kívánt elem fölé az emulátor ablakban...", "Inspect indul");
 
             await Task.Delay(3000);
 
-            // 1. UI hierarchy dump
-            RunAdb("shell uiautomator dump /sdcard/ui.xml");
-            RunAdb("pull /sdcard/ui.xml ui.xml");
+            RunAdb($"-s {deviceId} shell uiautomator dump /sdcard/ui.xml");
+            RunAdb($"-s {deviceId} pull /sdcard/ui.xml ui.xml");
 
-            // 2. Cursor pozíció
             POINT point = GetCursorPosition();
             int cursorX = point.X;
             int cursorY = point.Y;
 
-            // 3. XML feldolgozása
             XmlDocument doc = new XmlDocument();
             doc.Load("ui.xml");
-
             XmlNode targetNode = FindNodeByPoint(doc.DocumentElement, cursorX, cursorY);
 
             if (targetNode != null)
@@ -1338,20 +1388,15 @@ namespace TestAutomationUI
                     $"Class: {targetNode.Attributes?["class"]?.Value}\n" +
                     $"Package: {targetNode.Attributes?["package"]?.Value}\n" +
                     $"ContentDesc: {targetNode.Attributes?["content-desc"]?.Value}\n" +
-                    $"Bounds: {targetNode.Attributes?["bounds"]?.Value}\n" +
-                    $"Checkable: {targetNode.Attributes?["checkable"]?.Value}\n" +
-                    $"Clickable: {targetNode.Attributes?["clickable"]?.Value}\n" +
-                    $"Enabled: {targetNode.Attributes?["enabled"]?.Value}\n" +
-                    $"Focused: {targetNode.Attributes?["focused"]?.Value}\n" +
-                    $"Scrollable: {targetNode.Attributes?["scrollable"]?.Value}";
-
-                CustomMessageBox.Show(info, "Android Inspect eredmény");
+                    $"Bounds: {targetNode.Attributes?["bounds"]?.Value}";
+                CustomMessageBox.Show(info, "Inspect eredmény");
             }
             else
             {
                 CustomMessageBox.Show("Nem található elem az egér alatt.", "Hiba");
             }
         }
+
 
         private XmlNode FindNodeByPoint(XmlNode node, int x, int y)
         {
@@ -1383,17 +1428,46 @@ namespace TestAutomationUI
             return null;
         }
 
-        private void RunAdb(string args)
+        private string RunAdb(string command)
         {
-            var proc = new Process();
-            proc.StartInfo.FileName = "adb";
-            proc.StartInfo.Arguments = args;
-            proc.StartInfo.UseShellExecute = false;
-            proc.StartInfo.RedirectStandardOutput = true;
-            proc.StartInfo.RedirectStandardError = true;
-            proc.Start();
-            proc.WaitForExit();
+            try
+            {
+                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                string adbPath = Path.Combine(baseDir, "Tools", "adb", "adb.exe");
+
+                if (!File.Exists(adbPath))
+                    throw new FileNotFoundException($"Nem található az ADB: {adbPath}");
+
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = adbPath,
+                    Arguments = command,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = Path.Combine(baseDir, "Tools", "adb")
+                };
+
+                using (Process proc = Process.Start(psi))
+                {
+                    string output = proc.StandardOutput.ReadToEnd();
+                    string error = proc.StandardError.ReadToEnd();
+                    proc.WaitForExit();
+
+                    if (!string.IsNullOrWhiteSpace(error))
+                        Console.WriteLine($"⚠️ ADB hiba: {error}");
+
+                    return output;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ ADB futtatási hiba: {ex.Message}");
+                return string.Empty;
+            }
         }
+
 
 
         private async void iOSInspect_Click(object sender, RoutedEventArgs e)

@@ -2,15 +2,17 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="App Display"
-        Width="650" Height="1000"
-        Background="Transparent"
+        MinWidth="600" MinHeight="870"
+        Width="700" Height="900"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
-        Loaded="Window_Loaded"
-        Closed="Window_Closed"
-        WindowStyle="None">
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="#1E1E1E">
 
     <Window.Resources>
+
+        <!-- Alap gombstílus -->
         <Style x:Key="ButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#822" />
             <Setter Property="Foreground" Value="White" />
@@ -23,10 +25,10 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}" 
-                            CornerRadius="8"
-                            Padding="{TemplateBinding Padding}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}">
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                     </ControlTemplate>
@@ -37,9 +39,9 @@
                     <Setter Property="Background" Value="#A22" />
                 </Trigger>
             </Style.Triggers>
-            
         </Style>
 
+        <!-- Másodlagos gombstílus -->
         <Style x:Key="ActionButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#444" />
             <Setter Property="Foreground" Value="White" />
@@ -54,113 +56,131 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <!-- Lekerekített hátterű "TextBlock" stílus -->
+        <Style x:Key="RoundedLabelStyle" TargetType="Border">
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Background" Value="#444"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Margin" Value="0 10 0 10"/>
+        </Style>
+
     </Window.Resources>
+
     <Border CornerRadius="12"
             Background="#1E1E1E"
             BorderBrush="#555"
-            BorderThickness="2"
-            >
-            
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+            BorderThickness="2">
 
         <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-            <Grid.ColumnDefinitions>
+            <!-- Felső vezérlősor -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
+                <!-- Bezárás gomb -->
+                <Button Content="❌ Bezárás"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Grid.Column="0"
+                        Margin="10"
+                        Style="{StaticResource ButtonStyle}"
+                        Padding="10,5"
+                        Width="100"
+                        Click="BtnClose_Click"
+                        Background="#444"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        BorderThickness="0"/>
 
-            </Grid.ColumnDefinitions>
-            
-            <Button Content="❌ Bezárás"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                Grid.Column="0"
-                Margin="10"
-                Style="{StaticResource ButtonStyle}"
-                Padding="10,5"
-                Click="BtnClose_Click"
-                Background="#444"
-                Foreground="White"
-                FontWeight="Bold"
-                BorderThickness="0"/>
+         
+                <!--<Border Style="{StaticResource RoundedLabelStyle}" Grid.Column="1"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center">
+                    <TextBlock Text="Csatlakoztatott eszköz:"
+                               Foreground="White"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Center"/>
+                </Border>
+     
+                <TextBox Text=""
+                         Foreground="White"
+                         Grid.Column="2"
+                         VerticalAlignment="Center"
+                         HorizontalAlignment="Center"
+                         Background="#444"
+                         Margin="0 10 10 10"
+                         Padding="10,5"
+                         Width="150">
+                    <TextBox.Resources>
+                        <Style TargetType="{x:Type Border}">
+                            <Setter Property="CornerRadius" Value="8"/>
+                        </Style>
+                    </TextBox.Resources>
+                </TextBox>-->
 
-            <TextBlock Text="Csatlakoztatott eszköz:"
-                   Foreground="White"
-                   Grid.Column="1"
-                   VerticalAlignment="Center"
-                   HorizontalAlignment="Center"
-                   Background="#444"
-                   Margin="0 10 0 10"
-                   Padding="10,5">
-                <TextBlock.Resources>
-                    <Style TargetType="{x:Type Border}">
-                        <Setter Property="CornerRadius" Value="8"/> 
-                    </Style>
-                </TextBlock.Resources>
-            </TextBlock>
+                <Button Content="🔍 Inspect indítása"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Margin="10"
+                        Style="{StaticResource ButtonStyle}"
+                        Grid.Column="2"
+                        Padding="10,5"
+                        Click="BtnScreenshot_Click"
+                        Background="#444"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        x:Name="BtnInspect"
+                        Width="140"
+                        BorderThickness="0"/>
 
-            <TextBox Text=""
-                 Foreground="White"
-                 Grid.Column="2"
-                 
-                 VerticalAlignment="Center"
-                 HorizontalAlignment="Center"
-                 Background="#444"
-                 Margin="0 10 10 10"
-                 Padding="10,5"
-                 Width="150">
-                <TextBox.Resources>
-                    <Style TargetType="{x:Type Border}">
-                        <Setter Property="CornerRadius" Value="8"/>
-                    </Style>
-                </TextBox.Resources>
-            </TextBox>
+                <!-- Screenshot gomb -->
+                <Button Content="📸 Prrtsc"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Margin="10"
+                        Style="{StaticResource ButtonStyle}"
+                        Grid.Column="3"
+                        Padding="10,5"
+                        Click="BtnScreenshot_Click"
+                        Background="#444"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        Width="100"
+                        BorderThickness="0"/>
+            </Grid>
 
-        <Button Content="📸 Prrtsc"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                Margin="10"
-                Style="{StaticResource ButtonStyle}"
-                Grid.Column="3"
-                Padding="10,5"
-                Click="BtnScreenshot_Click"
-                Background="#444"
-                Foreground="White"
-                FontWeight="Bold"
-                BorderThickness="0"/>
-        </Grid>
+            <!-- Kép megjelenítő rész -->
+            <Border Margin="10"
+                    CornerRadius="12"
+                    Background="#222"
+                    Grid.Row="1"
+                    BorderBrush="#555"
+                    BorderThickness="2">
+                <Grid x:Name="ImageContainer"
+                      VerticalAlignment="Center"
+                      HorizontalAlignment="Center">
 
-        <Border Margin="10"
-                CornerRadius="12"
-                Background="#222"
-                Grid.Row="1"
-                BorderBrush="#555"
-                BorderThickness="2">
-            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <TextBlock Text="App Display"
-                           FontSize="22"
-                           Foreground="White"
-                           HorizontalAlignment="Center"/>
-                <TextBlock x:Name="DeviceText"
-                           Text="Device: --"
-                           Foreground="Gray"
-                           FontSize="14"
+                    <Image x:Name="PreviewImage"
+                           Width="600"
+                           Height="820"
+                           Stretch="Uniform"
+                           VerticalAlignment="Center"
                            HorizontalAlignment="Center"
-                           Margin="0,8,0,0"/>
-                <Image x:Name="PreviewImage"
-                       Width="600"
-                       Height="855"
-                       Stretch="Uniform"
-                       Margin="0,15,0,0"/>
-            </StackPanel>
-        </Border>            
-     </Grid>
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                </Grid>
+            </Border>
+
+
+        </Grid>
     </Border>
 </Window>
