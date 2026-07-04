@@ -1,6 +1,6 @@
 # AT Framework — új projekt váz
 
-Ez a solution a régi `AT` projekt (JanosHatvani/AT) modernizált újraírásának
+Ez a solution a régi `ATold` projekt (JanosHatvani/AT) modernizált újraírásának
 első lépése: a design-rendszer és a UI-shell. Automatizálási logika (Web,
 Desktop, Mobile) még nincs bekötve — azok külön fázisokban kerülnek bele.
 
