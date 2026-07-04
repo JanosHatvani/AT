@@ -1,0 +1,107 @@
+﻿<Window x:Class="AT.App.Views.InspectorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:conv="clr-namespace:AT.App.Converters"
+        Title="Elem-kereső"
+        Width="460"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowActivated="False"
+        ShowInTaskbar="False"
+        Topmost="True"
+        ResizeMode="NoResize"
+        SizeToContent="Height"
+        WindowStartupLocation="Manual">
+
+    <Border Style="{StaticResource CardStyle}" Padding="0">
+        <StackPanel>
+
+            <!-- ===================== FEJLÉC (húzható) ===================== -->
+            <Grid Margin="18,16,10,14" MouseLeftButtonDown="DragHandle_MouseLeftButtonDown" Background="Transparent">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding PlatformTitle, StringFormat='Elem-kereső — {0}'}"
+                           Style="{StaticResource SectionTitleStyle}" />
+                <Button Grid.Column="1" Content="✕" Style="{StaticResource LinkButtonStyle}" Click="CloseButton_Click" />
+            </Grid>
+
+            <Border Height="1" Background="{StaticResource Brush.Border}" />
+
+            <!-- ===================== TARTALOM ===================== -->
+            <StackPanel Margin="18,16,18,18">
+
+                <TextBlock Text="Ehhez a modulhoz jelenleg nincs elérhető driver."
+                           Style="{StaticResource SubtleTextStyle}" Foreground="{StaticResource Brush.Warning}" TextWrapping="Wrap" Margin="0,0,0,12"
+                           Visibility="{Binding IsPlatformReady, Converter={x:Static conv:InverseBoolToVisibilityConverter.Instance}}" />
+
+                <!-- Állapot: alap (indítás előtt) -->
+                <StackPanel Visibility="{Binding IsIdle, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}">
+                    <TextBlock TextWrapping="Wrap" Style="{StaticResource SubtleTextStyle}" Margin="0,0,0,16">
+                        Indítás után <Bold>3 másodperced</Bold> lesz, hogy az egeret a kívánt elem fölé vidd —
+                        akár egy felugró menüben vagy dialógusban is. Kattintanod nem kell.
+                    </TextBlock>
+                    <Button Content="Indítás (3 mp)" Style="{StaticResource PrimaryButtonStyle}"
+                            HorizontalAlignment="Left" Command="{Binding StartInspectCommand}" />
+                </StackPanel>
+
+                <!-- Állapot: visszaszámlálás -->
+                <StackPanel Visibility="{Binding IsCountingDown, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}"
+                            HorizontalAlignment="Center">
+                    <TextBlock Text="{Binding SecondsRemaining}" FontSize="48" FontWeight="Bold"
+                               Foreground="{StaticResource Brush.Accent}" HorizontalAlignment="Center" />
+                    <TextBlock Text="Pozícionáld az egeret az elem fölé…" Style="{StaticResource SubtleTextStyle}"
+                               HorizontalAlignment="Center" Margin="0,8,0,0" />
+                </StackPanel>
+
+                <!-- Állapot: rögzítve -->
+                <StackPanel Visibility="{Binding IsCaptured, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}">
+                    <TextBlock Text="{Binding ControlType, StringFormat='Elem típusa: {0}'}"
+                               Style="{StaticResource SubtleTextStyle}" Margin="0,0,0,12" TextWrapping="Wrap" />
+
+                    <ItemsControl ItemsSource="{Binding Candidates}"
+                                  Visibility="{Binding HasCandidates, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,0,1" Padding="0,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0" Text="{Binding Label}" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" />
+
+                                        <TextBlock Grid.Column="1" Text="{Binding Value}" VerticalAlignment="Center"
+                                                   Margin="8,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Value}" />
+
+                                        <Button Grid.Column="2" Content="Használat" Style="{StaticResource GhostButtonStyle}"
+                                                Padding="12,5"
+                                                Command="{Binding DataContext.UseCandidateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Text="Nem található egyetlen használható azonosító sem ehhez az elemhez."
+                               Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap"
+                               Visibility="{Binding HasCandidates, Converter={x:Static conv:InverseBoolToVisibilityConverter.Instance}}" />
+
+                    <Button Content="Új keresés" Style="{StaticResource GhostButtonStyle}"
+                            HorizontalAlignment="Left" Margin="0,14,0,0" Command="{Binding StartInspectCommand}" />
+                </StackPanel>
+
+                <Border Height="1" Background="{StaticResource Brush.Border}" Margin="0,18,0,14" />
+
+                <Button Content="Bezárás" Style="{StaticResource GhostButtonStyle}"
+                        HorizontalAlignment="Left" Click="CloseButton_Click" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

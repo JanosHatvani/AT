@@ -1,0 +1,108 @@
+﻿<Window x:Class="AT.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:AT.App.ViewModels"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="AT Framework"
+        Icon="Assets/app.ico"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        Height="800" Width="1280"
+        MinHeight="600" MinWidth="960"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource Brush.Background}">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0"
+                             ResizeBorderThickness="6"
+                             GlassFrameThickness="0"
+                             CornerRadius="0"
+                             UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="240" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ===================== OLDALSÁV ===================== -->
+        <!-- A teljes sidebar húzva mozgatja az ablakot (a gombok elsőbbséget élveznek a saját kattintásukra) -->
+        <Border Grid.Column="0" Background="{StaticResource Brush.SidebarBg}"
+                MouseLeftButtonDown="DragHandle_MouseLeftButtonDown">
+            <DockPanel LastChildFill="False">
+
+                <StackPanel DockPanel.Dock="Top" Margin="24,28,24,20">
+                    <TextBlock Text="AT" FontSize="26" FontWeight="Bold"
+                               Foreground="{StaticResource Brush.SidebarTextPrimary}" />
+                    <TextBlock Text="Automatizált tesztelés" FontSize="11"
+                               Foreground="{StaticResource Brush.SidebarTextSecondary}"
+                               Margin="0,2,0,0" />
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Top" Margin="12,8,12,0">
+                    <Button Content="Áttekintés"
+                            Style="{StaticResource NavButtonStyle}"
+                            Command="{Binding NavigateCommand}"
+                            CommandParameter="{x:Type vm:DashboardViewModel}"
+                            IsEnabled="{Binding IsDashboardActive, Converter={StaticResource InverseBooleanConverter}}" />
+                    <Button Content="Web tesztelés"
+                            x:Name="WebTestButton"
+                            Uid="pontaaz"
+                            AutomationProperties.AutomationId="HAHs1"
+                            Style="{StaticResource NavButtonStyle}"
+                            Command="{Binding NavigateCommand}"
+                            CommandParameter="{x:Type vm:WebTestViewModel}"
+                            IsEnabled="{Binding IsWebActive, Converter={StaticResource InverseBooleanConverter}}" />
+                    <Button Content="Windows desktop"
+                            Style="{StaticResource NavButtonStyle}"
+                            Command="{Binding NavigateCommand}"
+                            CommandParameter="{x:Type vm:DesktopTestViewModel}"
+                            IsEnabled="{Binding IsDesktopActive, Converter={StaticResource InverseBooleanConverter}}" />
+                    <Button Content="Mobil (Android / iOS)"
+                            Style="{StaticResource NavButtonStyle}"
+                            Command="{Binding NavigateCommand}"
+                            CommandParameter="{x:Type vm:MobileTestViewModel}"
+                            IsEnabled="{Binding IsMobileActive, Converter={StaticResource InverseBooleanConverter}}" />
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Bottom" Margin="12,0,12,20">
+                    <Border Height="1" Background="{StaticResource Brush.SidebarHover}" Margin="8,0,8,8" />
+                    <Button Content="Beállítások"
+                            Style="{StaticResource NavButtonStyle}"
+                            Command="{Binding NavigateCommand}"
+                            CommandParameter="{x:Type vm:SettingsViewModel}"
+                            IsEnabled="{Binding IsSettingsActive, Converter={StaticResource InverseBooleanConverter}}" />
+                    <Button Content="Bezárás"
+                            Style="{StaticResource NavButtonStyle}"
+                            Click="CloseButton_Click" />
+                </StackPanel>
+
+            </DockPanel>
+        </Border>
+
+        <!-- ===================== TARTALOM ===================== -->
+        <Grid Grid.Column="1" Background="{StaticResource Brush.ContentBackground}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="36,32">
+                <ContentControl Content="{Binding CurrentViewModel}" />
+            </ScrollViewer>
+
+            <!-- Toast overlay - jobb alsó sarok -->
+            <ItemsControl ItemsSource="{Binding Toasts}"
+                          HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                          Margin="0,0,24,24">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource ToastBorderStyle}">
+                            <TextBlock Text="{Binding Message}"
+                                       Foreground="White"
+                                       FontSize="13"
+                                       TextWrapping="Wrap" />
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Grid>
+
+    </Grid>
+</Window>

@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>AT.App</RootNamespace>
+    <AssemblyName>AT.App</AssemblyName>
+    <PlatformTarget>x64</PlatformTarget>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AT.Core\AT.Core.csproj" />
+    <ProjectReference Include="..\AT.Infrastructure\AT.Infrastructure.csproj" />
+    <ProjectReference Include="..\AT.Automation.Web\AT.Automation.Web.csproj" />
+    <ProjectReference Include="..\AT.Automation.Desktop\AT.Automation.Desktop.csproj" />
+    <ProjectReference Include="..\AT.Automation.Mobile\AT.Automation.Mobile.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>

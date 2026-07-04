@@ -1,0 +1,119 @@
+using AT.App.Models;
+using AT.App.Services;
+using AT.Infrastructure;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+
+namespace AT.App.ViewModels;
+
+/// <summary>
+/// A modulok alapértelmezéseit kezeli — ez váltja ki a régi kódban hardcode-olt
+/// útvonalakat (pl. az APK elérési útját), és helyben, a gépeden tárolja őket.
+/// </summary>
+public sealed partial class SettingsViewModel : ObservableObject
+{
+    private readonly ISettingsService _settingsService;
+    private readonly INotificationService _notificationService;
+
+    public string Title => "Beállítások";
+    public string Description => "Alapértelmezett értékek a Web / Desktop / Mobil modulokhoz — a gépeden tárolva, nem kerülnek fel semmilyen szerverre.";
+
+    public IReadOnlyList<string> AvailableBrowsers { get; } = new[] { "Chrome", "Firefox", "Edge" };
+
+    [ObservableProperty]
+    private string? androidSdkRoot;
+
+    [ObservableProperty]
+    private string defaultBrowser = "Chrome";
+
+    [ObservableProperty]
+    private int defaultTimeoutSeconds = 10;
+
+    [ObservableProperty]
+    private string? defaultAvdName;
+
+    [ObservableProperty]
+    private string? defaultApkPath;
+
+    [ObservableProperty]
+    private string? defaultDesktopAppPath;
+
+    public SettingsViewModel(ISettingsService settingsService, INotificationService notificationService)
+    {
+        _settingsService = settingsService;
+        _notificationService = notificationService;
+        LoadFromSettings();
+    }
+
+    private void LoadFromSettings()
+    {
+        var s = _settingsService.Current;
+        AndroidSdkRoot = s.AndroidSdkRoot;
+        DefaultBrowser = s.DefaultBrowser;
+        DefaultTimeoutSeconds = s.DefaultTimeoutSeconds;
+        DefaultAvdName = s.DefaultAvdName;
+        DefaultApkPath = s.DefaultApkPath;
+        DefaultDesktopAppPath = s.DefaultDesktopAppPath;
+    }
+
+    [RelayCommand]
+    private void BrowseAndroidSdkRoot()
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Android SDK gyökérmappa kiválasztása" };
+        if (dialog.ShowDialog() == true)
+            AndroidSdkRoot = dialog.FolderName;
+    }
+
+    [RelayCommand]
+    private void BrowseApkPath()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Alapértelmezett APK kiválasztása",
+            Filter = "Android csomag (*.apk)|*.apk|Minden fájl (*.*)|*.*"
+        };
+        if (dialog.ShowDialog() == true)
+            DefaultApkPath = dialog.FileName;
+    }
+
+    [RelayCommand]
+    private void BrowseDesktopAppPath()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Alapértelmezett alkalmazás kiválasztása",
+            Filter = "Futtatható fájl (*.exe)|*.exe|Minden fájl (*.*)|*.*"
+        };
+        if (dialog.ShowDialog() == true)
+            DefaultDesktopAppPath = dialog.FileName;
+    }
+
+    [RelayCommand]
+    private async Task SaveAsync()
+    {
+        var s = _settingsService.Current;
+        s.AndroidSdkRoot = NullIfEmpty(AndroidSdkRoot);
+        s.DefaultBrowser = DefaultBrowser;
+        s.DefaultTimeoutSeconds = Math.Max(1, DefaultTimeoutSeconds);
+        s.DefaultAvdName = NullIfEmpty(DefaultAvdName);
+        s.DefaultApkPath = NullIfEmpty(DefaultApkPath);
+        s.DefaultDesktopAppPath = NullIfEmpty(DefaultDesktopAppPath);
+
+        await _settingsService.SaveAsync();
+        _notificationService.Show("Beállítások mentve.", NotificationType.Success);
+    }
+
+    [RelayCommand]
+    private void ResetDefaults()
+    {
+        AndroidSdkRoot = null;
+        DefaultBrowser = "Chrome";
+        DefaultTimeoutSeconds = 10;
+        DefaultAvdName = null;
+        DefaultApkPath = null;
+        DefaultDesktopAppPath = null;
+        _notificationService.Show("Alapértelmezett értékek visszaállítva — a Mentés gombbal rögzítheted.", NotificationType.Info);
+    }
+
+    private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+}
