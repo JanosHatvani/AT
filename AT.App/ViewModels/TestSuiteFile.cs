@@ -57,6 +57,12 @@ public sealed class TestStepDto
 
     [XmlAttribute("timeoutSeconds")]
     public int TimeoutSeconds { get; set; } = 10;
+
+    [XmlAttribute("continueOnError")]
+    public bool ContinueOnError { get; set; }
+
+    [XmlAttribute("skip")]
+    public bool Skip { get; set; }
 }
 
 public static class TestSuiteMapper
@@ -71,7 +77,9 @@ public static class TestSuiteMapper
         Value = step.Value,
         TargetLocator = step.TargetLocator,
         TargetLocatorType = step.TargetLocatorType,
-        TimeoutSeconds = step.TimeoutSeconds
+        TimeoutSeconds = step.TimeoutSeconds,
+        ContinueOnError = step.ContinueOnError,
+        Skip = step.Skip
     };
 
     public static TestStep ToTestStep(TestStepDto dto, AutomationTarget target) => new()
@@ -85,6 +93,8 @@ public static class TestSuiteMapper
         Value = dto.Value,
         TargetLocator = dto.TargetLocator,
         TargetLocatorType = dto.TargetLocatorType,
-        TimeoutSeconds = dto.TimeoutSeconds
+        TimeoutSeconds = dto.TimeoutSeconds,
+        ContinueOnError = dto.ContinueOnError,
+        Skip = dto.Skip
     };
 }

@@ -34,7 +34,7 @@
 
                     <StackPanel Grid.Column="1">
                         <TextBlock Text="Alapért. timeout (mp)" Style="{StaticResource FieldLabelStyle}" />
-                        <TextBox Text="{Binding DefaultTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}"  />
+                        <TextBox Text="{Binding DefaultTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </Grid>
                 <TextBlock Text="Ez tölti ki előre a Timeout mezőt minden új lépésnél, mindhárom modulban."
@@ -54,7 +54,7 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBox Grid.Column="0" Text="{Binding AndroidSdkRoot, UpdateSourceTrigger=PropertyChanged}"
-                              Margin="0,0,10,0" />
+                             Margin="0,0,10,0" />
                     <Button Grid.Column="1" Content="Tallózás" Style="{StaticResource GhostButtonStyle}"
                             Command="{Binding BrowseAndroidSdkRootCommand}" />
                 </Grid>
@@ -97,6 +97,39 @@
                             Command="{Binding BrowseDesktopAppPathCommand}" />
                 </Grid>
                 <TextBlock Text="Ez tölti ki előre az Érték mezőt a Desktop oldal LaunchApp lépésénél."
+                           Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- ===================== KÉPERNYŐKÉP-MENTÉS ===================== -->
+        <Border Style="{StaticResource CardStyle}" Margin="0,0,0,20">
+            <StackPanel>
+                <TextBlock Text="Képernyőkép-mentés" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,12" />
+
+                <TextBlock Text="Mikor készüljön képernyőkép" Style="{StaticResource FieldLabelStyle}" />
+                <StackPanel Margin="0,0,0,12">
+                    <RadioButton Content="Soha" GroupName="ScreenshotMode"
+                                 IsChecked="{Binding IsCaptureNever}" Margin="0,0,0,6" />
+                    <RadioButton Content="Csak hiba esetén" GroupName="ScreenshotMode"
+                                 IsChecked="{Binding IsCaptureOnErrorOnly}" Margin="0,0,0,6" />
+                    <RadioButton Content="Minden lépés után" GroupName="ScreenshotMode"
+                                 IsChecked="{Binding IsCaptureAlways}" />
+                </StackPanel>
+
+                <TextBlock Text="Mentési mappa" Style="{StaticResource FieldLabelStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" Text="{Binding ScreenshotFolderPath, UpdateSourceTrigger=PropertyChanged}"
+                             IsEnabled="{Binding IsFolderPathEditable}"
+                             Margin="0,0,10,0" />
+                    <Button Grid.Column="1" Content="Tallózás" Style="{StaticResource GhostButtonStyle}"
+                            IsEnabled="{Binding IsFolderPathEditable}"
+                            Command="{Binding BrowseScreenshotFolderCommand}" />
+                </Grid>
+                <TextBlock Text="Ha üresen hagyod, a képernyőképek az Asztalra kerülnek."
                            Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap" />
             </StackPanel>
         </Border>

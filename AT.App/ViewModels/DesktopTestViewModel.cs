@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
 using AT.App.Models;
 using AT.App.Services;
 using AT.Automation.Desktop;
@@ -14,9 +16,7 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     private readonly DesktopAutomationDriver _driver;
     private readonly INotificationService _notificationService;
     private readonly AT.Infrastructure.ITestSuiteFileService _fileService;
-
-    [ObservableProperty]
-    private string testName = "";
+    private readonly AT.Infrastructure.ISettingsService _settingsService;
 
     private static readonly DesktopStepAction[] NoLocatorActions =
         { DesktopStepAction.LaunchApp, DesktopStepAction.AttachToWindow, DesktopStepAction.Wait, DesktopStepAction.Close };
@@ -37,6 +37,9 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     public string Description => "FlaUI (UIA3) alapú lépéslista — a Winium leváltása.";
 
     public ObservableCollection<TestStepRow> Steps { get; } = new();
+
+    [ObservableProperty]
+    private string testName = "";
 
     public IReadOnlyList<DesktopStepAction> AvailableActions { get; } = Enum.GetValues<DesktopStepAction>();
     public IReadOnlyList<LocatorType> AvailableLocatorTypes { get; } = SupportedLocatorTypes;
@@ -62,6 +65,14 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     [ObservableProperty]
     private int newTimeoutSeconds = 10;
 
+    /// <summary>Ha be van jelölve, a lépés hibája NEM szakítja meg a futtatást.</summary>
+    [ObservableProperty]
+    private bool newContinueOnError;
+
+    /// <summary>Ha be van jelölve, a lépést a futtatás átugorja — meg sem kísérli végrehajtani.</summary>
+    [ObservableProperty]
+    private bool newSkip;
+
     [ObservableProperty]
     private bool isRunning;
 
@@ -82,6 +93,7 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         _driver = driver;
         _notificationService = notificationService;
         _fileService = fileService;
+        _settingsService = settingsService;
         Steps.CollectionChanged += (_, _) => RunStepsCommand.NotifyCanExecuteChanged();
 
         var defaults = settingsService.Current;
@@ -133,7 +145,9 @@ public sealed partial class DesktopTestViewModel : ObservableObject
             TargetLocator = NewTargetLocator,
             TargetLocatorType = NewTargetLocatorType,
             Value = NewValue,
-            TimeoutSeconds = NewTimeoutSeconds
+            TimeoutSeconds = NewTimeoutSeconds,
+            ContinueOnError = NewContinueOnError,
+            Skip = NewSkip
         };
 
         if (_editingRow is not null)
@@ -141,6 +155,7 @@ public sealed partial class DesktopTestViewModel : ObservableObject
             _editingRow.Step = step;
             _editingRow.Status = TestStatus.NotRun;
             _editingRow.Message = null;
+            _editingRow.Duration = null;
             _notificationService.Show("Lépés frissítve.", NotificationType.Success);
         }
         else
@@ -163,6 +178,8 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         NewTargetLocator = row.Step.TargetLocator ?? string.Empty;
         NewValue = row.Step.Value ?? string.Empty;
         NewTimeoutSeconds = row.Step.TimeoutSeconds;
+        NewContinueOnError = row.Step.ContinueOnError;
+        NewSkip = row.Step.Skip;
 
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(AddButtonLabel));
@@ -177,10 +194,170 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         NewLocator = string.Empty;
         NewTargetLocator = string.Empty;
         NewValue = string.Empty;
-        NewTimeoutSeconds = 10;
+        NewTimeoutSeconds = _defaultTimeoutSeconds;
+        NewContinueOnError = false;
+        NewSkip = false;
 
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(AddButtonLabel));
+    }
+
+    [RelayCommand]
+    private void RemoveStep(TestStepRow row)
+    {
+        if (_editingRow == row)
+            CancelEdit();
+
+        Steps.Remove(row);
+    }
+
+    [RelayCommand]
+    private void MoveStepUp(TestStepRow row)
+    {
+        var index = Steps.IndexOf(row);
+        if (index > 0)
+            Steps.Move(index, index - 1);
+    }
+
+    [RelayCommand]
+    private void MoveStepDown(TestStepRow row)
+    {
+        var index = Steps.IndexOf(row);
+        if (index >= 0 && index < Steps.Count - 1)
+            Steps.Move(index, index + 1);
+    }
+
+    [RelayCommand]
+    private void DuplicateStep(TestStepRow row)
+    {
+        var original = row.Step;
+        var copy = new TestStep
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = original.Name,
+            Target = original.Target,
+            Action = original.Action,
+            Locator = original.Locator,
+            LocatorType = original.LocatorType,
+            Value = original.Value,
+            TargetLocator = original.TargetLocator,
+            TargetLocatorType = original.TargetLocatorType,
+            TimeoutSeconds = original.TimeoutSeconds,
+            ContinueOnError = original.ContinueOnError,
+            Skip = original.Skip
+        };
+
+        var index = Steps.IndexOf(row);
+        Steps.Insert(index + 1, new TestStepRow { Step = copy });
+        _notificationService.Show("Lépés duplikálva.", NotificationType.Success);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRun))]
+    private async Task RunStepsAsync()
+    {
+        IsRunning = true;
+        RunStepsCommand.NotifyCanExecuteChanged();
+
+        try
+        {
+            await _driver.StartAsync();
+
+            foreach (var row in Steps)
+            {
+                row.Message = null;
+                row.Duration = null;
+
+                if (row.Step.Skip)
+                {
+                    row.Status = TestStatus.Skipped;
+                    continue;
+                }
+
+                row.Status = TestStatus.Running;
+                var stopwatch = Stopwatch.StartNew();
+
+                try
+                {
+                    var result = await _driver.ExecuteStepAsync(row.Step);
+                    stopwatch.Stop();
+                    row.Duration = stopwatch.Elapsed;
+                    row.Status = TestStatus.Passed;
+                    await CaptureScreenshotIfNeededAsync(row, isFailure: false);
+
+                    if (!string.IsNullOrEmpty(result))
+                        _notificationService.Show($"{row.Step.Name} → {result}", NotificationType.Info);
+                }
+                catch (Exception ex)
+                {
+                    stopwatch.Stop();
+                    row.Duration = stopwatch.Elapsed;
+                    row.Status = TestStatus.Failed;
+                    row.Message = ex.Message;
+                    _notificationService.Show($"Lépés sikertelen: {row.Step.Name}", NotificationType.Error);
+                    await CaptureScreenshotIfNeededAsync(row, isFailure: true);
+
+                    if (!row.Step.ContinueOnError)
+                        break;
+                }
+            }
+
+            var hasFailed = Steps.Any(s => s.Status == TestStatus.Failed);
+            _notificationService.Show(
+                hasFailed ? "A futtatás hibával leállt (vagy folytatódott a beállítás szerint)." : "Minden lépés sikeresen lefutott.",
+                hasFailed ? NotificationType.Error : NotificationType.Success);
+        }
+        catch (Exception ex)
+        {
+            _notificationService.Show($"Hiba a futtatás közben: {ex.Message}", NotificationType.Error);
+        }
+        finally
+        {
+            IsRunning = false;
+            RunStepsCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    private bool CanRun() => !IsRunning && Steps.Count > 0;
+
+    /// <summary>A Beállításokban választott mód szerint (soha / csak hiba / minden lépés) ment képernyőképet.</summary>
+    private async Task CaptureScreenshotIfNeededAsync(TestStepRow row, bool isFailure)
+    {
+        var mode = _settingsService.Current.ScreenshotCaptureMode;
+        var shouldCapture = mode == AT.Infrastructure.ScreenshotCaptureMode.Always
+            || (isFailure && mode == AT.Infrastructure.ScreenshotCaptureMode.OnErrorOnly);
+
+        if (!shouldCapture)
+            return;
+
+        try
+        {
+            var bytes = await _driver.GetScreenshotAsync();
+
+            var folder = string.IsNullOrWhiteSpace(_settingsService.Current.ScreenshotFolderPath)
+                ? Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)
+                : _settingsService.Current.ScreenshotFolderPath!;
+
+            Directory.CreateDirectory(folder);
+
+            var fileName = $"desktop_{SanitizeFileName(row.Step.Name)}_{DateTime.Now:yyyyMMdd_HHmmss_fff}.png";
+            var fullPath = Path.Combine(folder, fileName);
+
+            await File.WriteAllBytesAsync(fullPath, bytes);
+
+            if (isFailure)
+                _notificationService.Show($"Képernyőkép mentve: {fullPath}", NotificationType.Info);
+        }
+        catch (Exception ex)
+        {
+            _notificationService.Show($"Képernyőkép mentése sikertelen: {ex.Message}", NotificationType.Warning);
+        }
+    }
+
+    private static string SanitizeFileName(string name)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var sanitized = new string(name.Select(c => invalid.Contains(c) ? '_' : c).ToArray());
+        return sanitized.Length > 40 ? sanitized[..40] : sanitized;
     }
 
     [RelayCommand]
@@ -245,66 +422,6 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void RemoveStep(TestStepRow row)
-    {
-        if (_editingRow == row)
-            CancelEdit();
-
-        Steps.Remove(row);
-    }
-
-    [RelayCommand(CanExecute = nameof(CanRun))]
-    private async Task RunStepsAsync()
-    {
-        IsRunning = true;
-        RunStepsCommand.NotifyCanExecuteChanged();
-
-        try
-        {
-            await _driver.StartAsync();
-
-            foreach (var row in Steps)
-            {
-                row.Status = TestStatus.Running;
-                row.Message = null;
-
-                try
-                {
-                    var result = await _driver.ExecuteStepAsync(row.Step);
-                    row.Status = TestStatus.Passed;
-
-                    if (!string.IsNullOrEmpty(result))
-                        _notificationService.Show($"{row.Step.Name} → {result}", NotificationType.Info);
-                }
-                catch (Exception ex)
-                {
-                    row.Status = TestStatus.Failed;
-                    row.Message = ex.Message;
-                    _notificationService.Show($"Lépés sikertelen: {row.Step.Name}", NotificationType.Error);
-                    break;
-                }
-            }
-
-            var hasFailed = Steps.Any(s => s.Status == TestStatus.Failed);
-            _notificationService.Show(
-                hasFailed ? "A futtatás hibával leállt." : "Minden lépés sikeresen lefutott.",
-                hasFailed ? NotificationType.Error : NotificationType.Success);
-        }
-        catch (Exception ex)
-        {
-            _notificationService.Show($"Hiba a futtatás közben: {ex.Message}", NotificationType.Error);
-        }
-        finally
-        {
-            IsRunning = false;
-            RunStepsCommand.NotifyCanExecuteChanged();
-        }
-    }
-
-    private bool CanRun() => !IsRunning && Steps.Count > 0;
-
-
-    [RelayCommand]
     private async Task OpenElementFinderAsync()
     {
         await _driver.StartAsync();
@@ -319,15 +436,12 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         window.Show();
     }
 
-
     [RelayCommand]
     private async Task CloseAppAsync()
     {
         await _driver.StopAsync();
         _notificationService.Show("Alkalmazás bezárva / leválasztva.", NotificationType.Info);
     }
-
-        
 
     private static string BuildStepName(DesktopStepAction action, string locator, string value, string targetLocator) => action switch
     {
@@ -336,12 +450,12 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         DesktopStepAction.Click => $"Kattintás → {locator}",
         DesktopStepAction.DoubleClick => $"Dupla kattintás → {locator}",
         DesktopStepAction.RightClick => $"Jobb-klikk → {locator}",
-        DesktopStepAction.SetText => $"Szöveg beállítása ({locator}) → {value}",
+        DesktopStepAction.SetText => $"Szöveg beállítása → {locator} → {value}",
         DesktopStepAction.Clear => $"Mező ürítése → {locator}",
         DesktopStepAction.Hover => $"Rámutatás → {locator}",
-        DesktopStepAction.SelectComboBoxItem => $"Lista-elem kiválasztása ({locator}) → {value}",
+        DesktopStepAction.SelectComboBoxItem => $"Lista-elem kiválasztása → {locator} → {value}",
         DesktopStepAction.DragAndDrop => $"Húzás → {locator} ⇒ {targetLocator}",
-        DesktopStepAction.ReadAttribute => $"Attribútum kiolvasása ({locator}) → {value}",
+        DesktopStepAction.ReadAttribute => $"Attribútum kiolvasása → {locator} → {value}",
         DesktopStepAction.Wait => "Várakozás",
         DesktopStepAction.WaitVisible => $"Várakozás láthatóra → {locator}",
         DesktopStepAction.WaitEnabled => $"Várakozás elérhetőre → {locator}",
@@ -349,10 +463,10 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         DesktopStepAction.WaitPresent => $"Várakozás megjelenésre → {locator}",
         DesktopStepAction.WaitAbsent => $"Várakozás eltűnésre → {locator}",
         DesktopStepAction.WaitSelected => $"Várakozás kiválasztásra → {locator}",
-        DesktopStepAction.WaitHasText => $"Várakozás szövegre ({locator}) → {value}",
-        DesktopStepAction.WaitHasValue => $"Várakozás értékre ({locator}) → {value}",
-        DesktopStepAction.WaitHasClass => $"Várakozás class-ra ({locator}) → {value}",
-        DesktopStepAction.WaitHasAttribute => $"Várakozás attribútumra ({locator}) → {value}",
+        DesktopStepAction.WaitHasText => $"Várakozás szövegre → {locator} → {value}",
+        DesktopStepAction.WaitHasValue => $"Várakozás értékre → {locator} → {value}",
+        DesktopStepAction.WaitHasClass => $"Várakozás class-ra → {locator} → {value}",
+        DesktopStepAction.WaitHasAttribute => $"Várakozás attribútumra → {locator} → {value}",
         DesktopStepAction.Close => "Alkalmazás bezárása",
         _ => action.ToString()
     };

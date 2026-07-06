@@ -1,43 +1,32 @@
 using System.Collections.ObjectModel;
-using System.Windows;
 using System.Windows.Threading;
 using AT.App.Models;
 
 namespace AT.App.Services;
 
 /// <summary>
-/// Központi, nem blokkoló értesítési szolgáltatás. Ez váltja ki a jelenlegi
-/// kódbázis 102 db MessageBox.Show hívását: a hívó csak annyit tud, hogy
-/// "üzenetet akarok mutatni", a UI dönti el, hogyan (toast, jelenleg).
+/// A Toasts kollekciót a MainWindow.xaml egy ItemsControl-lal köti ki (jobb alsó sarok
+/// overlay). Minden Show hívás egy új ToastMessage-et ad hozzá, majd 3 másodperc múlva
+/// automatikusan eltávolítja — a törlés egy DispatcherTimer-en keresztül, UI-szálon
+/// történik, mert az ObservableCollection csak onnan módosítható biztonságosan.
 /// </summary>
-public interface INotificationService
-{
-    ObservableCollection<ToastMessage> Toasts { get; }
-
-    void Show(string message, NotificationType type = NotificationType.Info);
-}
-
 public sealed class NotificationService : INotificationService
 {
-    private const int DisplayDurationMs = 3500;
+    private static readonly TimeSpan DisplayDuration = TimeSpan.FromSeconds(3);
 
     public ObservableCollection<ToastMessage> Toasts { get; } = new();
 
     public void Show(string message, NotificationType type = NotificationType.Info)
     {
         var toast = new ToastMessage { Message = message, Type = type };
+        Toasts.Add(toast);
 
-        void Add() => Toasts.Add(toast);
-        void Remove() => Toasts.Remove(toast);
-
-        if (Application.Current?.Dispatcher.CheckAccess() == true)
-            Add();
-        else
-            Application.Current?.Dispatcher.Invoke(Add);
-
-        _ = Task.Delay(DisplayDurationMs).ContinueWith(_ =>
+        var timer = new DispatcherTimer { Interval = DisplayDuration };
+        timer.Tick += (sender, _) =>
         {
-            Application.Current?.Dispatcher.Invoke(Remove);
-        });
+            Toasts.Remove(toast);
+            ((DispatcherTimer)sender!).Stop();
+        };
+        timer.Start();
     }
 }

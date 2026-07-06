@@ -22,6 +22,7 @@ public partial class App : Application
         // ---- Szolgáltatások ----
         services.AddSingleton<INavigationService, NavigationService>();
         services.AddSingleton<INotificationService, NotificationService>();
+        services.AddSingleton<IMobileMirrorWindowService, MobileMirrorWindowService>();
         services.AddSingleton<AT.Infrastructure.ISettingsService, AT.Infrastructure.SettingsService>();
         services.AddSingleton<AT.Infrastructure.ITestSuiteFileService, AT.Infrastructure.TestSuiteFileService>();
 

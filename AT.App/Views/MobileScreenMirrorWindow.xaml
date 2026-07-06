@@ -1,0 +1,69 @@
+﻿<Window x:Class="AT.App.Views.MobileScreenMirrorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:conv="clr-namespace:AT.App.Converters"
+        Title="Élő kijelző — Mobil (Android) tesztelés"
+        Width="420" Height="640"
+        MinWidth="340" MinHeight="480"
+        WindowStartupLocation="Manual"
+        Closing="Window_Closing">
+
+    <Border Style="{StaticResource CardStyle}" Margin="0">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="4">
+                <TextBlock Text="Élő kijelző" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,4" />
+                <TextBlock Text="A régi verzió egy sosem írt fájlt figyelt — ez most tényleg a driver-től kér képet."
+                           Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap" Margin="0,0,0,12" />
+
+                <Border Background="{StaticResource Brush.Background}" CornerRadius="8" Height="360" ClipToBounds="True">
+                    <Grid>
+                        <Image Source="{Binding ScreenImage}" Stretch="Uniform"
+                               MouseLeftButtonDown="ScreenImage_MouseLeftButtonDown"
+                               Cursor="{Binding IsPicking, Converter={x:Static conv:PickingCursorConverter.Instance}}" />
+                        <TextBlock Text="Nincs kép — indítsd el a tükrözést"
+                                   Style="{StaticResource SubtleTextStyle}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Visibility="{Binding IsMirroring, Converter={x:Static conv:InverseBoolToVisibilityConverter.Instance}}" />
+                        <Border BorderBrush="{StaticResource Brush.Accent}" BorderThickness="3" IsHitTestVisible="False"
+                                Visibility="{Binding IsPicking, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}" />
+                    </Grid>
+                </Border>
+
+                <StackPanel Margin="0,12,0,0">
+                    <Button Content="{Binding IsMirroring, Converter={x:Static conv:MirrorButtonLabelConverter.Instance}}"
+                            Style="{StaticResource GhostButtonStyle}"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,8"
+                            Command="{Binding ToggleMirroringCommand}" />
+                    <Button Content="{Binding IsPicking, Converter={x:Static conv:PickingButtonLabelConverter.Instance}}"
+                            Style="{StaticResource GhostButtonStyle}"
+                            HorizontalAlignment="Center"
+                            Command="{Binding TogglePickingCommand}" />
+                </StackPanel>
+
+                <TextBlock Text="Kattints a képen a kívánt elemre — nem küldi tovább a kattintást az eszköznek, csak leolvassa, mi van ott."
+                           Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap" Margin="0,10,0,0"
+                           Visibility="{Binding IsPicking, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}" />
+
+                <ItemsControl ItemsSource="{Binding InspectorCandidates}" Margin="0,10,0,0"
+                              Visibility="{Binding HasInspectorResult, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,0,1" Padding="0,8">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="12" />
+                                    <TextBlock Text="{Binding Value}" Style="{StaticResource SubtleTextStyle}"
+                                               TextWrapping="Wrap" Margin="0,2,0,6" />
+                                    <Button Content="Használat" Style="{StaticResource GhostButtonStyle}"
+                                            HorizontalAlignment="Left" Padding="12,4"
+                                            Command="{Binding DataContext.UseInspectorCandidateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Border>
+</Window>

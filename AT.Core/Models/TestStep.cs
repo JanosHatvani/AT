@@ -35,6 +35,12 @@ public sealed class TestStep
     public LocatorType TargetLocatorType { get; set; } = LocatorType.Id;
 
     public int TimeoutSeconds { get; set; } = 10;
+
+    /// <summary>Ha true, a lépés hibája nem szakítja meg a futtatást — a lista folytatódik.</summary>
+    public bool ContinueOnError { get; set; }
+
+    /// <summary>Ha true, a lépést a futtatás átugorja — meg sem kísérli végrehajtani.</summary>
+    public bool Skip { get; set; }
 }
 
 /// <summary>Egy lefuttatott lépés eredménye — ez kerül majd a statisztika modulba.</summary>

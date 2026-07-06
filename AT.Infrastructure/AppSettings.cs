@@ -1,5 +1,12 @@
 ﻿namespace AT.Infrastructure;
 
+public enum ScreenshotCaptureMode
+{
+    Never,
+    OnErrorOnly,
+    Always
+}
+
 /// <summary>
 /// Perzisztens, helyi alapértelmezések a Web/Desktop/Mobil modulokhoz.
 /// Ez váltja ki a régi kódban hardcode-olt útvonalakat (pl. C:\TesztApp\app-debug.apk).
@@ -19,4 +26,10 @@ public sealed class AppSettings
     public string? DefaultApkPath { get; set; }
 
     public string? DefaultDesktopAppPath { get; set; }
+
+    /// <summary>Soha / csak hiba esetén / minden lépés után készítsen-e képernyőképet.</summary>
+    public ScreenshotCaptureMode ScreenshotCaptureMode { get; set; } = ScreenshotCaptureMode.Never;
+
+    /// <summary>Ha üres, a képernyőképek az Asztalra kerülnek.</summary>
+    public string? ScreenshotFolderPath { get; set; }
 }

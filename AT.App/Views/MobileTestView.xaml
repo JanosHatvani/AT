@@ -20,40 +20,88 @@
                 <DataTrigger Binding="{Binding Status}" Value="Failed">
                     <Setter Property="Foreground" Value="{StaticResource Brush.Danger}" />
                 </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Skipped">
+                    <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+                </DataTrigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="FieldLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource SubtleTextStyle}">
             <Setter Property="Margin" Value="0,0,0,4" />
         </Style>
+
+        <Style x:Key="TagBadgeStyle" TargetType="Border">
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="TagBadgeTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <Style x:Key="ColumnHeaderStyle" TargetType="TextBlock" BasedOn="{StaticResource FieldLabelStyle}">
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <!-- Kompaktabb stílus a lépéssor jobb szélén lévő művelet-linkekhez,
+             hogy 5 gomb (↑ ↓ Duplikálás Szerkesztés Törlés) is kényelmesen
+             kiférjen egy keskenyebb sávban is. A meglévő LinkButtonStyle-t
+             örökli, csak a paddinget/fontméretet szűkíti. -->
+        <Style x:Key="StepActionLinkButtonStyle" TargetType="Button" BasedOn="{StaticResource LinkButtonStyle}">
+            <Setter Property="Padding" Value="4,2" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="2,2,2,2" />
+        </Style>
     </UserControl.Resources>
 
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="320" />
-        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-        <!-- ===================== BAL OLDAL: LÉPÉSLISTA ===================== -->
-        <StackPanel Grid.Column="0" Margin="0,0,24,0">
-            <TextBlock Text="{Binding Title}" Style="{StaticResource PageTitleStyle}" />
-            <TextBlock Text="{Binding Description}" Style="{StaticResource SubtleTextStyle}" Margin="0,4,0,24" />
+        <!-- ===================== ROW 0: FEJLÉC + TESZT MEGNEVEZÉSE + ÚJ LÉPÉS (teljes szélesség) ===================== -->
+        <StackPanel Grid.Row="0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,20">
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="{Binding Title}" Style="{StaticResource PageTitleStyle}" />
+                    <TextBlock Text="{Binding Description}" Style="{StaticResource SubtleTextStyle}" Margin="0,4,0,0" />
+                </StackPanel>
+
+                <!-- Csak akkor látszik, ha a felhasználó bezárta az Élő kijelző ablakát —
+                     ezzel bármikor visszahozható ugyanaz az ablak-példány. -->
+                <Button Grid.Column="1" Content="Élő kijelző megnyitása"
+                        Style="{StaticResource GhostButtonStyle}"
+                        VerticalAlignment="Top"
+                        Command="{Binding OpenMirrorWindowCommand}"
+                        Visibility="{Binding IsMirrorWindowOpen, Converter={x:Static conv:InverseBoolToVisibilityConverter.Instance}}" />
+            </Grid>
+
+            <Border Style="{StaticResource CardStyle}" Margin="0,24,0,20">
                 <StackPanel>
                     <TextBlock Text="Teszt megnevezése" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,12" />
-                    <TextBox Text="{Binding TestName, UpdateSourceTrigger=PropertyChanged}" Width="200" MaxWidth="400" HorizontalAlignment="Left" />
+                    <TextBox Text="{Binding TestName, UpdateSourceTrigger=PropertyChanged}" MaxWidth="400" HorizontalAlignment="Left" />
                 </StackPanel>
             </Border>
 
             <!-- ===================== ÚJ LÉPÉS FORM ===================== -->
-            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,20">
+            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,0">
                 <StackPanel>
                     <TextBlock Text="Új lépés" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,12" />
 
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="200" />
+                            <ColumnDefinition Width="250" />
                             <ColumnDefinition Width="100" />
                         </Grid.ColumnDefinitions>
 
@@ -70,13 +118,13 @@
 
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="Timeout (mp)" Style="{StaticResource FieldLabelStyle}" />
-                            <TextBox Text="{Binding NewTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}"  />
+                            <TextBox Text="{Binding NewTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
                         </StackPanel>
                     </Grid>
 
                     <Grid Margin="0,0,0,10" IsEnabled="{Binding IsLocatorNeeded}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="250" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
@@ -93,7 +141,7 @@
 
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="Lokátor (resource-id / XPath / content-desc)" Style="{StaticResource FieldLabelStyle}" />
-                            <TextBox Text="{Binding NewLocator, UpdateSourceTrigger=PropertyChanged}"  />
+                            <TextBox Text="{Binding NewLocator, UpdateSourceTrigger=PropertyChanged}" />
                         </StackPanel>
                     </Grid>
 
@@ -106,7 +154,7 @@
                         <StackPanel Grid.Column="0" Margin="0,0,10,0">
                             <TextBlock Text="Érték (AVD név / .apk útvonal / szöveg / attribútum)" Style="{StaticResource FieldLabelStyle}"
                                        Visibility="{Binding IsSwipeDirection, Converter={x:Static conv:InverseBoolToVisibilityConverter.Instance}}" />
-                            <TextBox Text="{Binding NewValue, UpdateSourceTrigger=PropertyChanged}" Padding="6"
+                            <TextBox Text="{Binding NewValue, UpdateSourceTrigger=PropertyChanged}"
                                      IsEnabled="{Binding IsValueNeeded}"
                                      Visibility="{Binding IsSwipeDirection, Converter={x:Static conv:InverseBoolToVisibilityConverter.Instance}}" />
 
@@ -122,6 +170,15 @@
                                 Command="{Binding AddStepCommand}" />
                     </Grid>
 
+                    <!-- ===================== HIBAKEZELÉSI BEÁLLÍTÁSOK ===================== -->
+                    <StackPanel Margin="0,14,0,0">
+                        <CheckBox Content="Hiba esetén is folytatódjon a futtatás"
+                                  IsChecked="{Binding NewContinueOnError}"
+                                  Margin="0,0,0,8" />
+                        <CheckBox Content="Kihagyás (ne hajtsa végre)"
+                                  IsChecked="{Binding NewSkip}" />
+                    </StackPanel>
+
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0"
                                 Visibility="{Binding IsEditing, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}">
                         <TextBlock Text="Lépés szerkesztése — a Mentés felülírja az eredetit."
@@ -131,148 +188,138 @@
                     </StackPanel>
                 </StackPanel>
             </Border>
-
-            <!-- ===================== LÉPÉSLISTA ===================== -->
-            <Border Style="{StaticResource CardStyle}" Padding="0" Margin="0,0,0,20">
-                <StackPanel>
-                    
-                    <Grid Margin="20,20,20,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Lépések" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <Button Content="Betöltés fájlból" Style="{StaticResource GhostButtonStyle}"
-                                Margin="0,0,10,0" Command="{Binding LoadStepsCommand}" />
-                            <Button Content="Mentés fájlba" Style="{StaticResource GhostButtonStyle}"
-                                Command="{Binding SaveStepsCommand}" />
-                        </StackPanel>
-                    </Grid>
-                    
-                    <ItemsControl ItemsSource="{Binding Steps}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,1,0,0" Padding="20,12">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="130" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Step.Name}" FontSize="14"
-                                                       Foreground="{StaticResource Brush.TextPrimary}" TextWrapping="Wrap" />
-                                            <TextBlock Text="{Binding Message}" Style="{StaticResource SubtleTextStyle}"
-                                                       Foreground="{StaticResource Brush.Danger}"
-                                                       Visibility="{Binding Message, Converter={x:Static conv:NullToVisibilityConverter.Instance}}" />
-                                        </StackPanel>
-
-                                        <TextBlock Grid.Column="1"
-                                                   Text="{Binding Status, Converter={StaticResource TestStatusToLabelConverter}}"
-                                                   Style="{StaticResource StatusTextStyle}"
-                                                   VerticalAlignment="Center" />
-
-                                        <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                            <Button Content="Szerkesztés"
-                                                    Style="{StaticResource LinkButtonStyle}"
-                                                    Foreground="{StaticResource Brush.Accent}"
-                                                    Command="{Binding DataContext.EditStepCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}" />
-                                            <Button Content="Törlés"
-                                                    Style="{StaticResource LinkButtonStyle}"
-                                                    Foreground="{StaticResource Brush.Danger}"
-                                                    Command="{Binding DataContext.RemoveStepCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}" />
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <TextBlock Text="Még nincs lépés — indíts emulátort 'StartEmulator'-ral, majd 'LaunchApp'-pal telepítsd az apk-t."
-                               Style="{StaticResource SubtleTextStyle}"
-                               Margin="20,8,20,20" TextWrapping="Wrap"
-                               Visibility="{Binding Steps.Count, Converter={x:Static conv:ZeroToVisibilityConverter.Instance}}" />
-                </StackPanel>
-            </Border>
-
-            <!-- ===================== VEZÉRLŐK ===================== -->
-            <StackPanel Orientation="Horizontal">
-                <Button Content="Futtatás" Style="{StaticResource PrimaryButtonStyle}"
-                        Command="{Binding RunStepsCommand}" Margin="0,0,10,0" />
-                <Button Content="Leállítás" Style="{StaticResource GhostButtonStyle}"
-                        Command="{Binding StopAllCommand}" />
-                <TextBlock Text="Fut…" Style="{StaticResource SubtleTextStyle}"
-                           VerticalAlignment="Center" Margin="14,0,0,0"
-                           Visibility="{Binding IsRunning, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}" />
-            </StackPanel>
         </StackPanel>
 
-        <!-- ===================== JOBB OLDAL: ÉLŐ KIJELZŐ ===================== -->
-        <Border Grid.Column="1" Style="{StaticResource CardStyle}" VerticalAlignment="Top">
+        <!-- ===================== ROW 1: LÉPÉSLISTA (teljes szélességben) ===================== -->
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="0" Margin="0,20,0,20">
             <StackPanel>
-                <TextBlock Text="Élő kijelző" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,4" />
-                <TextBlock Text="A régi verzió egy sosem írt fájlt figyelt — ez most tényleg a driver-től kér képet."
-                           Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap" Margin="0,0,0,12" />
-
-                <Border Background="{StaticResource Brush.Background}" CornerRadius="8" Height="360" ClipToBounds="True">
-                    <Grid>
-                        <Image Source="{Binding ScreenImage}" Stretch="Uniform"
-                               MouseLeftButtonDown="ScreenImage_MouseLeftButtonDown"
-                               Cursor="{Binding IsPicking, Converter={x:Static conv:PickingCursorConverter.Instance}}" />
-                        <TextBlock Text="Nincs kép — indítsd el a tükrözést"
-                                   Style="{StaticResource SubtleTextStyle}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Visibility="{Binding IsMirroring, Converter={x:Static conv:InverseBoolToVisibilityConverter.Instance}}" />
-                        <Border BorderBrush="{StaticResource Brush.Accent}" BorderThickness="3" IsHitTestVisible="False"
-                                Visibility="{Binding IsPicking, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}" />
-                    </Grid>
-                </Border>
-
-                <Grid Margin="0,12,0,0">
+                <Grid Margin="20,20,20,8">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />   
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel Margin="0,12,0,0">
-                        <Button Content="{Binding IsMirroring, Converter={x:Static conv:MirrorButtonLabelConverter.Instance}}"
-                            Style="{StaticResource GhostButtonStyle}"
-                            HorizontalAlignment="Center"
-                            Margin="0,0,0,8"
-                            Command="{Binding ToggleMirroringCommand}" />
-                        <Button Content="{Binding IsPicking, Converter={x:Static conv:PickingButtonLabelConverter.Instance}}"
-                            Style="{StaticResource GhostButtonStyle}"
-                            HorizontalAlignment="Center"
-                            Command="{Binding TogglePickingCommand}" />
+                    <TextBlock Grid.Column="0" Text="Lépések" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button Content="Betöltés" Style="{StaticResource GhostButtonStyle}"
+                                    Margin="0,0,10,0" Command="{Binding LoadStepsCommand}" />
+                        <Button Content="Mentés" Style="{StaticResource GhostButtonStyle}"
+                                    Command="{Binding SaveStepsCommand}" />
                     </StackPanel>
                 </Grid>
 
-                <TextBlock Text="Kattints a képen a kívánt elemre — nem küldi tovább a kattintást az eszköznek, csak leolvassa, mi van ott."
-                           Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap" Margin="0,10,0,0"
-                           Visibility="{Binding IsPicking, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}" />
+                <!-- Oszlop-fejléc: pontosan ugyanaz a 4 oszlop, mint a sor-sablonban,
+                         hogy a fejléc és az adatsorok egymás alá igazodjanak. -->
+                <Grid Margin="20,0,20,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="160" />
+                        <ColumnDefinition Width="70" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="230" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Művelet / Lokátor / Ért" Style="{StaticResource ColumnHeaderStyle}" />
+                    <TextBlock Grid.Column="1" Text="Idő" Style="{StaticResource ColumnHeaderStyle}" HorizontalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="Státusz" Style="{StaticResource ColumnHeaderStyle}" HorizontalAlignment="Center" />
+                    <TextBlock Grid.Column="3" Text="Műveletek" Style="{StaticResource ColumnHeaderStyle}" HorizontalAlignment="Center" />
+                </Grid>
 
-                <ItemsControl ItemsSource="{Binding InspectorCandidates}" Margin="0,10,0,0"
-                              Visibility="{Binding HasInspectorResult, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}">
+                <ItemsControl ItemsSource="{Binding Steps}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,0,1" Padding="0,8">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="12" />
-                                    <TextBlock Text="{Binding Value}" Style="{StaticResource SubtleTextStyle}"
-                                               TextWrapping="Wrap" Margin="0,2,0,6" />
-                                    <Button Content="Használat" Style="{StaticResource GhostButtonStyle}"
-                                            HorizontalAlignment="Left" Padding="12,4"
-                                            Command="{Binding DataContext.UseInspectorCandidateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}" />
-                                </StackPanel>
+                            <Border BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,1,0,0" Padding="20,12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" MinWidth="160" />
+                                        <ColumnDefinition Width="70" />
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="230" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Step.Name}" FontSize="14"
+                                                           Foreground="{StaticResource Brush.TextPrimary}" TextWrapping="Wrap" />
+                                            <Border Style="{StaticResource TagBadgeStyle}" Background="{StaticResource Brush.Warning}"
+                                                        Visibility="{Binding Step.Skip, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}">
+                                                <TextBlock Text="Kihagyva" Style="{StaticResource TagBadgeTextStyle}" />
+                                            </Border>
+                                            <Border Style="{StaticResource TagBadgeStyle}" Background="{StaticResource Brush.Accent}"
+                                                        Visibility="{Binding Step.ContinueOnError, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}">
+                                                <TextBlock Text="Folytatás" Style="{StaticResource TagBadgeTextStyle}" />
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Message}" Style="{StaticResource SubtleTextStyle}"
+                                                       Foreground="{StaticResource Brush.Danger}"
+                                                       TextWrapping="Wrap"
+                                                       Visibility="{Binding Message, Converter={x:Static conv:NullToVisibilityConverter.Instance}}" />
+                                    </StackPanel>
+
+                                    <TextBlock Grid.Column="1" Text="{Binding DurationText}"
+                                                   Style="{StaticResource SubtleTextStyle}"
+                                                   TextWrapping="Wrap"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                                    <TextBlock Grid.Column="2"
+                                                   Text="{Binding Status, Converter={StaticResource TestStatusToLabelConverter}}"
+                                                   Style="{StaticResource StatusTextStyle}"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" />
+
+                                    <!-- WrapPanel: ha az 5 gomb nem fér ki egy sorban,
+                                             automatikusan tördeli új sorba, így semmi nem
+                                             vágódik le vagy csúszik a szomszéd oszlopokba. -->
+                                    <WrapPanel Grid.Column="3"
+                                                   Orientation="Horizontal"
+                                                   HorizontalAlignment="Right"
+                                                   VerticalAlignment="Center">
+                                        <Button Content="↑" ToolTip="Feljebb"
+                                                Style="{StaticResource StepActionLinkButtonStyle}"
+                                                Foreground="{StaticResource Brush.TextSecondary}"
+                                                Command="{Binding DataContext.MoveStepUpCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                        <Button Content="↓" ToolTip="Lejjebb"
+                                                Style="{StaticResource StepActionLinkButtonStyle}"
+                                                Foreground="{StaticResource Brush.TextSecondary}"
+                                                Command="{Binding DataContext.MoveStepDownCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                        <Button Content="Duplikálás"
+                                                Style="{StaticResource StepActionLinkButtonStyle}"
+                                                Foreground="{StaticResource Brush.Accent}"
+                                                Command="{Binding DataContext.DuplicateStepCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                        <Button Content="Szerkesztés"
+                                                Style="{StaticResource StepActionLinkButtonStyle}"
+                                                Foreground="{StaticResource Brush.Accent}"
+                                                Command="{Binding DataContext.EditStepCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                        <Button Content="Törlés"
+                                                Style="{StaticResource StepActionLinkButtonStyle}"
+                                                Foreground="{StaticResource Brush.Danger}"
+                                                Command="{Binding DataContext.RemoveStepCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                    </WrapPanel>
+                                </Grid>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <TextBlock Text="Még nincs lépés — indíts emulátort 'StartEmulator'-ral, majd 'LaunchApp'-pal telepítsd az apk-t."
+                               Style="{StaticResource SubtleTextStyle}"
+                               Margin="20,8,20,20" TextWrapping="Wrap"
+                               Visibility="{Binding Steps.Count, Converter={x:Static conv:ZeroToVisibilityConverter.Instance}}" />
             </StackPanel>
         </Border>
+
+        <!-- ===================== ROW 2: VEZÉRLŐK (mindig alul) ===================== -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal">
+            <Button Content="Futtatás" Style="{StaticResource PrimaryButtonStyle}"
+                    Command="{Binding RunStepsCommand}" Margin="0,0,10,0" />
+            <Button Content="Leállítás" Style="{StaticResource GhostButtonStyle}"
+                    Command="{Binding StopAllCommand}" />
+            <TextBlock Text="Fut…" Style="{StaticResource SubtleTextStyle}"
+                       VerticalAlignment="Center" Margin="14,0,0,0"
+                       Visibility="{Binding IsRunning, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}" />
+        </StackPanel>
 
     </Grid>
 </UserControl>

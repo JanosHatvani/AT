@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
 using AT.App.Models;
 using AT.App.Services;
 using AT.Automation.Web;
@@ -12,8 +14,9 @@ namespace AT.App.ViewModels;
 public sealed partial class WebTestViewModel : ObservableObject
 {
     private readonly WebAutomationDriver _driver;
-    private readonly INotificationService _notificationService; 
+    private readonly INotificationService _notificationService;
     private readonly AT.Infrastructure.ITestSuiteFileService _fileService;
+    private readonly AT.Infrastructure.ISettingsService _settingsService;
 
     private static readonly WebStepAction[] NoLocatorActions = { WebStepAction.Navigate, WebStepAction.Wait };
     private static readonly WebStepAction[] NoValueActions =
@@ -27,6 +30,9 @@ public sealed partial class WebTestViewModel : ObservableObject
     public string Description => "Selenium alapú lépéslista — Chrome, Firefox vagy Edge.";
 
     public ObservableCollection<TestStepRow> Steps { get; } = new();
+
+    [ObservableProperty]
+    private string testName = "";
 
     public IReadOnlyList<BrowserType> AvailableBrowsers { get; } = Enum.GetValues<BrowserType>();
     public IReadOnlyList<WebStepAction> AvailableActions { get; } = Enum.GetValues<WebStepAction>();
@@ -57,13 +63,18 @@ public sealed partial class WebTestViewModel : ObservableObject
     [ObservableProperty]
     private int newTimeoutSeconds = 10;
 
+    /// <summary>Ha be van jelölve, a lépés hibája NEM szakítja meg a futtatást.</summary>
+    [ObservableProperty]
+    private bool newContinueOnError;
+
+    /// <summary>Ha be van jelölve, a lépést a futtatás átugorja — meg sem kísérli végrehajtani.</summary>
+    [ObservableProperty]
+    private bool newSkip;
+
     [ObservableProperty]
     private bool isRunning;
 
     private TestStepRow? _editingRow;
-
-    [ObservableProperty]
-    private string testName = "";
 
     public bool IsEditing => _editingRow is not null;
     public string AddButtonLabel => IsEditing ? "Mentés" : "Hozzáadás";
@@ -79,6 +90,7 @@ public sealed partial class WebTestViewModel : ObservableObject
         _driver = driver;
         _notificationService = notificationService;
         _fileService = fileService;
+        _settingsService = settingsService;
         Steps.CollectionChanged += (_, _) => RunStepsCommand.NotifyCanExecuteChanged();
 
         var defaults = settingsService.Current;
@@ -127,7 +139,9 @@ public sealed partial class WebTestViewModel : ObservableObject
             TargetLocator = NewTargetLocator,
             TargetLocatorType = NewTargetLocatorType,
             Value = NewValue,
-            TimeoutSeconds = NewTimeoutSeconds
+            TimeoutSeconds = NewTimeoutSeconds,
+            ContinueOnError = NewContinueOnError,
+            Skip = NewSkip
         };
 
         if (_editingRow is not null)
@@ -135,6 +149,7 @@ public sealed partial class WebTestViewModel : ObservableObject
             _editingRow.Step = step;
             _editingRow.Status = TestStatus.NotRun;
             _editingRow.Message = null;
+            _editingRow.Duration = null;
             _notificationService.Show("Lépés frissítve.", NotificationType.Success);
         }
         else
@@ -157,6 +172,8 @@ public sealed partial class WebTestViewModel : ObservableObject
         NewTargetLocator = row.Step.TargetLocator ?? string.Empty;
         NewValue = row.Step.Value ?? string.Empty;
         NewTimeoutSeconds = row.Step.TimeoutSeconds;
+        NewContinueOnError = row.Step.ContinueOnError;
+        NewSkip = row.Step.Skip;
 
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(AddButtonLabel));
@@ -172,6 +189,8 @@ public sealed partial class WebTestViewModel : ObservableObject
         NewTargetLocator = string.Empty;
         NewValue = string.Empty;
         NewTimeoutSeconds = _defaultTimeoutSeconds;
+        NewContinueOnError = false;
+        NewSkip = false;
 
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(AddButtonLabel));
@@ -184,6 +203,47 @@ public sealed partial class WebTestViewModel : ObservableObject
             CancelEdit();
 
         Steps.Remove(row);
+    }
+
+    [RelayCommand]
+    private void MoveStepUp(TestStepRow row)
+    {
+        var index = Steps.IndexOf(row);
+        if (index > 0)
+            Steps.Move(index, index - 1);
+    }
+
+    [RelayCommand]
+    private void MoveStepDown(TestStepRow row)
+    {
+        var index = Steps.IndexOf(row);
+        if (index >= 0 && index < Steps.Count - 1)
+            Steps.Move(index, index + 1);
+    }
+
+    [RelayCommand]
+    private void DuplicateStep(TestStepRow row)
+    {
+        var original = row.Step;
+        var copy = new TestStep
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = original.Name,
+            Target = original.Target,
+            Action = original.Action,
+            Locator = original.Locator,
+            LocatorType = original.LocatorType,
+            Value = original.Value,
+            TargetLocator = original.TargetLocator,
+            TargetLocatorType = original.TargetLocatorType,
+            TimeoutSeconds = original.TimeoutSeconds,
+            ContinueOnError = original.ContinueOnError,
+            Skip = original.Skip
+        };
+
+        var index = Steps.IndexOf(row);
+        Steps.Insert(index + 1, new TestStepRow { Step = copy });
+        _notificationService.Show("Lépés duplikálva.", NotificationType.Success);
     }
 
     [RelayCommand(CanExecute = nameof(CanRun))]
@@ -199,26 +259,43 @@ public sealed partial class WebTestViewModel : ObservableObject
 
             foreach (var row in Steps)
             {
-                row.Status = TestStatus.Running;
                 row.Message = null;
+                row.Duration = null;
+
+                if (row.Step.Skip)
+                {
+                    row.Status = TestStatus.Skipped;
+                    continue;
+                }
+
+                row.Status = TestStatus.Running;
+                var stopwatch = Stopwatch.StartNew();
 
                 try
                 {
                     await _driver.ExecuteStepAsync(row.Step);
+                    stopwatch.Stop();
+                    row.Duration = stopwatch.Elapsed;
                     row.Status = TestStatus.Passed;
+                    await CaptureScreenshotIfNeededAsync(row, isFailure: false);
                 }
                 catch (Exception ex)
                 {
+                    stopwatch.Stop();
+                    row.Duration = stopwatch.Elapsed;
                     row.Status = TestStatus.Failed;
                     row.Message = ex.Message;
                     _notificationService.Show($"Lépés sikertelen: {row.Step.Name}", NotificationType.Error);
-                    break;
+                    await CaptureScreenshotIfNeededAsync(row, isFailure: true);
+
+                    if (!row.Step.ContinueOnError)
+                        break;
                 }
             }
 
             var hasFailed = Steps.Any(s => s.Status == TestStatus.Failed);
             _notificationService.Show(
-                hasFailed ? "A futtatás hibával leállt." : "Minden lépés sikeresen lefutott.",
+                hasFailed ? "A futtatás hibával leállt (vagy folytatódott a beállítás szerint)." : "Minden lépés sikeresen lefutott.",
                 hasFailed ? NotificationType.Error : NotificationType.Success);
         }
         catch (Exception ex)
@@ -233,6 +310,47 @@ public sealed partial class WebTestViewModel : ObservableObject
     }
 
     private bool CanRun() => !IsRunning && Steps.Count > 0;
+
+    /// <summary>A Beállításokban választott mód szerint (soha / csak hiba / minden lépés) ment képernyőképet.</summary>
+    private async Task CaptureScreenshotIfNeededAsync(TestStepRow row, bool isFailure)
+    {
+        var mode = _settingsService.Current.ScreenshotCaptureMode;
+        var shouldCapture = mode == AT.Infrastructure.ScreenshotCaptureMode.Always
+            || (isFailure && mode == AT.Infrastructure.ScreenshotCaptureMode.OnErrorOnly);
+
+        if (!shouldCapture)
+            return;
+
+        try
+        {
+            var bytes = await _driver.GetScreenshotAsync();
+
+            var folder = string.IsNullOrWhiteSpace(_settingsService.Current.ScreenshotFolderPath)
+                ? Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)
+                : _settingsService.Current.ScreenshotFolderPath!;
+
+            Directory.CreateDirectory(folder);
+
+            var fileName = $"web_{SanitizeFileName(row.Step.Name)}_{DateTime.Now:yyyyMMdd_HHmmss_fff}.png";
+            var fullPath = Path.Combine(folder, fileName);
+
+            await File.WriteAllBytesAsync(fullPath, bytes);
+
+            if (isFailure)
+                _notificationService.Show($"Képernyőkép mentve: {fullPath}", NotificationType.Info);
+        }
+        catch (Exception ex)
+        {
+            _notificationService.Show($"Képernyőkép mentése sikertelen: {ex.Message}", NotificationType.Warning);
+        }
+    }
+
+    private static string SanitizeFileName(string name)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var sanitized = new string(name.Select(c => invalid.Contains(c) ? '_' : c).ToArray());
+        return sanitized.Length > 40 ? sanitized[..40] : sanitized;
+    }
 
     [RelayCommand]
     private async Task SaveStepsAsync()
@@ -323,23 +441,23 @@ public sealed partial class WebTestViewModel : ObservableObject
         WebStepAction.Click => $"Kattintás → {locator}",
         WebStepAction.DoubleClick => $"Dupla kattintás → {locator}",
         WebStepAction.RightClick => $"Jobb-klikk → {locator}",
-        WebStepAction.SendKeys => $"Beírás ({locator}) → {value}",
+        WebStepAction.SendKeys => $"Beírás → {locator} → {value}",
         WebStepAction.Clear => $"Mező ürítése → {locator}",
         WebStepAction.Hover => $"Rámutatás → {locator}",
-        WebStepAction.SelectByText => $"Kiválasztás szöveg alapján ({locator}) → {value}",
-        WebStepAction.SelectByValue => $"Kiválasztás érték alapján ({locator}) → {value}",
+        WebStepAction.SelectByText => $"Kiválasztás szöveg alapján → {locator} → {value}",
+        WebStepAction.SelectByValue => $"Kiválasztás érték alapján → {locator} → {value}",
         WebStepAction.DragAndDrop => $"Húzás → {locator} ⇒ {targetLocator}",
         WebStepAction.Wait => "Várakozás",
         WebStepAction.WaitVisible => $"Várakozás láthatóra → {locator}",
         WebStepAction.WaitClickable => $"Várakozás kattinthatóra → {locator}",
         WebStepAction.WaitPresent => $"Várakozás megjelenésre → {locator}",
         WebStepAction.WaitAbsent => $"Várakozás eltűnésre → {locator}",
-        WebStepAction.WaitHasText => $"Várakozás szövegre ({locator}) → {value}",
-        WebStepAction.WaitHasAttribute => $"Várakozás attribútumra ({locator}) → {value}",
-        WebStepAction.WaitHasClass => $"Várakozás class-ra ({locator}) → {value}",
-        WebStepAction.WaitHasValue => $"Várakozás value-ra ({locator}) → {value}",
-        WebStepAction.WaitHasCssValue => $"Várakozás CSS-re ({locator}) → {value}",
-        WebStepAction.WaitHasStyle => $"Várakozás style-ra ({locator}) → {value}",
+        WebStepAction.WaitHasText => $"Várakozás szövegre → {locator} → {value}",
+        WebStepAction.WaitHasAttribute => $"Várakozás attribútumra → {locator} → {value}",
+        WebStepAction.WaitHasClass => $"Várakozás class-ra → {locator} → {value}",
+        WebStepAction.WaitHasValue => $"Várakozás value-ra → {locator} → {value}",
+        WebStepAction.WaitHasCssValue => $"Várakozás CSS-re → {locator} → {value}",
+        WebStepAction.WaitHasStyle => $"Várakozás style-ra → {locator} → {value}",
         _ => action.ToString()
     };
 }

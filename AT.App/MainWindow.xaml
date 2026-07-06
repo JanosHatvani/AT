@@ -7,7 +7,7 @@
         Icon="Assets/app.ico"
         WindowStyle="None"
         ResizeMode="CanResize"
-        Height="800" Width="1280"
+        Height="850" Width="1400"
         MinHeight="600" MinWidth="960"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource Brush.Background}">

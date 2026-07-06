@@ -38,6 +38,43 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string? defaultDesktopAppPath;
 
+    /// <summary>Soha / csak hiba esetén / minden lépés után készítsen-e képernyőképet.</summary>
+    [ObservableProperty]
+    private ScreenshotCaptureMode screenshotCaptureMode = ScreenshotCaptureMode.Never;
+
+    public bool IsCaptureNever
+    {
+        get => ScreenshotCaptureMode == ScreenshotCaptureMode.Never;
+        set { if (value) ScreenshotCaptureMode = ScreenshotCaptureMode.Never; }
+    }
+
+    public bool IsCaptureOnErrorOnly
+    {
+        get => ScreenshotCaptureMode == ScreenshotCaptureMode.OnErrorOnly;
+        set { if (value) ScreenshotCaptureMode = ScreenshotCaptureMode.OnErrorOnly; }
+    }
+
+    public bool IsCaptureAlways
+    {
+        get => ScreenshotCaptureMode == ScreenshotCaptureMode.Always;
+        set { if (value) ScreenshotCaptureMode = ScreenshotCaptureMode.Always; }
+    }
+
+    /// <summary>A mappa-mező csak akkor szerkeszthető, ha egyáltalán készül képernyőkép.</summary>
+    public bool IsFolderPathEditable => ScreenshotCaptureMode != ScreenshotCaptureMode.Never;
+
+    partial void OnScreenshotCaptureModeChanged(ScreenshotCaptureMode value)
+    {
+        OnPropertyChanged(nameof(IsCaptureNever));
+        OnPropertyChanged(nameof(IsCaptureOnErrorOnly));
+        OnPropertyChanged(nameof(IsCaptureAlways));
+        OnPropertyChanged(nameof(IsFolderPathEditable));
+    }
+
+    /// <summary>Ha üres, a képernyőképek az Asztalra kerülnek.</summary>
+    [ObservableProperty]
+    private string? screenshotFolderPath;
+
     public SettingsViewModel(ISettingsService settingsService, INotificationService notificationService)
     {
         _settingsService = settingsService;
@@ -54,6 +91,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         DefaultAvdName = s.DefaultAvdName;
         DefaultApkPath = s.DefaultApkPath;
         DefaultDesktopAppPath = s.DefaultDesktopAppPath;
+        ScreenshotCaptureMode = s.ScreenshotCaptureMode;
+        ScreenshotFolderPath = s.ScreenshotFolderPath;
     }
 
     [RelayCommand]
@@ -89,6 +128,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void BrowseScreenshotFolder()
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Képernyőkép-mentési mappa kiválasztása" };
+        if (dialog.ShowDialog() == true)
+            ScreenshotFolderPath = dialog.FolderName;
+    }
+
+    [RelayCommand]
     private async Task SaveAsync()
     {
         var s = _settingsService.Current;
@@ -98,6 +145,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         s.DefaultAvdName = NullIfEmpty(DefaultAvdName);
         s.DefaultApkPath = NullIfEmpty(DefaultApkPath);
         s.DefaultDesktopAppPath = NullIfEmpty(DefaultDesktopAppPath);
+        s.ScreenshotCaptureMode = ScreenshotCaptureMode;
+        s.ScreenshotFolderPath = NullIfEmpty(ScreenshotFolderPath);
 
         await _settingsService.SaveAsync();
         _notificationService.Show("Beállítások mentve.", NotificationType.Success);
@@ -112,6 +161,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         DefaultAvdName = null;
         DefaultApkPath = null;
         DefaultDesktopAppPath = null;
+        ScreenshotCaptureMode = ScreenshotCaptureMode.Never;
+        ScreenshotFolderPath = null;
         _notificationService.Show("Alapértelmezett értékek visszaállítva — a Mentés gombbal rögzítheted.", NotificationType.Info);
     }
 

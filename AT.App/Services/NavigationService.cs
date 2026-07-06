@@ -18,6 +18,7 @@ public interface INavigationService
 public sealed class NavigationService : INavigationService
 {
     private readonly IServiceProvider _serviceProvider;
+    private ObservableObject? _current;
 
     public event EventHandler<ObservableObject>? CurrentViewModelChanged;
 
@@ -31,7 +32,18 @@ public sealed class NavigationService : INavigationService
 
     public void NavigateTo(Type viewModelType)
     {
-        if (_serviceProvider.GetService(viewModelType) is ObservableObject viewModel)
-            CurrentViewModelChanged?.Invoke(this, viewModel);
+        if (_serviceProvider.GetService(viewModelType) is not ObservableObject viewModel)
+            return;
+
+        // Mielőtt lecserélnénk, hagyjuk, hogy a régi ViewModel takarítson maga után
+        // (pl. timerek leállítása, külön ablakok elrejtése). A ViewModel-first
+        // navigáció miatt minden váltás új példányt hoz létre — enélkül a hook
+        // nélkül a régi példány referenciái (DispatcherTimer, Window) élve
+        // maradnának a háttérben, feleslegesen futva/látszódva.
+        if (_current is INavigationAware previousAware)
+            previousAware.OnNavigatedFrom();
+
+        _current = viewModel;
+        CurrentViewModelChanged?.Invoke(this, viewModel);
     }
 }
