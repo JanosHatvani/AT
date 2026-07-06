@@ -20,6 +20,14 @@ public sealed partial class TestStepRow : ObservableObject
     [ObservableProperty]
     private TimeSpan? duration;
 
+    /// <summary>
+    /// Az utolsó futtatáshoz készült képernyőkép teljes elérési útja, ha a Beállításokban
+    /// beállított mód szerint készült ilyen. A HTML riport ebből ágyazza be a képet.
+    /// Csak futásidejű adat, nem kerül XML-be (a lépéssor-mentés/betöltés nem érinti).
+    /// </summary>
+    [ObservableProperty]
+    private string? screenshotPath;
+
     /// <summary>Olvasható formában, pl. "1.23 mp" — üres kötőjel, ha még nem futott.</summary>
     public string DurationText => Duration is { } d ? $"{d.TotalSeconds:0.00} mp" : "—";
 

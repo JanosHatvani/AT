@@ -1,32 +1,49 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net9.0-windows</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <UseWPF>true</UseWPF>
-    <OutputType>WinExe</OutputType>
-    <RootNamespace>AT.App</RootNamespace>
-    <AssemblyName>AT.App</AssemblyName>
-    <PlatformTarget>x64</PlatformTarget>
-    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net9.0-windows</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UseWPF>true</UseWPF>
+		<OutputType>WinExe</OutputType>
+		<RootNamespace>AT.App</RootNamespace>
+		<AssemblyName>AT.App</AssemblyName>
+		<PlatformTarget>x64</PlatformTarget>
+		<ApplicationIcon>Assets\app.ico</ApplicationIcon>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\AT.Core\AT.Core.csproj" />
-    <ProjectReference Include="..\AT.Infrastructure\AT.Infrastructure.csproj" />
-    <ProjectReference Include="..\AT.Automation.Web\AT.Automation.Web.csproj" />
-    <ProjectReference Include="..\AT.Automation.Desktop\AT.Automation.Desktop.csproj" />
-    <ProjectReference Include="..\AT.Automation.Mobile\AT.Automation.Mobile.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\AT.Core\AT.Core.csproj" />
+		<ProjectReference Include="..\AT.Infrastructure\AT.Infrastructure.csproj" />
+		<ProjectReference Include="..\AT.Automation.Web\AT.Automation.Web.csproj" />
+		<ProjectReference Include="..\AT.Automation.Desktop\AT.Automation.Desktop.csproj" />
+		<ProjectReference Include="..\AT.Automation.Mobile\AT.Automation.Mobile.csproj" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <Resource Include="Assets\app.ico" />
-  </ItemGroup>
+	<ItemGroup>
+		<Resource Include="Assets\app.ico" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+	</ItemGroup>
+
+	<!--
+    A becsomagolt, önálló Node.js + Appium runtime (AT.AppiumRuntime, a solution
+    gyökerében) másolása a build kimeneti mappájába. Ezáltal a végfelhasználónak
+    nem kell külön Node.js-t vagy Appium-ot telepítenie — a MobileAutomationDriver
+    a kimeneti mappa mellett megtalálja ezt a "AppiumRuntime" almappában, és onnan
+    indítja el a szervert (lásd MobileAutomationDriver.StartAsync).
+    A Link segítségével a fájlok a kimeneti struktúrában "AppiumRuntime\..." alá
+    kerülnek, függetlenül attól, hogy a forrásban a solution gyökeréhez képest hol
+    helyezkednek el.
+  -->
+	<ItemGroup>
+		<None Include="..\AT.AppiumRuntime\**\*.*">
+			<Link>AppiumRuntime\%(RecursiveDir)%(Filename)%(Extension)</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
 
 </Project>

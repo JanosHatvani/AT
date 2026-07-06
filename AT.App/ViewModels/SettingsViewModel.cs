@@ -75,6 +75,10 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string? screenshotFolderPath;
 
+    /// <summary>Ha üres, a futtatási előzmények (riportok alapja) az Asztalra kerülnek.</summary>
+    [ObservableProperty]
+    private string? testHistoryFolderPath;
+
     public SettingsViewModel(ISettingsService settingsService, INotificationService notificationService)
     {
         _settingsService = settingsService;
@@ -93,6 +97,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         DefaultDesktopAppPath = s.DefaultDesktopAppPath;
         ScreenshotCaptureMode = s.ScreenshotCaptureMode;
         ScreenshotFolderPath = s.ScreenshotFolderPath;
+        TestHistoryFolderPath = s.TestHistoryFolderPath;
     }
 
     [RelayCommand]
@@ -136,6 +141,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void BrowseTestHistoryFolder()
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Előzmények mentési mappájának kiválasztása" };
+        if (dialog.ShowDialog() == true)
+            TestHistoryFolderPath = dialog.FolderName;
+    }
+
+    [RelayCommand]
     private async Task SaveAsync()
     {
         var s = _settingsService.Current;
@@ -147,6 +160,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         s.DefaultDesktopAppPath = NullIfEmpty(DefaultDesktopAppPath);
         s.ScreenshotCaptureMode = ScreenshotCaptureMode;
         s.ScreenshotFolderPath = NullIfEmpty(ScreenshotFolderPath);
+        s.TestHistoryFolderPath = NullIfEmpty(TestHistoryFolderPath);
 
         await _settingsService.SaveAsync();
         _notificationService.Show("Beállítások mentve.", NotificationType.Success);
@@ -163,6 +177,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         DefaultDesktopAppPath = null;
         ScreenshotCaptureMode = ScreenshotCaptureMode.Never;
         ScreenshotFolderPath = null;
+        TestHistoryFolderPath = null;
         _notificationService.Show("Alapértelmezett értékek visszaállítva — a Mentés gombbal rögzítheted.", NotificationType.Info);
     }
 

@@ -22,6 +22,7 @@ public sealed partial class MainViewModel : ObservableObject
     public bool IsWebActive => CurrentViewModel is WebTestViewModel;
     public bool IsDesktopActive => CurrentViewModel is DesktopTestViewModel;
     public bool IsMobileActive => CurrentViewModel is MobileTestViewModel;
+    public bool IsHistoryActive => CurrentViewModel is HistoryViewModel;
     public bool IsSettingsActive => CurrentViewModel is SettingsViewModel;
 
     public MainViewModel(INavigationService navigationService, INotificationService notificationService)
@@ -47,6 +48,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsWebActive));
         OnPropertyChanged(nameof(IsDesktopActive));
         OnPropertyChanged(nameof(IsMobileActive));
+        OnPropertyChanged(nameof(IsHistoryActive));
         OnPropertyChanged(nameof(IsSettingsActive));
     }
 }

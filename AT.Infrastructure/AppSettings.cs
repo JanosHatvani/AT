@@ -1,4 +1,4 @@
-﻿namespace AT.Infrastructure;
+namespace AT.Infrastructure;
 
 public enum ScreenshotCaptureMode
 {
@@ -32,4 +32,11 @@ public sealed class AppSettings
 
     /// <summary>Ha üres, a képernyőképek az Asztalra kerülnek.</summary>
     public string? ScreenshotFolderPath { get; set; }
+
+    /// <summary>
+    /// A futtatási előzmények (TestRunRecord JSON-ok) mentési mappája — ha üres,
+    /// az Asztalra kerülnek, ugyanúgy mint a ScreenshotFolderPath esetén.
+    /// Mindhárom modul (Web/Desktop/Mobil) közösen ezt használja.
+    /// </summary>
+    public string? TestHistoryFolderPath { get; set; }
 }

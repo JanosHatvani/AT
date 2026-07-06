@@ -98,7 +98,7 @@ public sealed class MobileStepActionToLabelConverter : IValueConverter
 
     private static string Label(MobileStepAction action) => action switch
     {
-        MobileStepAction.StartEmulator => "Emulátor indítása",
+        //MobileStepAction.StartEmulator => "Emulátor indítása",
         MobileStepAction.LaunchApp => "Alkalmazás telepítése / indítása",
         MobileStepAction.Click => "Kattintás",
         MobileStepAction.LongPress => "Hosszan nyomás",

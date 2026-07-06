@@ -12,7 +12,7 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="4">
                 <TextBlock Text="Élő kijelző" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,4" />
-                <TextBlock Text="A régi verzió egy sosem írt fájlt figyelt — ez most tényleg a driver-től kér képet."
+                <TextBlock Text=""
                            Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap" Margin="0,0,0,12" />
 
                 <Border Background="{StaticResource Brush.Background}" CornerRadius="8" Height="360" ClipToBounds="True">

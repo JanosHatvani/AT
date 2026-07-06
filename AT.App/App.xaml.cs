@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using AT.App.Services;
 using AT.App.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +25,8 @@ public partial class App : Application
         services.AddSingleton<IMobileMirrorWindowService, MobileMirrorWindowService>();
         services.AddSingleton<AT.Infrastructure.ISettingsService, AT.Infrastructure.SettingsService>();
         services.AddSingleton<AT.Infrastructure.ITestSuiteFileService, AT.Infrastructure.TestSuiteFileService>();
+        services.AddSingleton<AT.Infrastructure.ITestRunHistoryService, AT.Infrastructure.TestRunHistoryService>();
+        services.AddSingleton<AT.Infrastructure.ITestReportService, AT.Infrastructure.TestReportService>();
 
         // ---- Automatizálási driverek ----
         // Konkrét típusként regisztrálva (nem IAutomationDriver-ként), mert egyszerre
@@ -41,6 +43,7 @@ public partial class App : Application
         services.AddSingleton<WebTestViewModel>();
         services.AddSingleton<DesktopTestViewModel>();
         services.AddSingleton<MobileTestViewModel>();
+        services.AddSingleton<HistoryViewModel>();
         services.AddSingleton<SettingsViewModel>();
 
         // ---- Ablakok ----

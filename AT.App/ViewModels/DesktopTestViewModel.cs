@@ -6,6 +6,7 @@ using AT.App.Services;
 using AT.Automation.Desktop;
 using AT.Core.Contracts;
 using AT.Core.Models;
+using AT.Infrastructure;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -17,6 +18,16 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     private readonly INotificationService _notificationService;
     private readonly AT.Infrastructure.ITestSuiteFileService _fileService;
     private readonly AT.Infrastructure.ISettingsService _settingsService;
+    private readonly ITestRunHistoryService _historyService;
+    private readonly ITestReportService _reportService;
+
+    /// <summary>A folyamatban lévő (vagy legutóbb befejezett) futtatás képernyőkép-mappája — null, ha ehhez a futtatáshoz nem készül kép.</summary>
+    private string? _currentRunScreenshotFolder;
+
+    /// <summary>A legutóbbi futtatás összegzése — a "Riport exportálása" gomb ezt írja ki HTML-be.</summary>
+    private TestRunRecord? _lastRunRecord;
+
+    public bool HasLastRun => _lastRunRecord is not null;
 
     private static readonly DesktopStepAction[] NoLocatorActions =
         { DesktopStepAction.LaunchApp, DesktopStepAction.AttachToWindow, DesktopStepAction.Wait, DesktopStepAction.Close };
@@ -34,7 +45,7 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         { LocatorType.Id, LocatorType.Name, LocatorType.ClassName, LocatorType.XPath };
 
     public string Title => "Windows desktop tesztelés";
-    public string Description => "FlaUI (UIA3) alapú lépéslista — a Winium leváltása.";
+    public string Description => "";
 
     public ObservableCollection<TestStepRow> Steps { get; } = new();
 
@@ -88,12 +99,20 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     private readonly int _defaultTimeoutSeconds;
     private readonly string? _defaultAppPath;
 
-    public DesktopTestViewModel(DesktopAutomationDriver driver, INotificationService notificationService, AT.Infrastructure.ISettingsService settingsService, AT.Infrastructure.ITestSuiteFileService fileService)
+    public DesktopTestViewModel(
+        DesktopAutomationDriver driver,
+        INotificationService notificationService,
+        AT.Infrastructure.ISettingsService settingsService,
+        AT.Infrastructure.ITestSuiteFileService fileService,
+        ITestRunHistoryService historyService,
+        ITestReportService reportService)
     {
         _driver = driver;
         _notificationService = notificationService;
         _fileService = fileService;
         _settingsService = settingsService;
+        _historyService = historyService;
+        _reportService = reportService;
         Steps.CollectionChanged += (_, _) => RunStepsCommand.NotifyCanExecuteChanged();
 
         var defaults = settingsService.Current;
@@ -258,6 +277,9 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         IsRunning = true;
         RunStepsCommand.NotifyCanExecuteChanged();
 
+        var startedAt = DateTime.Now;
+        _currentRunScreenshotFolder = ResolveRunScreenshotFolder(startedAt);
+
         try
         {
             await _driver.StartAsync();
@@ -266,6 +288,7 @@ public sealed partial class DesktopTestViewModel : ObservableObject
             {
                 row.Message = null;
                 row.Duration = null;
+                row.ScreenshotPath = null;
 
                 if (row.Step.Skip)
                 {
@@ -314,35 +337,122 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         {
             IsRunning = false;
             RunStepsCommand.NotifyCanExecuteChanged();
+
+            await SaveRunToHistoryAsync(startedAt, DateTime.Now);
+        }
+    }
+
+    /// <summary>
+    /// Létrehozza (ha a Beállítások szerint egyáltalán készül kép) a futtatáshoz tartozó,
+    /// a teszt nevét és időbélyeget tartalmazó almappát. Null-t ad vissza, ha a screenshot
+    /// mód "Soha" — ilyenkor sem mappa, sem kép nem jön létre.
+    /// </summary>
+    private string? ResolveRunScreenshotFolder(DateTime startedAt)
+    {
+        if (_settingsService.Current.ScreenshotCaptureMode == AT.Infrastructure.ScreenshotCaptureMode.Never)
+            return null;
+
+        var baseFolder = string.IsNullOrWhiteSpace(_settingsService.Current.ScreenshotFolderPath)
+            ? Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)
+            : _settingsService.Current.ScreenshotFolderPath!;
+
+        return ScreenshotFolderResolver.CreateRunFolder(baseFolder, TestName, startedAt);
+    }
+
+    /// <summary>Összeállítja és elmenti a futtatás összegzését a közös history-tárolóba, majd riport-exportálhatóvá teszi.</summary>
+    private async Task SaveRunToHistoryAsync(DateTime startedAt, DateTime finishedAt)
+    {
+        var record = new TestRunRecord
+        {
+            TestName = TestName,
+            Target = AutomationTarget.Desktop,
+            StartedAt = startedAt,
+            FinishedAt = finishedAt,
+            TotalSteps = Steps.Count,
+            PassedCount = Steps.Count(s => s.Status == TestStatus.Passed),
+            FailedCount = Steps.Count(s => s.Status == TestStatus.Failed),
+            SkippedCount = Steps.Count(s => s.Status == TestStatus.Skipped),
+            ScreenshotFolderPath = _currentRunScreenshotFolder,
+            StepResults = Steps.Select(s => new TestStepResult
+            {
+                StepName = s.Step.Name,
+                Status = s.Status,
+                Duration = s.Duration,
+                Message = s.Message,
+                ScreenshotPath = s.ScreenshotPath
+            }).ToList()
+        };
+
+        _lastRunRecord = record;
+        OnPropertyChanged(nameof(HasLastRun));
+
+        try
+        {
+            await _historyService.SaveRunAsync(record);
+        }
+        catch (Exception ex)
+        {
+            _notificationService.Show($"Előzmény mentése sikertelen: {ex.Message}", NotificationType.Warning);
+        }
+    }
+
+    /// <summary>A legutóbbi futtatás HTML riportjának exportálása fájlba, majd megnyitása böngészőben.</summary>
+    [RelayCommand]
+    private void ExportReport()
+    {
+        if (_lastRunRecord is null)
+        {
+            _notificationService.Show("Még nincs futtatási eredmény, amiből riportot lehetne készíteni.", NotificationType.Warning);
+            return;
+        }
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Riport exportálása",
+            Filter = "HTML fájl (*.html)|*.html",
+            DefaultExt = ".html",
+            FileName = string.IsNullOrWhiteSpace(TestName) ? "desktop-riport.html" : $"{TestName}-riport.html"
+        };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            var html = _reportService.GenerateHtml(_lastRunRecord);
+            File.WriteAllText(dialog.FileName, html);
+            _notificationService.Show("Riport elmentve.", NotificationType.Success);
+
+            Process.Start(new ProcessStartInfo(dialog.FileName) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            _notificationService.Show($"Riport exportálása sikertelen: {ex.Message}", NotificationType.Error);
         }
     }
 
     private bool CanRun() => !IsRunning && Steps.Count > 0;
 
-    /// <summary>A Beállításokban választott mód szerint (soha / csak hiba / minden lépés) ment képernyőképet.</summary>
+    /// <summary>A Beállításokban választott mód szerint (soha / csak hiba / minden lépés) ment képernyőképet,
+    /// a futtatáshoz tartozó, ResolveRunScreenshotFolder által létrehozott almappába.</summary>
     private async Task CaptureScreenshotIfNeededAsync(TestStepRow row, bool isFailure)
     {
         var mode = _settingsService.Current.ScreenshotCaptureMode;
         var shouldCapture = mode == AT.Infrastructure.ScreenshotCaptureMode.Always
             || (isFailure && mode == AT.Infrastructure.ScreenshotCaptureMode.OnErrorOnly);
 
-        if (!shouldCapture)
+        if (!shouldCapture || _currentRunScreenshotFolder is null)
             return;
 
         try
         {
             var bytes = await _driver.GetScreenshotAsync();
 
-            var folder = string.IsNullOrWhiteSpace(_settingsService.Current.ScreenshotFolderPath)
-                ? Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)
-                : _settingsService.Current.ScreenshotFolderPath!;
-
-            Directory.CreateDirectory(folder);
-
-            var fileName = $"desktop_{SanitizeFileName(row.Step.Name)}_{DateTime.Now:yyyyMMdd_HHmmss_fff}.png";
-            var fullPath = Path.Combine(folder, fileName);
+            var fileName = $"{SanitizeFileName(row.Step.Name)}_{DateTime.Now:HHmmss_fff}.png";
+            var fullPath = Path.Combine(_currentRunScreenshotFolder, fileName);
 
             await File.WriteAllBytesAsync(fullPath, bytes);
+            row.ScreenshotPath = fullPath;
 
             if (isFailure)
                 _notificationService.Show($"Képernyőkép mentve: {fullPath}", NotificationType.Info);

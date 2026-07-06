@@ -34,6 +34,23 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
 
     // ===================== ÉLETCIKLUS =====================
 
+    /// <summary>
+    /// A becsomagolt, önálló Node.js + Appium runtime várt helye a kimeneti mappához
+    /// képest (lásd AT.App.csproj: az AT.AppiumRuntime tartalma ide másolódik build
+    /// közben). Ha ez a mappa hiányzik (pl. fejlesztői gépen még nem futtatták le az
+    /// npm install-t az AT.AppiumRuntime mappában), a StartAsync visszaesik a rendszer
+    /// PATH-jára — így a régi, kézzel telepített Node.js/Appium-mal dolgozó fejlesztői
+    /// gépek is tovább működnek.
+    /// </summary>
+    private static readonly string BundledRuntimeRoot =
+        Path.Combine(AppContext.BaseDirectory, "AppiumRuntime");
+
+    private static readonly string BundledNodePath =
+        Path.Combine(BundledRuntimeRoot, "node", "node.exe");
+
+    private static readonly string BundledAppiumMainJsPath =
+        Path.Combine(BundledRuntimeRoot, "node_modules", "appium", "build", "lib", "main.js");
+
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
         if (_appiumService is not null)
@@ -41,10 +58,23 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
 
         return Task.Run(() =>
         {
-            _appiumService = new AppiumServiceBuilder()
+            var builder = new AppiumServiceBuilder()
                 .WithIPAddress("127.0.0.1")
-                .UsingAnyFreePort()
-                .Build();
+                .UsingAnyFreePort();
+
+            if (File.Exists(BundledNodePath) && File.Exists(BundledAppiumMainJsPath))
+            {
+                // Becsomagolt runtime használata — a végfelhasználónak nem kell
+                // semmit telepítenie, teljesen önállóan működik.
+                builder = builder
+                    .UsingDriverExecutable(new FileInfo(BundledNodePath))
+                    .WithAppiumJS(new FileInfo(BundledAppiumMainJsPath));
+            }
+            // Ha a becsomagolt runtime hiányzik, a builder a rendszer PATH-ján
+            // keresi a node-ot és a globálisan telepített appium-ot (a korábbi,
+            // "telepítsd magad" viselkedés) — ez a fallback fejlesztői gépeken hasznos.
+
+            _appiumService = builder.Build();
             _appiumService.Start();
         }, cancellationToken);
     }

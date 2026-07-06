@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="AT.App.Views.SettingsView"
+<UserControl x:Class="AT.App.Views.SettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
@@ -129,7 +129,28 @@
                             IsEnabled="{Binding IsFolderPathEditable}"
                             Command="{Binding BrowseScreenshotFolderCommand}" />
                 </Grid>
-                <TextBlock Text="Ha üresen hagyod, a képernyőképek az Asztalra kerülnek."
+                <TextBlock Text="Ha üresen hagyod, a képernyőképek az Asztalra kerülnek. Minden futtatáshoz külön, a teszt nevét és időbélyeget tartalmazó almappa jön létre ezen a mappán belül."
+                           Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- ===================== ELŐZMÉNYEK / RIPORTOK ===================== -->
+        <Border Style="{StaticResource CardStyle}" Margin="0,0,0,20">
+            <StackPanel>
+                <TextBlock Text="Előzmények" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,12" />
+
+                <TextBlock Text="Mentési mappa" Style="{StaticResource FieldLabelStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" Text="{Binding TestHistoryFolderPath, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,0,10,0" />
+                    <Button Grid.Column="1" Content="Tallózás" Style="{StaticResource GhostButtonStyle}"
+                            Command="{Binding BrowseTestHistoryFolderCommand}" />
+                </Grid>
+                <TextBlock Text="Ide kerülnek a futtatási előzmények (Web / Desktop / Mobil közösen), amiket az Előzmények oldalon böngészhetsz, és amikből riportot exportálhatsz. Ha üresen hagyod, az Asztalra kerülnek."
                            Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap" />
             </StackPanel>
         </Border>

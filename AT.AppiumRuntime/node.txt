@@ -1,0 +1,17 @@
+Futtasd az npm parancsokat
+Mivel a Node.js-t portable (zip-ből kicsomagolt) formában tetted be egy node alnévbe, és nem telepítetted rendszerszinten, a rendszered PATH-ja valószínűleg nem ismeri az npm-et sem, hacsak nincs más, rendszerszinten telepített Node.js-ed. Két eset van:
+A) Ha van már rendszerszinten telepített Node.js/npm a gépeden (a hibaüzenetben ez hiányzott, de lehet, hogy csak a PATH volt hibás) — egyszerűen futtasd
+
+npm init -y
+npm install appium@latest
+npx appium driver install uiautomator2
+
+
+Ha egyáltalán nincs Node.js a gépeden sehol (ez a valószínűbb, a hibaüzenet alapján) — akkor a portable node.exe mellett 
+van egy npm.cmd/npm fájl is ugyanabban a mappában (a Node.js .zip csomag ezt is tartalmazza). 
+Ezt kell közvetlenül hívnod a teljes útvonalával:
+
+cd C:\utad\a\AT\solutionhoz\AT.AppiumRuntime
+.\node\npm.cmd init -y
+.\node\npm.cmd install appium@latest
+.\node\npx.cmd appium driver install uiautomator2
