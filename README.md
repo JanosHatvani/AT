@@ -1,6 +1,6 @@
 # AT Framework — új projekt váz
 
-Ez a solution a régi `AT` projekt (JanosHatvani/AT) modernizált újraírásának
+Ez a solution a régi `ATold` projekt (JanosHatvani/AT) modernizált újraírásának
 első lépése: a design-rendszer és a UI-shell. Automatizálási logika (Web,
 Desktop, Mobile) még nincs bekötve — azok külön fázisokban kerülnek bele.
 
@@ -33,11 +33,11 @@ Desktop, Mobile) még nincs bekötve — azok külön fázisokban kerülnek bele
   Hover, SelectByText, SelectByValue, DragAndDrop, Wait, és 10 különböző
   wait-feltétel (láthatóság, kattinthatóság, jelenlét, szöveg/attribútum/class/
   CSS-érték egyezés stb.) — a régi `WebMethods.cs` összes egyedi műveletét lefedi.
-- **Nem került át**: a képernyőkép-mentés (`PrtScFolderPath`, `CaptureScreenshots`)
-  és a futási statisztika (`testName`, `LastFindElementDuration`) — ezek az
-  Infrastructure/riportozási fázisban kerülnek be, mert adatréteget igényelnek.
+
 
 ## Következő lépések
 
-1. Windows desktop modul (FlaUI)
-2. Android/iOS modul (a régi `AppMethods.cs` logika átemelése, tisztítva)
+1. Android/iOS modul (a régi `AppMethods.cs` logika átemelése, tisztítva)
+2. a képernyőkép-mentés (`PrtScFolderPath`, `CaptureScreenshots`)
+  és a futási statisztika (`testName`, `LastFindElementDuration`) — ezek az
+  Infrastructure/riportozási fázisban kerülnek be, mert adatréteget igényelnek.
