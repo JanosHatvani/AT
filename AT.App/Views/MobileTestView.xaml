@@ -80,13 +80,19 @@
                     <TextBlock Text="{Binding Description}" Style="{StaticResource SubtleTextStyle}" Margin="0,4,0,0" />
                 </StackPanel>
 
-                <!-- Csak akkor látszik, ha a felhasználó bezárta az Élő kijelző ablakát —
-                     ezzel bármikor visszahozható ugyanaz az ablak-példány. -->
-                <Button Grid.Column="1" Content="Élő kijelző megnyitása"
-                        Style="{StaticResource GhostButtonStyle}"
-                        VerticalAlignment="Top"
-                        Command="{Binding OpenMirrorWindowCommand}"
-                        Visibility="{Binding IsMirrorWindowOpen, Converter={x:Static conv:InverseBoolToVisibilityConverter.Instance}}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                    <Button Content="Új teszt"
+                            Style="{StaticResource GhostButtonStyle}"
+                            Margin="0,0,10,0"
+                            Command="{Binding NewTestCommand}" />
+
+                    <!-- Csak akkor látszik, ha a felhasználó bezárta az Élő kijelző ablakát —
+                         ezzel bármikor visszahozható ugyanaz az ablak-példány. -->
+                    <Button Content="Élő kijelző megnyitása"
+                            Style="{StaticResource GhostButtonStyle}"
+                            Command="{Binding OpenMirrorWindowCommand}"
+                            Visibility="{Binding IsMirrorWindowOpen, Converter={x:Static conv:InverseBoolToVisibilityConverter.Instance}}" />
+                </StackPanel>
             </Grid>
 
             <Border Style="{StaticResource CardStyle}" Margin="0,24,0,20">
@@ -171,6 +177,32 @@
                                 VerticalAlignment="Bottom"
                                 Command="{Binding AddStepCommand}" />
                     </Grid>
+
+                    <!-- ===================== FELTÉTELES VÉGREHAJTÁS (if/else ugrás) ===================== -->
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                            <TextBlock Text="Címke" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox Text="{Binding NewLabel, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                            <TextBlock Text="Siker esetén ugrás" Style="{StaticResource FieldLabelStyle}" />
+                            <ComboBox ItemsSource="{Binding AvailableGoToLabels}" SelectedItem="{Binding NewOnSuccessGoToLabel}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Hiba esetén ugrás" Style="{StaticResource FieldLabelStyle}" />
+                            <ComboBox ItemsSource="{Binding AvailableGoToLabels}" SelectedItem="{Binding NewOnFailureGoToLabel}" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="A címke a lépés saját azonosítója (automatikusan generált, felülírható) — más lépések erre hivatkozva ugorhatnak ide. Üresen hagyott ugrás-mező esetén a következő lépés jön (hiba esetén a lenti beállítás szerint)."
+                               Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap" Margin="0,4,0,0" />
 
                     <!-- ===================== HIBAKEZELÉSI BEÁLLÍTÁSOK ===================== -->
                     <StackPanel Margin="0,14,0,0">
@@ -257,6 +289,20 @@
                                                 <TextBlock Text="Folytatás" Style="{StaticResource TagBadgeTextStyle}" />
                                             </Border>
                                         </StackPanel>
+                                        <TextBlock Style="{StaticResource SubtleTextStyle}" Margin="0,2,0,0" TextWrapping="Wrap">
+                                            <Run Text="Címke:" />
+                                            <Run Text="{Binding Step.Label, Mode=OneWay}" FontWeight="SemiBold" />
+                                        </TextBlock>
+                                        <TextBlock Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap"
+                                                   Visibility="{Binding Step.OnSuccessGoToLabel, Converter={x:Static conv:NullToVisibilityConverter.Instance}}">
+                                            <Run Text="Siker → ugrás:" />
+                                            <Run Text="{Binding Step.OnSuccessGoToLabel, Mode=OneWay}" FontWeight="SemiBold" Foreground="{StaticResource Brush.Success}" />
+                                        </TextBlock>
+                                        <TextBlock Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap"
+                                                   Visibility="{Binding Step.OnFailureGoToLabel, Converter={x:Static conv:NullToVisibilityConverter.Instance}}">
+                                            <Run Text="Hiba → ugrás:" />
+                                            <Run Text="{Binding Step.OnFailureGoToLabel, Mode=OneWay}" FontWeight="SemiBold" Foreground="{StaticResource Brush.Danger}" />
+                                        </TextBlock>
                                         <TextBlock Text="{Binding Message}" Style="{StaticResource SubtleTextStyle}"
                                                        Foreground="{StaticResource Brush.Danger}"
                                                        TextWrapping="Wrap"

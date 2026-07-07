@@ -41,6 +41,29 @@ public sealed class TestStep
 
     /// <summary>Ha true, a lépést a futtatás átugorja — meg sem kísérli végrehajtani.</summary>
     public bool Skip { get; set; }
+
+    /// <summary>
+    /// A lépés saját, egyedi azonosító címkéje — más lépések ezt hivatkozzák ugrás
+    /// célpontjaként (OnSuccessGoToLabel / OnFailureGoToLabel). Automatikusan generált
+    /// ("Lépés 1", "Lépés 2", ...), de a felhasználó felülírhatja. Névhez (nem sorszámhoz)
+    /// kötött, hogy a lépések átrendezése ne törje el a rá mutató ugrásokat.
+    /// </summary>
+    public string Label { get; set; } = "";
+
+    /// <summary>
+    /// Ha a lépés sikeresen lefut, és ez ki van töltve, a végrehajtás az ezzel a
+    /// Label-lel rendelkező lépésre ugrik (nem a listában következőre). Üresen hagyva
+    /// a normál, soron következő lépés jön.
+    /// </summary>
+    public string? OnSuccessGoToLabel { get; set; }
+
+    /// <summary>
+    /// Ha a lépés hibára fut, és ez ki van töltve, a végrehajtás az ezzel a Label-lel
+    /// rendelkező lépésre ugrik, FÜGGETLENÜL a ContinueOnError beállítástól. Üresen
+    /// hagyva a régi viselkedés érvényes: ContinueOnError szerint folytatódik a
+    /// következő lépéssel, vagy leáll a futtatás.
+    /// </summary>
+    public string? OnFailureGoToLabel { get; set; }
 }
 
 /// <summary>Egy lefuttatott lépés eredménye — ez kerül majd a statisztika modulba.</summary>

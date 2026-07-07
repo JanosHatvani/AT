@@ -6,7 +6,10 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace AT.App.ViewModels;
 
-
+/// <summary>
+/// A modulok alapértelmezéseit kezeli — ez váltja ki a régi kódban hardcode-olt
+/// útvonalakat (pl. az APK elérési útját), és helyben, a gépeden tárolja őket.
+/// </summary>
 public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly ISettingsService _settingsService;
@@ -14,11 +17,15 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly IThemeService _themeService;
 
     public string Title => "Beállítások";
-    public string Description => "Alapértelmezett értékek a Web / Desktop / Mobil modulokhoz — a gépeden tárolva";
+    public string Description => "Alapértelmezett értékek a Web / Desktop / Mobil modulokhoz — a gépeden tárolva, nem kerülnek fel semmilyen szerverre.";
 
     public IReadOnlyList<string> AvailableBrowsers { get; } = new[] { "Chrome", "Firefox", "Edge" };
 
-
+    /// <summary>
+    /// A sötét téma azonnal alkalmazódik (nem várja meg a Mentés gombot) és rögtön
+    /// el is mentődik — egy vizuális beállításnál ez jobb élmény, mint a "Mentés"-re
+    /// várakozás, hiszen a hatása amúgy is azonnal látszik.
+    /// </summary>
     [ObservableProperty]
     private bool isDarkTheme;
 

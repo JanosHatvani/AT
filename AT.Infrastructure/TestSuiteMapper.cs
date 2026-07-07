@@ -63,6 +63,18 @@ public sealed class TestStepDto
 
     [XmlAttribute("skip")]
     public bool Skip { get; set; }
+
+    /// <summary>A lépés saját azonosító címkéje — lásd TestStep.Label.</summary>
+    [XmlAttribute("label")]
+    public string Label { get; set; } = "";
+
+    /// <summary>Siker esetén ugrás célja (Label) — lásd TestStep.OnSuccessGoToLabel.</summary>
+    [XmlElement("OnSuccessGoToLabel")]
+    public string? OnSuccessGoToLabel { get; set; }
+
+    /// <summary>Hiba esetén ugrás célja (Label) — lásd TestStep.OnFailureGoToLabel.</summary>
+    [XmlElement("OnFailureGoToLabel")]
+    public string? OnFailureGoToLabel { get; set; }
 }
 
 public static class TestSuiteMapper
@@ -79,7 +91,10 @@ public static class TestSuiteMapper
         TargetLocatorType = step.TargetLocatorType,
         TimeoutSeconds = step.TimeoutSeconds,
         ContinueOnError = step.ContinueOnError,
-        Skip = step.Skip
+        Skip = step.Skip,
+        Label = step.Label,
+        OnSuccessGoToLabel = step.OnSuccessGoToLabel,
+        OnFailureGoToLabel = step.OnFailureGoToLabel
     };
 
     public static TestStep ToTestStep(TestStepDto dto, AutomationTarget target) => new()
@@ -95,6 +110,9 @@ public static class TestSuiteMapper
         TargetLocatorType = dto.TargetLocatorType,
         TimeoutSeconds = dto.TimeoutSeconds,
         ContinueOnError = dto.ContinueOnError,
-        Skip = dto.Skip
+        Skip = dto.Skip,
+        Label = dto.Label,
+        OnSuccessGoToLabel = dto.OnSuccessGoToLabel,
+        OnFailureGoToLabel = dto.OnFailureGoToLabel
     };
 }

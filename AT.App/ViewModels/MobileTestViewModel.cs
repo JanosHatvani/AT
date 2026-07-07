@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Windows;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using AT.App.Models;
@@ -97,6 +98,22 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
     [ObservableProperty]
     private bool newSkip;
 
+    /// <summary>A lépés saját azonosító címkéje — automatikusan generált, felülírható.</summary>
+    [ObservableProperty]
+    private string newLabel = "";
+
+    /// <summary>Siker esetén ugrás célja (másik lépés Label-je) — üresen a normál, következő lépés jön.</summary>
+    [ObservableProperty]
+    private string? newOnSuccessGoToLabel;
+
+    /// <summary>Hiba esetén ugrás célja (másik lépés Label-je) — üresen a ContinueOnError dönt.</summary>
+    [ObservableProperty]
+    private string? newOnFailureGoToLabel;
+
+    /// <summary>A lépéslistában szereplő Label-ek + egy "— következő —" opció, ugrás-célpont választáshoz a ComboBox-okban.</summary>
+    public IEnumerable<string> AvailableGoToLabels =>
+        new[] { "" }.Concat(Steps.Select(s => s.Step.Label).Where(l => !string.IsNullOrWhiteSpace(l)));
+
     [ObservableProperty]
     private bool isRunning;
 
@@ -161,7 +178,11 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         _reportService = reportService;
         _mirrorWindowService.Closed += OnMirrorWindowClosed;
 
-        Steps.CollectionChanged += (_, _) => RunStepsCommand.NotifyCanExecuteChanged();
+        Steps.CollectionChanged += (_, _) =>
+        {
+            RunStepsCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(AvailableGoToLabels));
+        };
 
         _mirrorTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
         _mirrorTimer.Tick += async (_, _) => await RefreshScreenAsync();
@@ -311,7 +332,12 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
             Value = NewValue,
             TimeoutSeconds = NewTimeoutSeconds,
             ContinueOnError = NewContinueOnError,
-            Skip = NewSkip
+            Skip = NewSkip,
+            Label = string.IsNullOrWhiteSpace(NewLabel)
+                ? AT.Infrastructure.StepFlowResolver.GenerateNextLabel(Steps.Select(r => r.Step).ToList())
+                : NewLabel,
+            OnSuccessGoToLabel = string.IsNullOrWhiteSpace(NewOnSuccessGoToLabel) ? null : NewOnSuccessGoToLabel,
+            OnFailureGoToLabel = string.IsNullOrWhiteSpace(NewOnFailureGoToLabel) ? null : NewOnFailureGoToLabel
         };
 
         if (_editingRow is not null)
@@ -342,6 +368,9 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         NewTimeoutSeconds = row.Step.TimeoutSeconds;
         NewContinueOnError = row.Step.ContinueOnError;
         NewSkip = row.Step.Skip;
+        NewLabel = row.Step.Label;
+        NewOnSuccessGoToLabel = row.Step.OnSuccessGoToLabel;
+        NewOnFailureGoToLabel = row.Step.OnFailureGoToLabel;
 
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(AddButtonLabel));
@@ -361,9 +390,40 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         NewTimeoutSeconds = _defaultTimeoutSeconds;
         NewContinueOnError = false;
         NewSkip = false;
+        NewLabel = "";
+        NewOnSuccessGoToLabel = null;
+        NewOnFailureGoToLabel = null;
 
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(AddButtonLabel));
+    }
+
+    /// <summary>
+    /// "Új teszt" — teljesen letisztázza a nézetet: kiüríti a lépéslistát, a teszt
+    /// nevét, és megszakít egy esetleg folyamatban lévő szerkesztést, hogy a felhasználó
+    /// nulláról kezdhessen egy új lépéssorozatot. Ha már van felvett lépés, előbb
+    /// megerősítést kér, hogy véletlenül ne veszítsen el munkát.
+    /// </summary>
+    [RelayCommand]
+    private void NewTest()
+    {
+        if (Steps.Count > 0)
+        {
+            var confirmed = AT.App.Views.ConfirmDialog.Show(
+                Application.Current.MainWindow,
+                "Új teszt",
+                "Biztosan törlöd a jelenlegi lépéssort? A nem mentett lépések elvesznek.",
+                confirmButtonText: "Törlés",
+                isDestructive: true);
+
+            if (!confirmed)
+                return;
+        }
+
+        CancelEdit();
+        Steps.Clear();
+        TestName = "";
+        _notificationService.Show("Új, üres lépéssor létrehozva.", NotificationType.Info);
     }
 
     [RelayCommand]
@@ -447,9 +507,21 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         {
             await _driver.StartAsync();
 
-            for (var i = startIndex; i < Steps.Count; i++)
+            var stepList = Steps.Select(r => r.Step).ToList();
+            var currentIndex = startIndex;
+            var executionCount = 0;
+            var hitExecutionLimit = false;
+
+            while (currentIndex is >= 0 && currentIndex < Steps.Count)
             {
-                var row = Steps[i];
+                executionCount++;
+                if (executionCount > AT.Infrastructure.StepFlowResolver.MaxStepExecutions)
+                {
+                    hitExecutionLimit = true;
+                    break;
+                }
+
+                var row = Steps[currentIndex];
 
                 row.Message = null;
                 row.Duration = null;
@@ -458,11 +530,13 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
                 if (row.Step.Skip)
                 {
                     row.Status = TestStatus.Skipped;
+                    currentIndex++;
                     continue;
                 }
 
                 row.Status = TestStatus.Running;
                 var stopwatch = Stopwatch.StartNew();
+                bool wasSuccess;
 
                 try
                 {
@@ -471,6 +545,7 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
                     row.Duration = stopwatch.Elapsed;
                     row.Status = TestStatus.Passed;
                     await CaptureScreenshotIfNeededAsync(row, isFailure: false);
+                    wasSuccess = true;
 
                     if (!string.IsNullOrEmpty(result))
                         _notificationService.Show($"{row.Step.Name} → {result}", NotificationType.Info);
@@ -483,10 +558,23 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
                     row.Message = ex.Message;
                     _notificationService.Show($"Lépés sikertelen: {row.Step.Name}", NotificationType.Error);
                     await CaptureScreenshotIfNeededAsync(row, isFailure: true);
-
-                    if (!row.Step.ContinueOnError)
-                        break;
+                    wasSuccess = false;
                 }
+
+                var nextIndex = AT.Infrastructure.StepFlowResolver.ResolveNextIndex(
+                    stepList, currentIndex, wasSuccess, row.Step.ContinueOnError, out var shouldStop);
+
+                if (shouldStop)
+                    break;
+
+                currentIndex = nextIndex ?? Steps.Count;
+            }
+
+            if (hitExecutionLimit)
+            {
+                _notificationService.Show(
+                    $"A futtatás leállt: több mint {AT.Infrastructure.StepFlowResolver.MaxStepExecutions} lépés futott le — valószínűleg végtelen ciklusba került az ugrások miatt.",
+                    NotificationType.Error);
             }
 
             var hasFailed = Steps.Any(s => s.Status == TestStatus.Failed);

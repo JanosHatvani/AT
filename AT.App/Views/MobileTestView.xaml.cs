@@ -1,8 +1,8 @@
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using AT.App.ViewModels;
-using System.Windows;
 
 namespace AT.App.Views;
 
