@@ -4,13 +4,13 @@
         xmlns:conv="clr-namespace:AT.App.Converters"
         Title="Elem-kereső"
         Width="460"
-        WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
         ShowActivated="False"
         ShowInTaskbar="False"
         Topmost="True"
-        ResizeMode="NoResize"
+        WindowStyle="None"
+        ResizeMode="CanResize"
         SizeToContent="Height"
         WindowStartupLocation="Manual">
 

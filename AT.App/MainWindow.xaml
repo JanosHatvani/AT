@@ -1,4 +1,4 @@
-﻿<Window x:Class="AT.App.MainWindow"
+<Window x:Class="AT.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:AT.App.ViewModels"
@@ -90,7 +90,7 @@
         <!-- ===================== TARTALOM ===================== -->
         <Grid Grid.Column="1" Background="{StaticResource Brush.ContentBackground}">
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="36,32">
-                <ContentControl Content="{Binding CurrentViewModel}" />
+                <ContentControl x:Name="MainContentControl" Content="{Binding CurrentViewModel}" />
             </ScrollViewer>
 
             <!-- Toast overlay - jobb alsó sarok -->

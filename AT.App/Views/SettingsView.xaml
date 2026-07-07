@@ -155,6 +155,16 @@
             </StackPanel>
         </Border>
 
+        <!-- ===================== MEGJELENÉS ===================== -->
+        <Border Style="{StaticResource CardStyle}" Margin="0,0,0,20">
+            <StackPanel>
+                <TextBlock Text="Megjelenés" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,12" />
+                <CheckBox Content="Sötét téma" IsChecked="{Binding IsDarkTheme}" />
+                <TextBlock Text="A váltás azonnal érvénybe lép, nem kell hozzá a Mentés gomb."
+                           Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
         <!-- ===================== VEZÉRLŐK ===================== -->
         <StackPanel Orientation="Horizontal">
             <Button Content="Mentés" Style="{StaticResource PrimaryButtonStyle}"

@@ -6,19 +6,28 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace AT.App.ViewModels;
 
-/// <summary>
-/// A modulok alapértelmezéseit kezeli — ez váltja ki a régi kódban hardcode-olt
-/// útvonalakat (pl. az APK elérési útját), és helyben, a gépeden tárolja őket.
-/// </summary>
+
 public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly ISettingsService _settingsService;
     private readonly INotificationService _notificationService;
+    private readonly IThemeService _themeService;
 
     public string Title => "Beállítások";
-    public string Description => "Alapértelmezett értékek a Web / Desktop / Mobil modulokhoz — a gépeden tárolva, nem kerülnek fel semmilyen szerverre.";
+    public string Description => "Alapértelmezett értékek a Web / Desktop / Mobil modulokhoz — a gépeden tárolva";
 
     public IReadOnlyList<string> AvailableBrowsers { get; } = new[] { "Chrome", "Firefox", "Edge" };
+
+
+    [ObservableProperty]
+    private bool isDarkTheme;
+
+    partial void OnIsDarkThemeChanged(bool value)
+    {
+        _themeService.ApplyTheme(value);
+        _settingsService.Current.IsDarkTheme = value;
+        _ = _settingsService.SaveAsync();
+    }
 
     [ObservableProperty]
     private string? androidSdkRoot;
@@ -79,10 +88,11 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string? testHistoryFolderPath;
 
-    public SettingsViewModel(ISettingsService settingsService, INotificationService notificationService)
+    public SettingsViewModel(ISettingsService settingsService, INotificationService notificationService, IThemeService themeService)
     {
         _settingsService = settingsService;
         _notificationService = notificationService;
+        _themeService = themeService;
         LoadFromSettings();
     }
 
@@ -98,6 +108,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         ScreenshotCaptureMode = s.ScreenshotCaptureMode;
         ScreenshotFolderPath = s.ScreenshotFolderPath;
         TestHistoryFolderPath = s.TestHistoryFolderPath;
+
+        // Az IsDarkTheme betöltése NEM az [ObservableProperty] setter-en keresztül történik itt,
+        // mert az OnIsDarkThemeChanged újra elmentené a beállítást és újra alkalmazná a témát —
+        // ez az app induláskor már megtörtént (lásd App.xaml.cs OnStartup), itt csak a UI-t
+        // szinkronizáljuk a tényleges állapottal, mentés/alkalmazás kiváltása nélkül.
+        isDarkTheme = s.IsDarkTheme;
+        OnPropertyChanged(nameof(IsDarkTheme));
     }
 
     [RelayCommand]
@@ -178,6 +195,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         ScreenshotCaptureMode = ScreenshotCaptureMode.Never;
         ScreenshotFolderPath = null;
         TestHistoryFolderPath = null;
+        IsDarkTheme = false;
         _notificationService.Show("Alapértelmezett értékek visszaállítva — a Mentés gombbal rögzítheted.", NotificationType.Info);
     }
 

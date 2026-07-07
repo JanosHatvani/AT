@@ -87,6 +87,17 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     [ObservableProperty]
     private bool isRunning;
 
+    /// <summary>
+    /// A lépéslistában kijelölt sor — sorra kattintva állítódik be (lásd DesktopTestView.xaml,
+    /// SelectStepCommand). A billentyűparancsok (Delete, Ctrl+D, Ctrl+↑/↓) ezen keresztül
+    /// tudják, melyik lépésre vonatkozzanak.
+    /// </summary>
+    [ObservableProperty]
+    private TestStepRow? selectedStep;
+
+    [RelayCommand]
+    private void SelectStep(TestStepRow? row) => SelectedStep = row;
+
     private TestStepRow? _editingRow;
 
     public bool IsEditing => _editingRow is not null;
@@ -272,7 +283,24 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     }
 
     [RelayCommand(CanExecute = nameof(CanRun))]
-    private async Task RunStepsAsync()
+    private Task RunStepsAsync() => RunStepsCoreAsync(startIndex: 0);
+
+    /// <summary>
+    /// "Futtatás innentől" — a kijelölt lépéstől kezdve fut le a sor vége felé, a
+    /// megelőző lépéseket kihagyva. Hasznos hibakereséskor, ha nem szeretnéd az egész
+    /// sort újra lefuttatni egyetlen lépés ellenőrzéséhez.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanRun))]
+    private Task RunFromStepAsync(TestStepRow? row)
+    {
+        var startIndex = row is null ? 0 : Steps.IndexOf(row);
+        if (startIndex < 0)
+            startIndex = 0;
+
+        return RunStepsCoreAsync(startIndex);
+    }
+
+    private async Task RunStepsCoreAsync(int startIndex)
     {
         IsRunning = true;
         RunStepsCommand.NotifyCanExecuteChanged();
@@ -284,8 +312,10 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         {
             await _driver.StartAsync();
 
-            foreach (var row in Steps)
+            for (var i = startIndex; i < Steps.Count; i++)
             {
+                var row = Steps[i];
+
                 row.Message = null;
                 row.Duration = null;
                 row.ScreenshotPath = null;
@@ -551,6 +581,62 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     {
         await _driver.StopAsync();
         _notificationService.Show("Alkalmazás bezárva / leválasztva.", NotificationType.Info);
+    }
+
+    // ===================== BILLENTYŰPARANCSOK =====================
+    // A DesktopTestView.xaml.cs PreviewKeyDown-ja hívja meg ezeket, a SelectedStep-et
+    // használva "a kijelölt lépés" gyanánt. A metódusok szándékosan tolerálják a
+    // hiányzó kijelölést (null SelectedStep esetén egyszerűen nem csinálnak semmit).
+
+    /// <summary>Ctrl+S — a kijelölt lépéstől függetlenül mindig a teljes lépéssort menti.</summary>
+    public void HandleSaveShortcut() => SaveStepsCommand.Execute(null);
+
+    /// <summary>Ctrl+O — lépéssor betöltése.</summary>
+    public void HandleLoadShortcut() => LoadStepsCommand.Execute(null);
+
+    /// <summary>F5 — teljes futtatás az elejétől.</summary>
+    public void HandleRunShortcut()
+    {
+        if (RunStepsCommand.CanExecute(null))
+            RunStepsCommand.Execute(null);
+    }
+
+    /// <summary>Shift+F5 — leállítás (a Desktop modulban ez az alkalmazás bezárását jelenti).</summary>
+    public void HandleStopShortcut() => CloseAppCommand.Execute(null);
+
+    /// <summary>Delete — a kijelölt lépés törlése.</summary>
+    public void HandleDeleteShortcut()
+    {
+        if (SelectedStep is { } row)
+            RemoveStepCommand.Execute(row);
+    }
+
+    /// <summary>Ctrl+D — a kijelölt lépés duplikálása.</summary>
+    public void HandleDuplicateShortcut()
+    {
+        if (SelectedStep is { } row)
+            DuplicateStepCommand.Execute(row);
+    }
+
+    /// <summary>Ctrl+↑ — a kijelölt lépés feljebb mozgatása.</summary>
+    public void HandleMoveUpShortcut()
+    {
+        if (SelectedStep is { } row)
+            MoveStepUpCommand.Execute(row);
+    }
+
+    /// <summary>Ctrl+↓ — a kijelölt lépés lejjebb mozgatása.</summary>
+    public void HandleMoveDownShortcut()
+    {
+        if (SelectedStep is { } row)
+            MoveStepDownCommand.Execute(row);
+    }
+
+    /// <summary>Esc — folyamatban lévő szerkesztés megszakítása.</summary>
+    public void HandleEscapeShortcut()
+    {
+        if (IsEditing)
+            CancelEditCommand.Execute(null);
     }
 
     private static string BuildStepName(DesktopStepAction action, string locator, string value, string targetLocator) => action switch

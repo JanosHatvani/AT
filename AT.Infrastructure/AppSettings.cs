@@ -39,4 +39,7 @@ public sealed class AppSettings
     /// Mindhárom modul (Web/Desktop/Mobil) közösen ezt használja.
     /// </summary>
     public string? TestHistoryFolderPath { get; set; }
+
+    /// <summary>Igaz, ha a felhasználó a sötét témát választotta a Beállításokban.</summary>
+    public bool IsDarkTheme { get; set; }
 }

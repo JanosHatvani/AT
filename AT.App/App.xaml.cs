@@ -27,6 +27,7 @@ public partial class App : Application
         services.AddSingleton<AT.Infrastructure.ITestSuiteFileService, AT.Infrastructure.TestSuiteFileService>();
         services.AddSingleton<AT.Infrastructure.ITestRunHistoryService, AT.Infrastructure.TestRunHistoryService>();
         services.AddSingleton<AT.Infrastructure.ITestReportService, AT.Infrastructure.TestReportService>();
+        services.AddSingleton<IThemeService, ThemeService>();
 
         // ---- Automatizálási driverek ----
         // Konkrét típusként regisztrálva (nem IAutomationDriver-ként), mert egyszerre
@@ -47,7 +48,11 @@ public partial class App : Application
         services.AddSingleton<SettingsViewModel>();
 
         // ---- Ablakok ----
-        services.AddSingleton<MainWindow>();
+        // Transient: minden GetRequiredService<MainWindow>() hívás új példányt ad —
+        // ez szükséges a témaváltáskori teljes ablak-újranyitáshoz (lásd MainWindow.
+        // OnThemeChanged). Az állapot nem vész el, mert a DataContext (MainViewModel)
+        // továbbra is Singleton, csak maga az ablak-héj cserélődik.
+        services.AddTransient<MainWindow>();
     }
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -59,6 +64,11 @@ public partial class App : Application
         // (és így az összes ViewModel) feloldását.
         var settingsService = _host.Services.GetRequiredService<AT.Infrastructure.ISettingsService>();
         await settingsService.LoadAsync();
+
+        // A mentett téma alkalmazása még a MainWindow megjelenítése előtt, hogy ne
+        // villanjon fel egy pillanatra a világos téma sötét beállítás esetén.
+        var themeService = _host.Services.GetRequiredService<IThemeService>();
+        themeService.ApplyTheme(settingsService.Current.IsDarkTheme);
 
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         MainWindow = mainWindow;

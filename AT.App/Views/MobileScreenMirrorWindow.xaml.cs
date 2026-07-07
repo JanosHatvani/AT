@@ -54,6 +54,20 @@ public partial class MobileScreenMirrorWindow : Window
     }
 
     /// <summary>
+    /// A "Bezárás" gomb: leállítja a tükrözést, az Appium session-t és szervert
+    /// (StopAllCommand), majd bezárja az ablakot — a Close() a Window_Closing-on
+    /// keresztül fut le, ami a megszokott módon csak elrejti (Hide), nem szünteti
+    /// meg ténylegesen a példányt, hogy később újra elő lehessen hívni.
+    /// </summary>
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MobileTestViewModel viewModel && viewModel.StopAllCommand.CanExecute(null))
+            viewModel.StopAllCommand.Execute(null);
+
+        Close();
+    }
+
+    /// <summary>
     /// Közvetlen, determinisztikus jelzés arra, hogy a felhasználó bezárta (elrejtette)
     /// az ablakot. A MobileMirrorWindowService erre iratkozik fel a WPF IsVisibleChanged
     /// helyett, mert az utóbbi időzítése bizonyos Owner/Activate-kombinációk mellett
