@@ -1,0 +1,135 @@
+<Window x:Class="AT.App.Views.ScheduleTaskDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:conv="clr-namespace:AT.App.Converters"
+        Title="Ütemezés létrehozása"
+        Width="480" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{StaticResource Brush.Surface}"
+        BorderBrush="{StaticResource Brush.Border}"
+        BorderThickness="1">
+
+    <!--
+        FONTOS: ez az ablak a projekt meglévő ConfirmDialog-jának feltételezett
+        mintáját követi (egyedi WindowChrome, saját fejléc-sáv, Brush.* erőforrások).
+        Ha a te ConfirmDialog.xaml-od ettől eltérő WindowChrome-beállítást vagy
+        fejléc-felépítést használ, ezt a blokkot érdemes ahhoz igazítani, hogy a
+        két ablak pixel-pontosan egyformán nézzen ki.
+
+        A DataContext a code-behind-ban van beállítva (State, egy DialogState
+        példány) — ezért minden Binding itt egyszerű, RelativeSource nélküli,
+        közvetlenül a DialogState property-jeire mutat.
+    -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="40" CornerRadius="8" GlassFrameThickness="0" ResizeBorderThickness="4" />
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource SubtleTextStyle}">
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+        <Style x:Key="DialogTitleBarStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Brush.Background}" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="CornerRadius" Value="8,8,0,0" />
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ===================== FEJLÉC-SÁV ===================== -->
+        <Border Grid.Row="0" Style="{StaticResource DialogTitleBarStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Ütemezés létrehozása"
+                           FontWeight="SemiBold" FontSize="14"
+                           Foreground="{StaticResource Brush.TextPrimary}"
+                           VerticalAlignment="Center" Margin="16,0,0,0"
+                           WindowChrome.IsHitTestVisibleInChrome="False" />
+
+                <Button Grid.Column="1" Content="✕"
+                        Style="{StaticResource GhostButtonStyle}"
+                        Width="32" Height="32" Margin="0,0,6,0"
+                        Click="CloseButton_Click"
+                        WindowChrome.IsHitTestVisibleInChrome="True" />
+            </Grid>
+        </Border>
+
+        <!-- ===================== TARTALOM ===================== -->
+        <StackPanel Grid.Row="1" Margin="20,16,20,0">
+
+            <TextBlock Text="Ismétlődés" Style="{StaticResource FieldLabelStyle}" />
+            <ComboBox x:Name="CadenceComboBox" ItemsSource="{Binding CadenceOptions}"
+                      SelectedItem="{Binding SelectedCadence}"
+                      Margin="0,0,0,14">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Converter={x:Static conv:ScheduleCadenceToLabelConverter.Instance}}" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <Grid Margin="0,0,0,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0"
+                            Visibility="{Binding IsHourFieldVisible, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}">
+                    <TextBlock Text="Óra" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBox x:Name="HourTextBox" Text="{Binding HourText, UpdateSourceTrigger=PropertyChanged}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="Perc" Style="{StaticResource FieldLabelStyle}" />
+                    <TextBox x:Name="MinuteTextBox" Text="{Binding MinuteText, UpdateSourceTrigger=PropertyChanged}" />
+                </StackPanel>
+            </Grid>
+
+            <!-- ===================== WEEKLY: NAPOK CHECKBOX-CSOPORTJA ===================== -->
+            <StackPanel Margin="0,0,0,14"
+                        Visibility="{Binding IsWeeklyFieldsVisible, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}">
+                <TextBlock Text="Napok" Style="{StaticResource FieldLabelStyle}" />
+                <WrapPanel>
+                    <CheckBox Content="Hétfő" Margin="0,0,12,6" IsChecked="{Binding IsMonday}" />
+                    <CheckBox Content="Kedd" Margin="0,0,12,6" IsChecked="{Binding IsTuesday}" />
+                    <CheckBox Content="Szerda" Margin="0,0,12,6" IsChecked="{Binding IsWednesday}" />
+                    <CheckBox Content="Csütörtök" Margin="0,0,12,6" IsChecked="{Binding IsThursday}" />
+                    <CheckBox Content="Péntek" Margin="0,0,12,6" IsChecked="{Binding IsFriday}" />
+                    <CheckBox Content="Szombat" Margin="0,0,12,6" IsChecked="{Binding IsSaturday}" />
+                    <CheckBox Content="Vasárnap" Margin="0,0,12,6" IsChecked="{Binding IsSunday}" />
+                </WrapPanel>
+            </StackPanel>
+
+            <!-- ===================== MONTHLY: NAP-SZÁMMEZŐ ===================== -->
+            <StackPanel Margin="0,0,0,14"
+                        Visibility="{Binding IsMonthlyFieldsVisible, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}">
+                <TextBlock Text="A hónap hányadik napján (1-31)" Style="{StaticResource FieldLabelStyle}" />
+                <TextBox Text="{Binding DayOfMonthText, UpdateSourceTrigger=PropertyChanged}" MaxWidth="120" HorizontalAlignment="Left" />
+            </StackPanel>
+
+            <TextBlock Text="{Binding ValidationMessage}"
+                       Foreground="{StaticResource Brush.Danger}"
+                       TextWrapping="Wrap" Margin="0,0,0,10"
+                       Visibility="{Binding HasValidationMessage, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}" />
+        </StackPanel>
+
+        <!-- ===================== GOMBOK ===================== -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,10,20,16">
+            <Button Content="Mégse" Style="{StaticResource GhostButtonStyle}" Margin="0,0,10,0" Click="CancelButton_Click" />
+            <Button Content="Ütemezés létrehozása" Style="{StaticResource PrimaryButtonStyle}" Click="CreateButton_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

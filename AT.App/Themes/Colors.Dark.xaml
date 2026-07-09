@@ -18,7 +18,7 @@
     <Color x:Key="Color.Background">#FF232931</Color>
     <Color x:Key="Color.Surface">#FF393E46</Color>
     <Color x:Key="Color.ContentBackground">#FF232931</Color>
-    <Color x:Key="Color.Border">#FF4A5058</Color>
+    <Color x:Key="Color.Border">#FF5B6270</Color>
 
     <!-- Sidebar -->
     <Color x:Key="Color.SidebarBg">#FF1B2027</Color>

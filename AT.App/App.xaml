@@ -32,6 +32,9 @@
             <DataTemplate DataType="{x:Type vm:HistoryViewModel}">
                 <views:HistoryView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:ScheduledTasksViewModel}">
+                <views:ScheduledTasksView />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
                 <views:SettingsView />
             </DataTemplate>

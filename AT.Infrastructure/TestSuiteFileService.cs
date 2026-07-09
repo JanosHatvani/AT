@@ -6,7 +6,9 @@ namespace AT.Infrastructure;
 
 public interface ITestSuiteFileService
 {
-    Task SaveAsync(string filePath, AutomationTarget target, IEnumerable<TestStep> steps, string? name = null);
+    /// <param name="categoryId">A teszt-kategória Id-ja (TestCategory.Id) — a fájl gyökér-
+    /// elemének attribútumaként mentődik, ugyanúgy mint a name/target.</param>
+    Task SaveAsync(string filePath, AutomationTarget target, IEnumerable<TestStep> steps, string? name = null, string? categoryId = null);
 
     /// <summary>Betölt egy fájlt, és eldobja, ha az nem a várt modulhoz (expectedTarget) készült.</summary>
     Task<TestSuiteFile> LoadAsync(string filePath, AutomationTarget expectedTarget);
@@ -16,12 +18,13 @@ public sealed class TestSuiteFileService : ITestSuiteFileService
 {
     private static readonly XmlSerializer Serializer = new(typeof(TestSuiteFile));
 
-    public Task SaveAsync(string filePath, AutomationTarget target, IEnumerable<TestStep> steps, string? name = null)
+    public Task SaveAsync(string filePath, AutomationTarget target, IEnumerable<TestStep> steps, string? name = null, string? categoryId = null)
     {
         var file = new TestSuiteFile
         {
             Target = target,
             Name = name,
+            CategoryId = categoryId,
             SavedAtUtc = DateTime.UtcNow,
             Steps = steps.Select(TestSuiteMapper.ToDto).ToList()
         };

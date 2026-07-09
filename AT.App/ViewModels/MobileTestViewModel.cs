@@ -10,6 +10,7 @@ using AT.Automation.Mobile;
 using AT.Core.Contracts;
 using AT.Core.Models;
 using AT.Infrastructure;
+using AT.App.Views;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -25,6 +26,9 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
     private readonly ITestRunHistoryService _historyService;
     private readonly ITestReportService _reportService;
     private readonly DispatcherTimer _mirrorTimer;
+    private readonly IScheduledTaskService _scheduledTaskService;
+    private readonly ISchedulerService _schedulerService;
+    private readonly ITestCategoryService _categoryService;
 
     /// <summary>A folyamatban lévő (vagy legutóbb befejezett) futtatás képernyőkép-mappája — null, ha ehhez a futtatáshoz nem készül kép.</summary>
     private string? _currentRunScreenshotFolder;
@@ -65,6 +69,24 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
 
     [ObservableProperty]
     private string testName = "";
+
+    [ObservableProperty]
+    private string selectedCategoryId = "";
+
+    /// <summary>Csak az Android platformra engedélyezett kategóriák — lásd Beállítások, Teszt-kategóriák.</summary>
+    public ObservableCollection<TestCategory> AvailableCategories { get; } = new();
+
+    private void LoadAvailableCategories()
+    {
+        AvailableCategories.Clear();
+        foreach (var category in _categoryService.GetCategoriesForTarget(AutomationTarget.Android))
+            AvailableCategories.Add(category);
+
+        if (AvailableCategories.All(c => c.Id != SelectedCategoryId))
+            SelectedCategoryId = AvailableCategories.FirstOrDefault()?.Id ?? "";
+    }
+
+    partial void OnSelectedCategoryIdChanged(string value) => RunStepsCommand.NotifyCanExecuteChanged();
 
     public IReadOnlyList<MobileStepAction> AvailableActions { get; } = Enum.GetValues<MobileStepAction>();
     public IReadOnlyList<LocatorType> AvailableLocatorTypes { get; } = SupportedLocatorTypes;
@@ -167,7 +189,10 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         AT.Infrastructure.ITestSuiteFileService fileService,
         IMobileMirrorWindowService mirrorWindowService,
         ITestRunHistoryService historyService,
-        ITestReportService reportService)
+        ITestReportService reportService,
+        IScheduledTaskService scheduledTaskService,
+        ISchedulerService schedulerService,
+        ITestCategoryService categoryService)
     {
         _driver = driver;
         _notificationService = notificationService;
@@ -176,6 +201,9 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         _mirrorWindowService = mirrorWindowService;
         _historyService = historyService;
         _reportService = reportService;
+        _scheduledTaskService = scheduledTaskService;
+        _schedulerService = schedulerService;
+        _categoryService = categoryService;
         _mirrorWindowService.Closed += OnMirrorWindowClosed;
 
         Steps.CollectionChanged += (_, _) =>
@@ -193,6 +221,8 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         _defaultApkPath = defaults.DefaultApkPath;
         NewTimeoutSeconds = _defaultTimeoutSeconds;
         _driver.SdkRootOverride = defaults.AndroidSdkRoot;
+
+        LoadAvailableCategories();
 
         // Az Élő kijelző ablak a nézet betöltésekor automatikusan megnyílik.
         OpenMirrorWindow();
@@ -423,7 +453,40 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         CancelEdit();
         Steps.Clear();
         TestName = "";
+        LoadAvailableCategories();
         _notificationService.Show("Új, üres lépéssor létrehozva.", NotificationType.Info);
+    }
+
+    [RelayCommand]
+    private async Task ScheduleTaskAsync()
+    {
+        if (Steps.Count == 0)
+        {
+            _notificationService.Show("Nincs felvett lépés — előbb vegyél fel legalább egy lépést.", NotificationType.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(SelectedCategoryId))
+        {
+            _notificationService.Show("Válassz kategóriát az ütemezés létrehozása előtt.", NotificationType.Warning);
+            return;
+        }
+
+        var task = AT.App.Views.ScheduleTaskDialog.Show(
+            Application.Current.MainWindow,
+            TestName,
+            SelectedCategoryId,
+            AutomationTarget.Android,
+            Steps.Select(r => r.Step).ToList());
+
+        if (task is null)
+            return;
+
+        await _scheduledTaskService.AddAsync(task);
+        _schedulerService.RecalculateNextRun(task);
+        await _scheduledTaskService.UpdateAsync(task);
+
+        _notificationService.Show("Ütemezés létrehozva.", NotificationType.Success);
     }
 
     [RelayCommand]
@@ -449,6 +512,24 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         var index = Steps.IndexOf(row);
         if (index >= 0 && index < Steps.Count - 1)
             Steps.Move(index, index + 1);
+    }
+
+    /// <summary>
+    /// Egy lépés áthelyezése tetszőleges pozícióra — a drag&amp;drop átrendezéshez
+    /// (lásd MobileTestView.xaml.cs). A ↑/↓ gombokkal ellentétben ez nem csak
+    /// szomszédos cserét végez, hanem a lista bármely pontjára mozgathat egy lépést.
+    /// </summary>
+    public void MoveStepTo(TestStepRow row, int targetIndex)
+    {
+        var currentIndex = Steps.IndexOf(row);
+        if (currentIndex < 0)
+            return;
+
+        targetIndex = Math.Clamp(targetIndex, 0, Steps.Count - 1);
+        if (currentIndex == targetIndex)
+            return;
+
+        Steps.Move(currentIndex, targetIndex);
     }
 
     [RelayCommand]
@@ -497,7 +578,16 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
 
     private async Task RunStepsCoreAsync(int startIndex)
     {
+        if (string.IsNullOrWhiteSpace(SelectedCategoryId))
+        {
+            _notificationService.Show("Válassz kategóriát a teszt futtatása előtt.", NotificationType.Warning);
+            return;
+        }
+
         IsRunning = true;
+
+        _schedulerService.SetModuleBusy(AutomationTarget.Android, true);
+
         RunStepsCommand.NotifyCanExecuteChanged();
 
         var startedAt = DateTime.Now;
@@ -589,7 +679,10 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         finally
         {
             IsRunning = false;
+            
             RunStepsCommand.NotifyCanExecuteChanged();
+
+            _schedulerService.SetModuleBusy(AutomationTarget.Android, false);
 
             await SaveRunToHistoryAsync(startedAt, DateTime.Now);
         }
@@ -618,6 +711,7 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         var record = new TestRunRecord
         {
             TestName = TestName,
+            CategoryId = SelectedCategoryId,
             Target = AutomationTarget.Android,
             StartedAt = startedAt,
             FinishedAt = finishedAt,
@@ -684,7 +778,7 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         }
     }
 
-    private bool CanRun() => !IsRunning && Steps.Count > 0;
+    private bool CanRun() => !IsRunning && Steps.Count > 0 && !string.IsNullOrWhiteSpace(SelectedCategoryId);
 
     /// <summary>A Beállításokban választott mód szerint (soha / csak hiba / minden lépés) ment képernyőképet,
     /// a futtatáshoz tartozó, ResolveRunScreenshotFolder által létrehozott almappába.</summary>
@@ -745,7 +839,7 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
 
         try
         {
-            await _fileService.SaveAsync(dialog.FileName, AutomationTarget.Android, Steps.Select(r => r.Step), TestName);
+            await _fileService.SaveAsync(dialog.FileName, AutomationTarget.Android, Steps.Select(r => r.Step), TestName, SelectedCategoryId);
             _notificationService.Show("Lépéssor elmentve.", NotificationType.Success);
         }
         catch (Exception ex)
@@ -775,6 +869,11 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
                 Steps.Add(new TestStepRow { Step = AT.Infrastructure.TestSuiteMapper.ToTestStep(dto, AutomationTarget.Android) });
 
             TestName = file.Name ?? "";
+
+            LoadAvailableCategories();
+            if (!string.IsNullOrWhiteSpace(file.CategoryId) && AvailableCategories.Any(c => c.Id == file.CategoryId))
+                SelectedCategoryId = file.CategoryId;
+
             CancelEdit();
             _notificationService.Show($"{file.Steps.Count} lépés betöltve.", NotificationType.Success);
         }
@@ -924,7 +1023,7 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         MobileStepAction.LaunchApp => $"Alkalmazás telepítése/indítása → {value}",
         MobileStepAction.Click => $"Kattintás → {locator}",
         MobileStepAction.LongPress => $"Hosszan nyomás → {locator}",
-        MobileStepAction.SendKeys => $"Beírás → {locator} → {value}",
+        MobileStepAction.SendKeys => $"Szöveg beírása → {locator} → {value}",
         MobileStepAction.Clear => $"Mező ürítése → {locator}",
         MobileStepAction.Swipe => $"Húzás → {value}",
         MobileStepAction.ScrollToElement => $"Görgetés az elemig → {locator}",

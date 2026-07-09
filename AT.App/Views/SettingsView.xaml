@@ -1,6 +1,7 @@
 <UserControl x:Class="AT.App.Views.SettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:AT.App.Converters">
 
     <UserControl.Resources>
         <Style x:Key="FieldLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource SubtleTextStyle}">
@@ -152,6 +153,138 @@
                 </Grid>
                 <TextBlock Text="Ide kerülnek a futtatási előzmények (Web / Desktop / Mobil közösen), amiket az Előzmények oldalon böngészhetsz, és amikből riportot exportálhatsz. Ha üresen hagyod, az Asztalra kerülnek."
                            Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- ===================== RIPORT-EMAIL (ütemezett futtatás hibája esetén) ===================== -->
+        <Border Style="{StaticResource CardStyle}" Margin="0,0,0,20">
+            <StackPanel>
+                <TextBlock Text="Riport-email" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,12" />
+
+                <CheckBox Content="Email küldése, ha egy ütemezett (automatikus) futtatás hibával fejeződik be"
+                          IsChecked="{Binding EmailNotificationsEnabled}" Margin="0,0,0,4" />
+                <TextBlock Text="Csak az Ütemezett feladatok oldalon beállított, automatikus futtatásokra vonatkozik — kézi futtatás hibája esetén nem küld emailt."
+                           Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap" Margin="0,0,0,16" />
+
+                <Grid Margin="0,0,0,4" IsEnabled="{Binding AreEmailFieldsEditable}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="120" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                        <TextBlock Text="SMTP szerver (host)" Style="{StaticResource FieldLabelStyle}" />
+                        <TextBox Text="{Binding SmtpHost, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Port" Style="{StaticResource FieldLabelStyle}" />
+                        <TextBox Text="{Binding SmtpPort, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </Grid>
+                <TextBlock Text="Pl. smtp.gmail.com, port 587 (STARTTLS/SSL) — Gmailnél App Password szükséges a jelszó helyett."
+                           Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap" Margin="0,0,0,16"
+                           IsEnabled="{Binding AreEmailFieldsEditable}" />
+
+                <Grid Margin="0,0,0,16" IsEnabled="{Binding AreEmailFieldsEditable}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="SMTP felhasználónév" Style="{StaticResource FieldLabelStyle}" />
+                        <TextBox Text="{Binding SmtpUsername, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="SMTP jelszó" Style="{StaticResource FieldLabelStyle}" />
+                        <PasswordBox x:Name="SmtpPasswordBox"
+                                     PasswordChanged="SmtpPasswordBox_PasswordChanged" />
+                    </StackPanel>
+                </Grid>
+
+                <CheckBox Content="SSL/TLS titkosítás használata" IsChecked="{Binding SmtpUseSsl}"
+                          Margin="0,0,0,16" IsEnabled="{Binding AreEmailFieldsEditable}" />
+
+                <TextBlock Text="Feladó email cím" Style="{StaticResource FieldLabelStyle}"
+                           IsEnabled="{Binding AreEmailFieldsEditable}" />
+                <TextBox Text="{Binding EmailFrom, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,0,0,16" IsEnabled="{Binding AreEmailFieldsEditable}" />
+
+                <TextBlock Text="Címzettek" Style="{StaticResource FieldLabelStyle}"
+                           IsEnabled="{Binding AreEmailFieldsEditable}" />
+                <TextBox Text="{Binding EmailRecipients, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True" Height="60" TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         IsEnabled="{Binding AreEmailFieldsEditable}" />
+                <TextBlock Text="Több címzett vesszővel, pontosvesszővel vagy külön sorban is megadható."
+                           Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap" Margin="0,0,0,16" />
+
+                <Button Content="Teszt email küldése" Style="{StaticResource GhostButtonStyle}"
+                        HorizontalAlignment="Left"
+                        Command="{Binding SendTestEmailCommand}"
+                        IsEnabled="{Binding AreEmailFieldsEditable}" />
+            </StackPanel>
+        </Border>
+
+        <!-- ===================== TESZT-KATEGÓRIÁK ===================== -->
+        <Border Style="{StaticResource CardStyle}" Margin="0,0,0,20">
+            <StackPanel>
+                <TextBlock Text="Teszt-kategóriák" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,12" />
+                <TextBlock Text="A kategóriák a Web/Desktop/Mobil oldalakon a teszt neve mellett választhatók, és az Ütemezett feladatok / Előzmények nézeteken lehet ezek szerint szűrni."
+                           Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap" Margin="0,0,0,14" />
+
+                <ItemsControl ItemsSource="{Binding Categories}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,0,1" Padding="0,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" MaxWidth="300" HorizontalAlignment="Left" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                            <CheckBox Content="Web" IsChecked="{Binding IsWeb}" Margin="0,0,16,0" />
+                                            <CheckBox Content="Desktop" IsChecked="{Binding IsDesktop}" Margin="0,0,16,0" />
+                                            <CheckBox Content="Mobil" IsChecked="{Binding IsMobile}" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <Button Grid.Column="1" Content="Törlés"
+                                            Style="{StaticResource GhostButtonStyle}"
+                                            VerticalAlignment="Top"
+                                            Command="{Binding DataContext.DeleteCategoryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Text="Még nincs kategória létrehozva."
+                           Style="{StaticResource FieldHintStyle}" Margin="0,10,0,0"
+                           Visibility="{Binding HasCategories, Converter={x:Static conv:InverseBoolToVisibilityConverter.Instance}}" />
+
+                <!-- ===================== ÚJ KATEGÓRIA ===================== -->
+                <Border BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,1,0,0" Margin="0,14,0,0" Padding="0,14,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Új kategória" Style="{StaticResource FieldLabelStyle}" FontWeight="SemiBold" />
+                        <TextBox Text="{Binding NewCategoryName, UpdateSourceTrigger=PropertyChanged}" MaxWidth="300" HorizontalAlignment="Left" Margin="0,0,0,8" />
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <CheckBox Content="Web" IsChecked="{Binding NewCategoryIsWeb}" Margin="0,0,16,0" />
+                            <CheckBox Content="Desktop" IsChecked="{Binding NewCategoryIsDesktop}" Margin="0,0,16,0" />
+                            <CheckBox Content="Mobil" IsChecked="{Binding NewCategoryIsMobile}" />
+                        </StackPanel>
+                        <Button Content="Kategória létrehozása" Style="{StaticResource GhostButtonStyle}"
+                                HorizontalAlignment="Left"
+                                Command="{Binding AddCategoryCommand}" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </Border>
 

@@ -8,6 +8,7 @@ using AT.Automation.Desktop;
 using AT.Core.Contracts;
 using AT.Core.Models;
 using AT.Infrastructure;
+using AT.App.Views;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -21,6 +22,9 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     private readonly AT.Infrastructure.ISettingsService _settingsService;
     private readonly ITestRunHistoryService _historyService;
     private readonly ITestReportService _reportService;
+    private readonly IScheduledTaskService _scheduledTaskService;
+    private readonly ISchedulerService _schedulerService;
+    private readonly ITestCategoryService _categoryService;
 
     /// <summary>A folyamatban lévő (vagy legutóbb befejezett) futtatás képernyőkép-mappája — null, ha ehhez a futtatáshoz nem készül kép.</summary>
     private string? _currentRunScreenshotFolder;
@@ -52,6 +56,24 @@ public sealed partial class DesktopTestViewModel : ObservableObject
 
     [ObservableProperty]
     private string testName = "";
+
+    [ObservableProperty]
+    private string selectedCategoryId = "";
+
+    /// <summary>Csak a Desktop platformra engedélyezett kategóriák — lásd Beállítások, Teszt-kategóriák.</summary>
+    public ObservableCollection<TestCategory> AvailableCategories { get; } = new();
+
+    private void LoadAvailableCategories()
+    {
+        AvailableCategories.Clear();
+        foreach (var category in _categoryService.GetCategoriesForTarget(AutomationTarget.Desktop))
+            AvailableCategories.Add(category);
+
+        if (AvailableCategories.All(c => c.Id != SelectedCategoryId))
+            SelectedCategoryId = AvailableCategories.FirstOrDefault()?.Id ?? "";
+    }
+
+    partial void OnSelectedCategoryIdChanged(string value) => RunStepsCommand.NotifyCanExecuteChanged();
 
     public IReadOnlyList<DesktopStepAction> AvailableActions { get; } = Enum.GetValues<DesktopStepAction>();
     public IReadOnlyList<LocatorType> AvailableLocatorTypes { get; } = SupportedLocatorTypes;
@@ -133,7 +155,10 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         AT.Infrastructure.ISettingsService settingsService,
         AT.Infrastructure.ITestSuiteFileService fileService,
         ITestRunHistoryService historyService,
-        ITestReportService reportService)
+        ITestReportService reportService,
+        IScheduledTaskService scheduledTaskService,
+        ISchedulerService schedulerService,
+        ITestCategoryService categoryService)
     {
         _driver = driver;
         _notificationService = notificationService;
@@ -141,6 +166,9 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         _settingsService = settingsService;
         _historyService = historyService;
         _reportService = reportService;
+        _scheduledTaskService = scheduledTaskService;
+        _schedulerService = schedulerService;
+        _categoryService = categoryService;
         Steps.CollectionChanged += (_, _) =>
         {
             RunStepsCommand.NotifyCanExecuteChanged();
@@ -151,6 +179,8 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         _defaultTimeoutSeconds = defaults.DefaultTimeoutSeconds;
         _defaultAppPath = defaults.DefaultDesktopAppPath;
         NewTimeoutSeconds = _defaultTimeoutSeconds;
+
+        LoadAvailableCategories();
     }
 
     partial void OnNewActionChanged(DesktopStepAction value)
@@ -288,7 +318,40 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         CancelEdit();
         Steps.Clear();
         TestName = "";
+        LoadAvailableCategories();
         _notificationService.Show("Új, üres lépéssor létrehozva.", NotificationType.Info);
+    }
+
+    [RelayCommand]
+    private async Task ScheduleTaskAsync()
+    {
+        if (Steps.Count == 0)
+        {
+            _notificationService.Show("Nincs felvett lépés — előbb vegyél fel legalább egy lépést.", NotificationType.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(SelectedCategoryId))
+        {
+            _notificationService.Show("Válassz kategóriát az ütemezés létrehozása előtt.", NotificationType.Warning);
+            return;
+        }
+
+        var task = AT.App.Views.ScheduleTaskDialog.Show(
+            Application.Current.MainWindow,
+            TestName,
+            SelectedCategoryId,
+            AutomationTarget.Desktop,
+            Steps.Select(r => r.Step).ToList());
+
+        if (task is null)
+            return;
+
+        await _scheduledTaskService.AddAsync(task);
+        _schedulerService.RecalculateNextRun(task);
+        await _scheduledTaskService.UpdateAsync(task);
+
+        _notificationService.Show("Ütemezés létrehozva.", NotificationType.Success);
     }
 
     [RelayCommand]
@@ -314,6 +377,20 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         var index = Steps.IndexOf(row);
         if (index >= 0 && index < Steps.Count - 1)
             Steps.Move(index, index + 1);
+    }
+
+    /// <summary>Egy lépés áthelyezése tetszőleges pozícióra — a drag&amp;drop átrendezéshez.</summary>
+    public void MoveStepTo(TestStepRow row, int targetIndex)
+    {
+        var currentIndex = Steps.IndexOf(row);
+        if (currentIndex < 0)
+            return;
+
+        targetIndex = Math.Clamp(targetIndex, 0, Steps.Count - 1);
+        if (currentIndex == targetIndex)
+            return;
+
+        Steps.Move(currentIndex, targetIndex);
     }
 
     [RelayCommand]
@@ -361,7 +438,16 @@ public sealed partial class DesktopTestViewModel : ObservableObject
 
     private async Task RunStepsCoreAsync(int startIndex)
     {
+        if (string.IsNullOrWhiteSpace(SelectedCategoryId))
+        {
+            _notificationService.Show("Válassz kategóriát a teszt futtatása előtt.", NotificationType.Warning);
+            return;
+        }
+
         IsRunning = true;
+
+        _schedulerService.SetModuleBusy(AutomationTarget.Desktop, true);
+
         RunStepsCommand.NotifyCanExecuteChanged();
 
         var startedAt = DateTime.Now;
@@ -453,7 +539,10 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         finally
         {
             IsRunning = false;
+            
             RunStepsCommand.NotifyCanExecuteChanged();
+
+            _schedulerService.SetModuleBusy(AutomationTarget.Desktop, false);
 
             await SaveRunToHistoryAsync(startedAt, DateTime.Now);
         }
@@ -482,6 +571,7 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         var record = new TestRunRecord
         {
             TestName = TestName,
+            CategoryId = SelectedCategoryId,
             Target = AutomationTarget.Desktop,
             StartedAt = startedAt,
             FinishedAt = finishedAt,
@@ -548,7 +638,7 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         }
     }
 
-    private bool CanRun() => !IsRunning && Steps.Count > 0;
+    private bool CanRun() => !IsRunning && Steps.Count > 0 && !string.IsNullOrWhiteSpace(SelectedCategoryId);
 
     /// <summary>A Beállításokban választott mód szerint (soha / csak hiba / minden lépés) ment képernyőképet,
     /// a futtatáshoz tartozó, ResolveRunScreenshotFolder által létrehozott almappába.</summary>
@@ -609,7 +699,7 @@ public sealed partial class DesktopTestViewModel : ObservableObject
 
         try
         {
-            await _fileService.SaveAsync(dialog.FileName, AutomationTarget.Desktop, Steps.Select(r => r.Step), TestName);
+            await _fileService.SaveAsync(dialog.FileName, AutomationTarget.Desktop, Steps.Select(r => r.Step), TestName, SelectedCategoryId);
             _notificationService.Show("Lépéssor elmentve.", NotificationType.Success);
         }
         catch (Exception ex)
@@ -639,6 +729,11 @@ public sealed partial class DesktopTestViewModel : ObservableObject
                 Steps.Add(new TestStepRow { Step = AT.Infrastructure.TestSuiteMapper.ToTestStep(dto, AutomationTarget.Desktop) });
 
             TestName = file.Name ?? "";
+
+            LoadAvailableCategories();
+            if (!string.IsNullOrWhiteSpace(file.CategoryId) && AvailableCategories.Any(c => c.Id == file.CategoryId))
+                SelectedCategoryId = file.CategoryId;
+
             CancelEdit();
             _notificationService.Show($"{file.Steps.Count} lépés betöltve.", NotificationType.Success);
         }
@@ -733,11 +828,11 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         DesktopStepAction.Click => $"Kattintás → {locator}",
         DesktopStepAction.DoubleClick => $"Dupla kattintás → {locator}",
         DesktopStepAction.RightClick => $"Jobb-klikk → {locator}",
-        DesktopStepAction.SetText => $"Szöveg beállítása → {locator} → {value}",
+        DesktopStepAction.SetText => $"Szöveg beírása → {locator} → {value}",
         DesktopStepAction.Clear => $"Mező ürítése → {locator}",
         DesktopStepAction.Hover => $"Rámutatás → {locator}",
         DesktopStepAction.SelectComboBoxItem => $"Lista-elem kiválasztása → {locator} → {value}",
-        DesktopStepAction.DragAndDrop => $"Húzás → {locator} ⇒ {targetLocator}",
+        DesktopStepAction.DragAndDrop => $"Drag and Drop → {locator} ⇒ {targetLocator}",
         DesktopStepAction.ReadAttribute => $"Attribútum kiolvasása → {locator} → {value}",
         DesktopStepAction.Wait => "Várakozás",
         DesktopStepAction.WaitVisible => $"Várakozás láthatóra → {locator}",

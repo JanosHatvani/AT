@@ -150,7 +150,7 @@
     <Style x:Key="CardStyle" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource Brush.Surface}" />
         <Setter Property="BorderBrush" Value="{StaticResource Brush.Border}" />
-        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderThickness" Value="1.5" />
         <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Padding" Value="20" />
     </Style>

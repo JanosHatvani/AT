@@ -8,6 +8,7 @@ using AT.Automation.Web;
 using AT.Core.Contracts;
 using AT.Core.Models;
 using AT.Infrastructure;
+using AT.App.Views;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -21,6 +22,9 @@ public sealed partial class WebTestViewModel : ObservableObject
     private readonly AT.Infrastructure.ISettingsService _settingsService;
     private readonly ITestRunHistoryService _historyService;
     private readonly ITestReportService _reportService;
+    private readonly IScheduledTaskService _scheduledTaskService;
+    private readonly ISchedulerService _schedulerService;
+    private readonly ITestCategoryService _categoryService;
 
     /// <summary>A folyamatban lévő (vagy legutóbb befejezett) futtatás képernyőkép-mappája — null, ha ehhez a futtatáshoz nem készül kép.</summary>
     private string? _currentRunScreenshotFolder;
@@ -45,6 +49,27 @@ public sealed partial class WebTestViewModel : ObservableObject
 
     [ObservableProperty]
     private string testName = "";
+
+    [ObservableProperty]
+    private string selectedCategoryId = "";
+
+    /// <summary>Csak a Web platformra engedélyezett kategóriák — lásd Beállítások, Teszt-kategóriák.</summary>
+    public ObservableCollection<TestCategory> AvailableCategories { get; } = new();
+
+    private void LoadAvailableCategories()
+    {
+        AvailableCategories.Clear();
+        foreach (var category in _categoryService.GetCategoriesForTarget(AutomationTarget.Web))
+            AvailableCategories.Add(category);
+
+        // Ha a jelenleg kiválasztott kategória már nem szerepel a listában (pl. törölték,
+        // vagy még nincs kiválasztva), az első elérhetőre esünk vissza — enélkül a
+        // felhasználó egy érvénytelen/üres SelectedCategoryId-vel maradna.
+        if (AvailableCategories.All(c => c.Id != SelectedCategoryId))
+            SelectedCategoryId = AvailableCategories.FirstOrDefault()?.Id ?? "";
+    }
+
+    partial void OnSelectedCategoryIdChanged(string value) => RunStepsCommand.NotifyCanExecuteChanged();
 
     public IReadOnlyList<BrowserType> AvailableBrowsers { get; } = Enum.GetValues<BrowserType>();
     public IReadOnlyList<WebStepAction> AvailableActions { get; } = Enum.GetValues<WebStepAction>();
@@ -130,7 +155,10 @@ public sealed partial class WebTestViewModel : ObservableObject
         AT.Infrastructure.ISettingsService settingsService,
         AT.Infrastructure.ITestSuiteFileService fileService,
         ITestRunHistoryService historyService,
-        ITestReportService reportService)
+        ITestReportService reportService,
+        IScheduledTaskService scheduledTaskService,
+        ISchedulerService schedulerService,
+        ITestCategoryService categoryService)
     {
         _driver = driver;
         _notificationService = notificationService;
@@ -138,6 +166,9 @@ public sealed partial class WebTestViewModel : ObservableObject
         _settingsService = settingsService;
         _historyService = historyService;
         _reportService = reportService;
+        _scheduledTaskService = scheduledTaskService;
+        _schedulerService = schedulerService;
+        _categoryService = categoryService;
         Steps.CollectionChanged += (_, _) =>
         {
             RunStepsCommand.NotifyCanExecuteChanged();
@@ -149,6 +180,8 @@ public sealed partial class WebTestViewModel : ObservableObject
         NewTimeoutSeconds = _defaultTimeoutSeconds;
         if (Enum.TryParse<BrowserType>(defaults.DefaultBrowser, ignoreCase: true, out var browser))
             SelectedBrowser = browser;
+
+        LoadAvailableCategories();
     }
 
     partial void OnNewActionChanged(WebStepAction value)
@@ -282,7 +315,46 @@ public sealed partial class WebTestViewModel : ObservableObject
         CancelEdit();
         Steps.Clear();
         TestName = "";
+        LoadAvailableCategories();
         _notificationService.Show("Új, üres lépéssor létrehozva.", NotificationType.Info);
+    }
+
+    /// <summary>
+    /// Megnyitja az ütemezés-bekérő dialógust a jelenlegi lépéssorral és teszt-névvel.
+    /// Ha a felhasználó megerősíti, elmenti az ütemezett feladatot és újraszámítja a
+    /// scheduler számára a legközelebbi esedékességet.
+    /// </summary>
+    [RelayCommand]
+    private async Task ScheduleTaskAsync()
+    {
+        if (Steps.Count == 0)
+        {
+            _notificationService.Show("Nincs felvett lépés — előbb vegyél fel legalább egy lépést.", NotificationType.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(SelectedCategoryId))
+        {
+            _notificationService.Show("Válassz kategóriát az ütemezés létrehozása előtt.", NotificationType.Warning);
+            return;
+        }
+
+        var task = AT.App.Views.ScheduleTaskDialog.Show(
+            Application.Current.MainWindow,
+            TestName,
+            SelectedCategoryId,
+            AutomationTarget.Web,
+            Steps.Select(r => r.Step).ToList(),
+            SelectedBrowser);
+
+        if (task is null)
+            return;
+
+        await _scheduledTaskService.AddAsync(task);
+        _schedulerService.RecalculateNextRun(task);
+        await _scheduledTaskService.UpdateAsync(task);
+
+        _notificationService.Show("Ütemezés létrehozva.", NotificationType.Success);
     }
 
     [RelayCommand]
@@ -308,6 +380,20 @@ public sealed partial class WebTestViewModel : ObservableObject
         var index = Steps.IndexOf(row);
         if (index >= 0 && index < Steps.Count - 1)
             Steps.Move(index, index + 1);
+    }
+
+    /// <summary>Egy lépés áthelyezése tetszőleges pozícióra — a drag&amp;drop átrendezéshez.</summary>
+    public void MoveStepTo(TestStepRow row, int targetIndex)
+    {
+        var currentIndex = Steps.IndexOf(row);
+        if (currentIndex < 0)
+            return;
+
+        targetIndex = Math.Clamp(targetIndex, 0, Steps.Count - 1);
+        if (currentIndex == targetIndex)
+            return;
+
+        Steps.Move(currentIndex, targetIndex);
     }
 
     [RelayCommand]
@@ -355,7 +441,16 @@ public sealed partial class WebTestViewModel : ObservableObject
 
     private async Task RunStepsCoreAsync(int startIndex)
     {
+        if (string.IsNullOrWhiteSpace(SelectedCategoryId))
+        {
+            _notificationService.Show("Válassz kategóriát a teszt futtatása előtt.", NotificationType.Warning);
+            return;
+        }
+
         IsRunning = true;
+
+        _schedulerService.SetModuleBusy(AutomationTarget.Web, true);
+
         RunStepsCommand.NotifyCanExecuteChanged();
 
         var startedAt = DateTime.Now;
@@ -445,7 +540,10 @@ public sealed partial class WebTestViewModel : ObservableObject
         finally
         {
             IsRunning = false;
+            
             RunStepsCommand.NotifyCanExecuteChanged();
+
+            _schedulerService.SetModuleBusy(AutomationTarget.Web, false);
 
             await SaveRunToHistoryAsync(startedAt, DateTime.Now);
         }
@@ -474,6 +572,7 @@ public sealed partial class WebTestViewModel : ObservableObject
         var record = new TestRunRecord
         {
             TestName = TestName,
+            CategoryId = SelectedCategoryId,
             Target = AutomationTarget.Web,
             StartedAt = startedAt,
             FinishedAt = finishedAt,
@@ -540,7 +639,7 @@ public sealed partial class WebTestViewModel : ObservableObject
         }
     }
 
-    private bool CanRun() => !IsRunning && Steps.Count > 0;
+    private bool CanRun() => !IsRunning && Steps.Count > 0 && !string.IsNullOrWhiteSpace(SelectedCategoryId);
 
     /// <summary>A Beállításokban választott mód szerint (soha / csak hiba / minden lépés) ment képernyőképet,
     /// a futtatáshoz tartozó, ResolveRunScreenshotFolder által létrehozott almappába.</summary>
@@ -601,7 +700,7 @@ public sealed partial class WebTestViewModel : ObservableObject
 
         try
         {
-            await _fileService.SaveAsync(dialog.FileName, AutomationTarget.Web, Steps.Select(r => r.Step), TestName);
+            await _fileService.SaveAsync(dialog.FileName, AutomationTarget.Web, Steps.Select(r => r.Step), TestName, SelectedCategoryId);
             _notificationService.Show("Lépéssor elmentve.", NotificationType.Success);
         }
         catch (Exception ex)
@@ -631,6 +730,17 @@ public sealed partial class WebTestViewModel : ObservableObject
                 Steps.Add(new TestStepRow { Step = AT.Infrastructure.TestSuiteMapper.ToTestStep(dto, AutomationTarget.Web) });
 
             TestName = file.Name ?? "";
+
+            // A fájlban mentett kategória csak akkor állítható be, ha még mindig létezik
+            // és a Web platformon engedélyezett (lásd AvailableCategories) — enélkül egy
+            // törölt vagy más gépen létrehozott kategória Id-ja "ragadna be" érvénytelenül.
+            // LoadAvailableCategories() a jelenlegi, friss listát tölti be, majd ha a fájlból
+            // betöltött CategoryId szerepel benne, azt választjuk; egyébként az alapértelmezett
+            // (LoadAvailableCategories már beállított) első elérhető kategóriánál maradunk.
+            LoadAvailableCategories();
+            if (!string.IsNullOrWhiteSpace(file.CategoryId) && AvailableCategories.Any(c => c.Id == file.CategoryId))
+                SelectedCategoryId = file.CategoryId;
+
             CancelEdit();
             _notificationService.Show($"{file.Steps.Count} lépés betöltve.", NotificationType.Success);
         }
@@ -724,12 +834,12 @@ public sealed partial class WebTestViewModel : ObservableObject
         WebStepAction.Click => $"Kattintás → {locator}",
         WebStepAction.DoubleClick => $"Dupla kattintás → {locator}",
         WebStepAction.RightClick => $"Jobb-klikk → {locator}",
-        WebStepAction.SendKeys => $"Beírás → {locator} → {value}",
+        WebStepAction.SendKeys => $"Szöveg beírás → {locator} → {value}",
         WebStepAction.Clear => $"Mező ürítése → {locator}",
         WebStepAction.Hover => $"Rámutatás → {locator}",
         WebStepAction.SelectByText => $"Kiválasztás szöveg alapján → {locator} → {value}",
         WebStepAction.SelectByValue => $"Kiválasztás érték alapján → {locator} → {value}",
-        WebStepAction.DragAndDrop => $"Húzás → {locator} ⇒ {targetLocator}",
+        WebStepAction.DragAndDrop => $"Drag and Drop → {locator} ⇒ {targetLocator}",
         WebStepAction.Wait => "Várakozás",
         WebStepAction.WaitVisible => $"Várakozás láthatóra → {locator}",
         WebStepAction.WaitClickable => $"Várakozás kattinthatóra → {locator}",

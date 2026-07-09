@@ -18,6 +18,12 @@ public sealed class TestSuiteFile
     [XmlAttribute("name")]
     public string? Name { get; set; }
 
+    /// <summary>A teszt-kategória Id-ja (TestCategory.Id) — a teszt "fej" adata, ugyanúgy
+    /// mint a Name/Target, nem lépésenkénti. Régebbi, kategória nélkül mentett fájlok
+    /// betöltéskor null-t adnak vissza (az XmlAttribute nem kötelező elem).</summary>
+    [XmlAttribute("categoryId")]
+    public string? CategoryId { get; set; }
+
     [XmlAttribute("savedAtUtc")]
     public DateTime SavedAtUtc { get; set; } = DateTime.UtcNow;
 

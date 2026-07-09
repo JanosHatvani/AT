@@ -23,6 +23,7 @@ public sealed partial class MainViewModel : ObservableObject
     public bool IsDesktopActive => CurrentViewModel is DesktopTestViewModel;
     public bool IsMobileActive => CurrentViewModel is MobileTestViewModel;
     public bool IsHistoryActive => CurrentViewModel is HistoryViewModel;
+    public bool IsScheduledTasksActive => CurrentViewModel is ScheduledTasksViewModel;
     public bool IsSettingsActive => CurrentViewModel is SettingsViewModel;
 
     public MainViewModel(INavigationService navigationService, INotificationService notificationService)
@@ -49,6 +50,16 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsDesktopActive));
         OnPropertyChanged(nameof(IsMobileActive));
         OnPropertyChanged(nameof(IsHistoryActive));
+        OnPropertyChanged(nameof(IsScheduledTasksActive));
         OnPropertyChanged(nameof(IsSettingsActive));
+
+        // Az "Ütemezett feladatok" nézet Singleton ViewModel-je csak a program indulásakor
+        // épül fel egyszer — ha közben a Web/Desktop/Mobil nézeten új ütemezés jön létre,
+        // azt csak egy explicit újratöltés láttatja. Ahelyett hogy a felhasználónak minden
+        // alkalommal kézzel kellene a "Frissítés" gombra kattintania, a nézet minden
+        // odalátogatáskor automatikusan frissül — a gomb így csak kényelmi kiegészítés
+        // marad azoknak, akik az oldalon időznek, és onnan szeretnék frissíteni.
+        if (viewModel is ScheduledTasksViewModel scheduledTasksViewModel)
+            scheduledTasksViewModel.LoadRowsCommand.Execute(null);
     }
 }

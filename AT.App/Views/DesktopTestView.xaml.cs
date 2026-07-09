@@ -25,6 +25,50 @@ public partial class DesktopTestView : UserControl
         Focus();
     }
 
+    /// <summary>A "⋮⋮" fogó ikonra kattintva-húzva indítja el a WPF natív drag&amp;drop műveletét.</summary>
+    private void DragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: AT.App.Models.TestStepRow row } element)
+            return;
+
+        DragDrop.DoDragDrop(element, row, DragDropEffects.Move);
+        e.Handled = true;
+    }
+
+    /// <summary>Engedélyezi az eldobást, ha a húzott adat egy lépéssor.</summary>
+    private void StepRow_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(typeof(AT.App.Models.TestStepRow))
+            ? DragDropEffects.Move
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    /// <summary>Kiszámítja, hova essen az áthelyezett lépés, majd elvégzi a ViewModel MoveStepTo-jával.</summary>
+    private void StepRow_Drop(object sender, DragEventArgs e)
+    {
+        if (DataContext is not DesktopTestViewModel viewModel)
+            return;
+
+        if (e.Data.GetData(typeof(AT.App.Models.TestStepRow)) is not AT.App.Models.TestStepRow draggedRow)
+            return;
+
+        if (sender is not FrameworkElement { DataContext: AT.App.Models.TestStepRow targetRow } targetElement)
+            return;
+
+        if (ReferenceEquals(draggedRow, targetRow))
+            return;
+
+        var targetIndex = viewModel.Steps.IndexOf(targetRow);
+
+        var position = e.GetPosition(targetElement);
+        if (position.Y > targetElement.ActualHeight / 2)
+            targetIndex++;
+
+        viewModel.MoveStepTo(draggedRow, targetIndex);
+        e.Handled = true;
+    }
+
     /// <summary>
     /// Billentyűparancsok: F5 futtatás, Shift+F5 leállítás, Ctrl+S mentés, Ctrl+O
     /// betöltés, Ctrl+N fókusz az Új lépés form Művelet mezőjére, Delete a kijelölt

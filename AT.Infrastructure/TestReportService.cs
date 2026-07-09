@@ -10,6 +10,13 @@ namespace AT.Infrastructure;
 /// </summary>
 public sealed class TestReportService : ITestReportService
 {
+    private readonly ITestCategoryService _categoryService;
+
+    public TestReportService(ITestCategoryService categoryService)
+    {
+        _categoryService = categoryService;
+    }
+
     public string GenerateHtml(TestRunRecord record)
     {
         var sb = new StringBuilder();
@@ -31,7 +38,7 @@ public sealed class TestReportService : ITestReportService
         return sb.ToString();
     }
 
-    private static void AppendHeader(StringBuilder sb, TestRunRecord record)
+    private void AppendHeader(StringBuilder sb, TestRunRecord record)
     {
         var targetLabel = record.Target switch
         {
@@ -41,9 +48,12 @@ public sealed class TestReportService : ITestReportService
             _ => record.Target.ToString()
         };
 
+        var categoryName = _categoryService.Categories.FirstOrDefault(c => c.Id == record.CategoryId)?.Name;
+        var categorySuffix = string.IsNullOrWhiteSpace(categoryName) ? "" : $" &middot; {Html(categoryName)}";
+
         sb.Append("<div class=\"header\">\n");
         sb.Append($"<h1>{Html(string.IsNullOrWhiteSpace(record.TestName) ? "Névtelen teszt" : record.TestName)}</h1>\n");
-        sb.Append($"<div class=\"subtle\">{Html(targetLabel)} &middot; {record.StartedAt:yyyy.MM.dd. HH:mm:ss}</div>\n");
+        sb.Append($"<div class=\"subtle\">{Html(targetLabel)} &middot; {record.StartedAt:yyyy.MM.dd. HH:mm:ss}{categorySuffix}</div>\n");
         sb.Append("</div>\n");
     }
 
@@ -103,6 +113,13 @@ public sealed class TestReportService : ITestReportService
         sb.Append("<div class=\"step-row\">\n");
         sb.Append($"<div class=\"step-index\">{index}.</div>\n");
         sb.Append($"<div class=\"step-name\">{Html(step.StepName)}</div>\n");
+
+        // Csak akkor jelenik meg, ha ténylegesen történt retry (AttemptCount > 1) —
+        // retry nélküli lépéseknél (a legtöbb esetben) nem zsúfolja a sort felesleges
+        // "1. próbálkozásra" szöveggel.
+        if (step.AttemptCount > 1)
+            sb.Append($"<div class=\"step-attempts\">{step.AttemptCount}. próbálkozásra</div>\n");
+
         sb.Append($"<div class=\"step-duration\">{(step.Duration is { } d ? $"{d.TotalSeconds:0.00} mp" : "—")}</div>\n");
         sb.Append($"<div class=\"step-status {statusClass}\">{Html(statusLabel)}</div>\n");
         sb.Append("</div>\n");
@@ -280,6 +297,14 @@ public sealed class TestReportService : ITestReportService
         .step-name {
             flex: 1;
             font-size: 14px;
+        }
+
+        .step-attempts {
+            color: var(--warning);
+            font-size: 12px;
+            font-style: italic;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .step-duration {

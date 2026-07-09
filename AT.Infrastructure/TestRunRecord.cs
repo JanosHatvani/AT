@@ -14,6 +14,12 @@ public sealed class TestRunRecord
     /// <summary>A teszt neve (a TestName mezőből) — üres is lehet, ha a felhasználó nem adott meg nevet.</summary>
     public string TestName { get; init; } = string.Empty;
 
+    /// <summary>A teszt-kategória Id-ja (TestCategory.Id) — a teszt "fej" adata, ezzel
+    /// szűr az Előzmények nézet platform+kategória szerint. Régebbi, kategória-mező
+    /// nélkül mentett history-JSON-ok deszerializáláskor üres stringet kapnak
+    /// ("Kategória nélkül" a szűrőben).</summary>
+    public string CategoryId { get; init; } = string.Empty;
+
     public AutomationTarget Target { get; init; }
 
     public DateTime StartedAt { get; init; }
@@ -56,4 +62,9 @@ public sealed class TestStepResult
 
     /// <summary>Ha ehhez a lépéshez készült képernyőkép, ennek teljes elérési útja.</summary>
     public string? ScreenshotPath { get; init; }
+
+    /// <summary>Hány próbálkozásra sikerült/hiúsult meg a lépés — lásd TestStep.RetryCount.
+    /// 1 = elsőre sikerült/hibázott, retry nélkül. Régebbi, retry-mező nélkül mentett
+    /// history-JSON-ok deszerializáláskor ezt az alapértelmezett 1-et kapják.</summary>
+    public int AttemptCount { get; init; } = 1;
 }

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:AT.App.ViewModels"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="AT Framework"
+        Title="AT Studio"
         Icon="Assets/app.ico"
         WindowStyle="None"
         ResizeMode="CanResize"
@@ -33,7 +33,7 @@
             <DockPanel LastChildFill="False">
 
                 <StackPanel DockPanel.Dock="Top" Margin="24,28,24,20">
-                    <TextBlock Text="AT" FontSize="26" FontWeight="Bold"
+                    <TextBlock Text="AT Studio" FontSize="26" FontWeight="Bold"
                                Foreground="{StaticResource Brush.SidebarTextPrimary}" />
                     <TextBlock Text="Automatizált tesztelés" FontSize="11"
                                Foreground="{StaticResource Brush.SidebarTextSecondary}"
@@ -70,6 +70,11 @@
                             Command="{Binding NavigateCommand}"
                             CommandParameter="{x:Type vm:HistoryViewModel}"
                             IsEnabled="{Binding IsHistoryActive, Converter={StaticResource InverseBooleanConverter}}" />
+                    <Button Content="Ütemezett feladatok"
+                            Style="{StaticResource NavButtonStyle}"
+                            Command="{Binding NavigateCommand}"
+                            CommandParameter="{x:Type vm:ScheduledTasksViewModel}"
+                            IsEnabled="{Binding IsScheduledTasksActive, Converter={StaticResource InverseBooleanConverter}}" />
                 </StackPanel>
 
                 <StackPanel DockPanel.Dock="Bottom" Margin="12,0,12,20">

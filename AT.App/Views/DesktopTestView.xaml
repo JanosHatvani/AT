@@ -62,16 +62,44 @@
                 <TextBlock Text="{Binding Description}" Style="{StaticResource SubtleTextStyle}" Margin="0,4,0,0" />
             </StackPanel>
 
-            <Button Grid.Column="1" Content="Új teszt"
-                    Style="{StaticResource GhostButtonStyle}"
-                    VerticalAlignment="Top"
-                    Command="{Binding NewTestCommand}" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                <Button Content="Új teszt"
+                        Style="{StaticResource GhostButtonStyle}"
+                        Margin="0,0,10,0"
+                        Command="{Binding NewTestCommand}" />
+                <Button Content="Ütemezés létrehozása"
+                        Style="{StaticResource GhostButtonStyle}"
+                        Command="{Binding ScheduleTaskCommand}" />
+            </StackPanel>
         </Grid>
 
         <Border Style="{StaticResource CardStyle}" Margin="0,0,0,20">
             <StackPanel>
-                <TextBlock Text="Teszt megnevezése" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,12" />
-                <TextBox Text="{Binding TestName, UpdateSourceTrigger=PropertyChanged}" MaxWidth="400" HorizontalAlignment="Left" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="20" />
+                        <ColumnDefinition Width="220" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Teszt megnevezése" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,12" />
+                        <TextBox Text="{Binding TestName, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Kategória" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,12" />
+                        <ComboBox ItemsSource="{Binding AvailableCategories}"
+                                  SelectedValue="{Binding SelectedCategoryId, Mode=TwoWay}"
+                                  SelectedValuePath="Id">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                </Grid>
             </StackPanel>
         </Border>
 
@@ -221,7 +249,7 @@
         </Border>
 
         <!-- ===================== LÉPÉSLISTA ===================== -->
-        <Border Style="{StaticResource CardStyle}" Padding="0" Margin="0,0,0,20">
+        <Border Style="{StaticResource CardStyle}" Padding="0" Margin="0,0,0,20" Grid.IsSharedSizeScope="True">
             <StackPanel>
                 <Grid Margin="20,20,20,8">
                     <Grid.ColumnDefinitions>
@@ -237,17 +265,29 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Oszlop-fejléc -->
+                <!-- Oszlop-fejléc — minden cella jobb szélén egy elválasztó vonal (kivéve az utolsót),
+                     hogy táblázatszerű, rácsozott megjelenést adjon. -->
                 <Grid Margin="20,0,20,8">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="StepDragHandle" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="90" />
-                        <ColumnDefinition Width="110" />
-                        <ColumnDefinition Width="140" />
+                        <ColumnDefinition Width="90" SharedSizeGroup="StepDuration" />
+                        <ColumnDefinition Width="110" SharedSizeGroup="StepStatus" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="StepActions" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Művelet / Lokátor / Érték" Style="{StaticResource ColumnHeaderStyle}" />
-                    <TextBlock Grid.Column="1" Text="Idő" Style="{StaticResource ColumnHeaderStyle}" HorizontalAlignment="Center" />
-                    <TextBlock Grid.Column="2" Text="Státusz" Style="{StaticResource ColumnHeaderStyle}" HorizontalAlignment="Center" />
+                    <Border Grid.Column="0" BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,1,0" Padding="0,0,8,0">
+                        <TextBlock Text="" Width="20" />
+                    </Border>
+                    <Border Grid.Column="1" BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,1,0" Margin="12,0,0,0" Padding="0,0,12,0">
+                        <TextBlock Text="Művelet / Lokátor / Érték" Style="{StaticResource ColumnHeaderStyle}" />
+                    </Border>
+                    <Border Grid.Column="2" BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,1,0">
+                        <TextBlock Text="Idő" Style="{StaticResource ColumnHeaderStyle}" HorizontalAlignment="Center" />
+                    </Border>
+                    <Border Grid.Column="3" BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,1,0" Padding="0,0,12,0">
+                        <TextBlock Text="Státusz" Style="{StaticResource ColumnHeaderStyle}" HorizontalAlignment="Center" />
+                    </Border>
+                    <TextBlock Grid.Column="4" Text="Műveletek" Style="{StaticResource ColumnHeaderStyle}" HorizontalAlignment="Center" Margin="12,0,0,0" />
                 </Grid>
 
                 <ItemsControl ItemsSource="{Binding Steps}">
@@ -255,7 +295,10 @@
                         <DataTemplate>
                             <Border BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,1,0,0" Padding="20,12"
                                     Cursor="Hand"
-                                    MouseLeftButtonDown="StepRow_MouseLeftButtonDown">
+                                    AllowDrop="True"
+                                    MouseLeftButtonDown="StepRow_MouseLeftButtonDown"
+                                    DragOver="StepRow_DragOver"
+                                    Drop="StepRow_Drop">
                                 <Border.Background>
                                     <MultiBinding Converter="{x:Static conv:SameReferenceToBrushConverter.Instance}">
                                         <Binding Path="." />
@@ -264,13 +307,24 @@
                                 </Border.Background>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" SharedSizeGroup="StepDragHandle" />
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="90" />
-                                        <ColumnDefinition Width="110" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="90" SharedSizeGroup="StepDuration" />
+                                        <ColumnDefinition Width="110" SharedSizeGroup="StepStatus" />
+                                        <ColumnDefinition Width="Auto" SharedSizeGroup="StepActions" />
                                     </Grid.ColumnDefinitions>
 
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <Border Grid.Column="0" BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,1,0" Padding="0,0,8,0">
+                                        <TextBlock Text="⋮⋮" FontSize="16"
+                                                   Foreground="{StaticResource Brush.TextMuted}"
+                                                   VerticalAlignment="Center"
+                                                   Cursor="SizeAll"
+                                                   MouseLeftButtonDown="DragHandle_MouseLeftButtonDown"
+                                                   ToolTip="Húzd az átrendezéshez" />
+                                    </Border>
+
+                                    <Border Grid.Column="1" BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,1,0" Padding="12,0,12,0">
+                                    <StackPanel VerticalAlignment="Center">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="{Binding Step.Name}" FontSize="14"
                                                        Foreground="{StaticResource Brush.TextPrimary}" />
@@ -301,18 +355,22 @@
                                                    Foreground="{StaticResource Brush.Danger}"
                                                    Visibility="{Binding Message, Converter={x:Static conv:NullToVisibilityConverter.Instance}}" />
                                     </StackPanel>
+                                    </Border>
 
-                                    <TextBlock Grid.Column="1" Text="{Binding DurationText}"
-                                               Style="{StaticResource SubtleTextStyle}"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    <Border Grid.Column="2" BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,1,0">
+                                        <TextBlock Text="{Binding DurationText}"
+                                                   Style="{StaticResource SubtleTextStyle}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
 
-                                    <TextBlock Grid.Column="2"
-                                               Text="{Binding Status, Converter={StaticResource TestStatusToLabelConverter}}"
-                                               Style="{StaticResource StatusTextStyle}"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center" />
+                                    <Border Grid.Column="3" BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,1,0" Padding="0,0,12,0">
+                                        <TextBlock Text="{Binding Status, Converter={StaticResource TestStatusToLabelConverter}}"
+                                                   Style="{StaticResource StatusTextStyle}"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" />
+                                    </Border>
 
-                                    <WrapPanel Grid.Column="3" Orientation="Horizontal">
+                                    <WrapPanel Grid.Column="4" Orientation="Horizontal" Margin="12,0,0,0">
                                         <Button Content="Innentől" ToolTip="Futtatás ettől a lépéstől kezdve"
                                                 Style="{StaticResource LinkButtonStyle}"
                                                 Foreground="{StaticResource Brush.Accent}"

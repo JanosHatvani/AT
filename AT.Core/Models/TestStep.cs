@@ -43,6 +43,15 @@ public sealed class TestStep
     public bool Skip { get; set; }
 
     /// <summary>
+    /// Hiba esetén ennyiszer próbálja újra a lépést, mielőtt véglegesen hibásnak jelölné —
+    /// 0 esetén nincs retry (a lépés egyszeri hiba esetén azonnal Failed lesz, ahogy eddig is).
+    /// Minden kivétel retry-t vált ki (nem csak "elem nem található"-típusú hibák), mert egy
+    /// felügyelet nélküli, CI-szerű futtatásnál a legtöbb hiba amúgy is időzítés-érzékeny
+    /// (lassú betöltés, animáció, hálózati késés), és a retry ezekre ad esélyt.
+    /// </summary>
+    public int RetryCount { get; set; } = 0;
+
+    /// <summary>
     /// A lépés saját, egyedi azonosító címkéje — más lépések ezt hivatkozzák ugrás
     /// célpontjaként (OnSuccessGoToLabel / OnFailureGoToLabel). Automatikusan generált
     /// ("Lépés 1", "Lépés 2", ...), de a felhasználó felülírhatja. Névhez (nem sorszámhoz)
