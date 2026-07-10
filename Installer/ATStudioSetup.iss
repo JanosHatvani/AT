@@ -25,7 +25,7 @@
 ; magad (Inno Setup IDE-ben: Tools > Generate GUID), és NE változtasd meg
 ; többé jövőbeli verzióknál — ez teszi lehetővé, hogy a frissítő telepítő
 ; felismerje és lecserélje a korábbi verziót, ne kettőt telepítsen egymás mellé.
-AppId={{B5D9F1A2-4C3E-4A8B-9F1D-2E6C8A0D5F31}
+AppId={{EC2D9245-81AE-4D3F-85AD-8C690ED5DEEF}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
@@ -74,3 +74,84 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 ; history-fájljai megmaradjanak egy esetleges újratelepítéskor. Ha a vevő cég szeretné,
 ; hogy az eltávolító ezeket is törölje, egy [Code] szekció addModal InputOption-nal
 ; ("Beállítások és adatok törlése is?") bővíthető — szólj, ha ezt szeretnéd, és megírom.
+
+[Code]
+{ ============================================================================
+  Előfeltétel-ellenőrzés: figyelmeztet (de NEM blokkolja a telepítést), ha
+  hiányzik egy böngésző (Web modulhoz) vagy az Android SDK (Mobil modulhoz).
+  Szándékosan csak FIGYELMEZTETÉS, nem kényszerített megállítás — a felhasználó
+  dönthet úgy, hogy csak a Desktop modult fogja használni (aminek nincs ilyen
+  külső függősége, lásd DesktopAutomationDriver.cs, FlaUI-alapú, nincs Winium),
+  és nem szeretne emiatt megszakítani egy egyébként sikeres telepítést.
+  ============================================================================ }
+
+function IsChromeInstalled(): Boolean;
+begin
+  Result := RegKeyExists(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe')
+    or RegKeyExists(HKCU, 'SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe');
+end;
+
+function IsEdgeInstalled(): Boolean;
+begin
+  // Az Edge Windows 10/11-en gyárilag települ, de a registry-kulcs alapján
+  // mégis ellenőrizzük — ritka, "N" kiadású Windows-verzióknál hiányozhat.
+  Result := RegKeyExists(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe')
+    or RegKeyExists(HKCU, 'SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe');
+end;
+
+function IsFirefoxInstalled(): Boolean;
+begin
+  Result := RegKeyExists(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\firefox.exe')
+    or RegKeyExists(HKCU, 'SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\firefox.exe');
+end;
+
+function IsAndroidSdkPresent(): Boolean;
+var
+  SdkRootValue, SdkHomeValue: String;
+begin
+  // A DesktopAutomationDriver/MobileAutomationDriver az ANDROID_SDK_ROOT vagy
+  // ANDROID_HOME környezeti változóra, illetve a szokásos telepítési helyre
+  // esik vissza (lásd AndroidSdkLocator.cs a projektben) — itt csak a
+  // leggyakoribb jeleket nézzük meg, ez egy "valószínűleg megvan" ellenőrzés,
+  // nem egy teljes, hiteles validáció.
+  //
+  // Inno Setup Pascal Script-ben a környezeti változó olvasásának beépített
+  // módja az ExpandConstant '{%VAR}' szintaxisa (NEM egy GetEnvironmentVariable
+  // nevű függvény, ami itt nem létezik) — ha a változó nincs beállítva, az
+  // ExpandConstant magát a '{%VAR}' stringet adja vissza változatlanul, ezt
+  // kell összehasonlítani, nem üres stringgel.
+  SdkRootValue := ExpandConstant('{%ANDROID_SDK_ROOT}');
+  SdkHomeValue := ExpandConstant('{%ANDROID_HOME}');
+
+  Result := (SdkRootValue <> '{%ANDROID_SDK_ROOT}')
+    or (SdkHomeValue <> '{%ANDROID_HOME}')
+    or DirExists(ExpandConstant('{localappdata}\Android\Sdk'));
+end;
+
+function InitializeSetup(): Boolean;
+var
+  MissingItems: String;
+  HasAnyBrowser: Boolean;
+begin
+  Result := True; { a telepítés mindenképp folytatódhat — ez csak tájékoztatás }
+  MissingItems := '';
+
+  HasAnyBrowser := IsChromeInstalled() or IsEdgeInstalled() or IsFirefoxInstalled();
+  if not HasAnyBrowser then
+    MissingItems := MissingItems + '  • Böngésző (Chrome, Firefox vagy Edge) — a Web tesztelés modulhoz szükséges' + #13#10;
+
+  if not IsAndroidSdkPresent() then
+    MissingItems := MissingItems + '  • Android SDK — a Mobil (Android) tesztelés modulhoz szükséges' + #13#10;
+
+  if MissingItems <> '' then
+  begin
+    MsgBox(
+      'A telepítés folytatódhat, de a következő, egyes modulokhoz szükséges ' +
+      'összetevőt nem találtuk a gépeden:' + #13#10 + #13#10 +
+      MissingItems + #13#10 +
+      'A Windows desktop modul ezek nélkül is teljes egészében működik. ' +
+      'A hiányzó összetevőket később, a modulok tényleges használatba vétele ' +
+      'előtt bármikor telepítheted.',
+      mbInformation, MB_OK);
+  end;
+end;
