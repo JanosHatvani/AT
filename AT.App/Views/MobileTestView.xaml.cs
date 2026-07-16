@@ -13,11 +13,11 @@ public partial class MobileTestView : UserControl
         InitializeComponent();
     }
 
-    /// <summary>
-    /// A kép Stretch="Uniform", ezért letterbox-sávok lehetnek — a nyers kattintási
-    /// koordinátát a ténylegesen kirajzolt kép-területhez kell igazítani, mielőtt
-    /// relatív (0..1) koordinátává alakítjuk.
-    /// </summary>
+    
+    // A kép Stretch="Uniform", ezért letterbox-sávok lehetnek — a nyers kattintási
+    // koordinátát a ténylegesen kirajzolt kép-területhez kell igazítani, mielőtt
+    // relatív (0..1) koordinátává alakítjuk.
+    
     private void ScreenImage_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (DataContext is not MobileTestViewModel viewModel || !viewModel.IsPicking)
@@ -47,8 +47,8 @@ public partial class MobileTestView : UserControl
         _ = viewModel.CaptureElementAtAsync(relativeX, relativeY);
     }
 
-    /// <summary>A lépéssor egy sorára kattintva kijelöli azt — ez adja meg a "kijelölt lépést"
-    /// a Delete/Ctrl+D/Ctrl+↑/↓ billentyűparancsokhoz, és vizuálisan is kiemeli a sort.</summary>
+    // A lépéssor egy sorára kattintva kijelöli azt — ez adja meg a "kijelölt lépést"
+    // a Delete/Ctrl+D/Ctrl+↑/↓ billentyűparancsokhoz, és vizuálisan is kiemeli a sort.
     private void StepRow_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (DataContext is not MobileTestViewModel viewModel)
@@ -60,15 +60,16 @@ public partial class MobileTestView : UserControl
         // A fókuszt is a nézetre visszük, hogy az utána lenyomott billentyűparancsok
         // (pl. Delete) rögtön működjenek, anélkül hogy külön a UserControl-ra kellene
         // kattintani a sor kijelölése után.
+
         Focus();
     }
 
-    /// <summary>
-    /// A "⋮⋮" fogó ikonra kattintva-húzva indítja el a WPF natív drag&amp;drop műveletét.
-    /// Az egész sor helyett szándékosan csak ez a dedikált ikon indítja a húzást, hogy
-    /// ne ütközzön a sorban lévő gombokkal (Törlés, Szerkesztés, stb.) vagy a sorra
-    /// kattintva történő kijelöléssel.
-    /// </summary>
+
+    // A "⋮⋮" fogó ikonra kattintva-húzva indítja el a WPF natív drag&amp;drop műveletét.
+    // Az egész sor helyett szándékosan csak ez a dedikált ikon indítja a húzást, hogy
+    // ne ütközzön a sorban lévő gombokkal (Törlés, Szerkesztés, stb.) vagy a sorra
+    // kattintva történő kijelöléssel.
+
     private void DragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: AT.App.Models.TestStepRow row } element)
@@ -78,7 +79,7 @@ public partial class MobileTestView : UserControl
         e.Handled = true;
     }
 
-    /// <summary>Engedélyezi az eldobást, ha a húzott adat egy lépéssor — máskülönben "tiltott" kurzort mutat.</summary>
+    // Engedélyezi az eldobást, ha a húzott adat egy lépéssor — máskülönben "tiltott" kurzort mutat
     private void StepRow_DragOver(object sender, DragEventArgs e)
     {
         e.Effects = e.Data.GetDataPresent(typeof(AT.App.Models.TestStepRow))
@@ -87,11 +88,11 @@ public partial class MobileTestView : UserControl
         e.Handled = true;
     }
 
-    /// <summary>
-    /// Az eldobás pillanatában kiszámítja, hogy a húzott lépés a cél-sor elé vagy mögé
-    /// kerüljön-e (a kurzor függőleges pozíciója alapján a sormagasság felén belül/kívül),
-    /// majd a ViewModel MoveStepTo-jával ténylegesen áthelyezi a listában.
-    /// </summary>
+
+    // Az eldobás pillanatában kiszámítja, hogy a húzott lépés a cél-sor elé vagy mögé
+    // kerüljön-e (a kurzor függőleges pozíciója alapján a sormagasság felén belül/kívül),
+    // majd a ViewModel MoveStepTo-jával ténylegesen áthelyezi a listában.
+
     private void StepRow_Drop(object sender, DragEventArgs e)
     {
         if (DataContext is not MobileTestViewModel viewModel)
@@ -118,15 +119,15 @@ public partial class MobileTestView : UserControl
         e.Handled = true;
     }
 
-    /// <summary>
-    /// Billentyűparancsok: F5 futtatás, Shift+F5 leállítás, Ctrl+S mentés, Ctrl+O
-    /// betöltés, Ctrl+N fókusz az Új lépés form Művelet mezőjére, Delete a kijelölt
-    /// lépés törlése, Ctrl+D duplikálás, Ctrl+↑/↓ mozgatás, Esc szerkesztés megszakítása.
-    ///
-    /// A Delete/Ctrl+D/Ctrl+↑/↓ szándékosan kimarad, ha a fókusz épp egy szövegbeviteli
-    /// mezőben (TextBox/ComboBox) van — enélkül pl. egy TextBox-ban a Delete billentyű
-    /// karakter törlése helyett véletlenül egy egész lépést törölne ki a listából.
-    /// </summary>
+
+    // Billentyűparancsok: F5 futtatás, Shift+F5 leállítás, Ctrl+S mentés, Ctrl+O
+    // betöltés, Ctrl+N fókusz az Új lépés form Művelet mezőjére, Delete a kijelölt
+    // lépés törlése, Ctrl+D duplikálás, Ctrl+↑/↓ mozgatás, Esc szerkesztés megszakítása.
+
+    // A Delete/Ctrl+D/Ctrl+↑/↓ szándékosan kimarad, ha a fókusz épp egy szövegbeviteli
+    // mezőben (TextBox/ComboBox) van — enélkül pl. egy TextBox-ban a Delete billentyű
+    // karakter törlése helyett véletlenül egy egész lépést törölne ki a listából.
+
     private void MobileTestView_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (DataContext is not MobileTestViewModel viewModel)

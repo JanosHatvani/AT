@@ -85,7 +85,7 @@
             </ScrollViewer>
         </Border>
 
-        <!-- A Bezárás gomb mindig az ablak alján marad, függetlenül a fenti tartalom görgetésétől. -->
+     
         <Border Grid.Row="1" Background="{StaticResource Brush.Surface}"
                 BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,1,0,0"
                 CornerRadius="0,0,8,8" Padding="20,12">

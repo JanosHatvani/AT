@@ -10,6 +10,7 @@ public sealed partial class MainViewModel : ObservableObject
 {
     private readonly INavigationService _navigationService;
     private readonly INotificationService _notificationService;
+    private readonly IAndroidSdkInstallerService _androidSdkInstallerService;
 
     [ObservableProperty]
     private ObservableObject? currentViewModel;
@@ -26,19 +27,43 @@ public sealed partial class MainViewModel : ObservableObject
     public bool IsScheduledTasksActive => CurrentViewModel is ScheduledTasksViewModel;
     public bool IsSettingsActive => CurrentViewModel is SettingsViewModel;
 
-    public MainViewModel(INavigationService navigationService, INotificationService notificationService)
+    public MainViewModel(
+        INavigationService navigationService,
+        INotificationService notificationService,
+        IAndroidSdkInstallerService androidSdkInstallerService)
     {
         _navigationService = navigationService;
         _notificationService = notificationService;
+        _androidSdkInstallerService = androidSdkInstallerService;
 
         _navigationService.CurrentViewModelChanged += OnCurrentViewModelChanged;
-        NavigateCommand = new RelayCommand<Type>(t =>
-        {
-            if (t is not null)
-                _navigationService.NavigateTo(t);
-        });
+        NavigateCommand = new RelayCommand<Type>(OnNavigateRequested);
 
         _navigationService.NavigateTo<DashboardViewModel>();
+    }
+
+    /// <summary>
+    /// A NavigateCommand belépési pontja — a Mobil (Android) nézetre navigálás ELŐTT
+    /// ellenőrzi, van-e telepített Android SDK. Ha nincs, egy dialógusban megkérdezi a
+    /// felhasználót, szeretné-e most telepíteni (lásd AndroidSdkSetupWindow). A navigáció
+    /// MINDKÉT esetben megtörténik (a felhasználó "Nem"-et is választhat) — a Mobil nézet
+    /// saját maga jelzi (lásd MobileTestViewModel.IsAndroidSdkMissing), ha SDK nélkül,
+    /// korlátozott állapotban van.
+    /// </summary>
+    private void OnNavigateRequested(Type? targetViewModelType)
+    {
+        if (targetViewModelType is null)
+            return;
+
+        if (targetViewModelType == typeof(MobileTestViewModel) && !_androidSdkInstallerService.IsInstalled())
+        {
+            // A dialógus modális — a hívás itt blokkol, amíg a felhasználó dönt/végez a
+            // telepítéssel (vagy elutasítja). Ez szándékos: a navigáció csak ezután történik,
+            // hogy a Mobil nézet már a friss SDK-állapotot lássa (SdkRootOverride-frissítés).
+            AT.App.Views.AndroidSdkSetupWindow.Show(System.Windows.Application.Current.MainWindow, _androidSdkInstallerService);
+        }
+
+        _navigationService.NavigateTo(targetViewModelType);
     }
 
     private void OnCurrentViewModelChanged(object? sender, ObservableObject viewModel)
@@ -61,5 +86,11 @@ public sealed partial class MainViewModel : ObservableObject
         // marad azoknak, akik az oldalon időznek, és onnan szeretnék frissíteni.
         if (viewModel is ScheduledTasksViewModel scheduledTasksViewModel)
             scheduledTasksViewModel.LoadRowsCommand.Execute(null);
+
+        // A Mobil nézetre navigáláskor (akár telepítettük most az SDK-t, akár korábban
+        // már megvolt, akár a felhasználó "Nem"-et választott) frissítjük az SDK-állapot
+        // jelzést — enélkül a nézet a betöltéskori (esetleg elavult) állapotot mutatná.
+        if (viewModel is MobileTestViewModel mobileTestViewModel)
+            mobileTestViewModel.RefreshAndroidSdkStatusCommand.Execute(null);
     }
 }

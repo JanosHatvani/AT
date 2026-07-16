@@ -8,6 +8,11 @@
 ; FORDÍTÁS: nyisd meg ezt a fájlt az Inno Setup Compiler-ben (ISCC.exe / a
 ; grafikus Inno Setup IDE-ben), és nyomj Compile-t (Ctrl+F9). A kész telepítő
 ; az "Output" mappában jön létre: AT-Studio-Setup-1.0.0.exe
+;
+; MEGJEGYZÉS: az Android SDK telepítése MOST MÁR NEM ennek a telepítőnek a
+; feladata — azt a program saját maga, a Mobil nézetre navigáláskor, egy
+; program-belüli dialóguson (AndroidSdkSetupWindow) keresztül végzi, valós
+; idejű progress-visszajelzéssel. Lásd README_AndroidSdk_ProgramBelul.md.
 ; ============================================================================
 
 #define MyAppName "AT Studio"
@@ -25,7 +30,7 @@
 ; magad (Inno Setup IDE-ben: Tools > Generate GUID), és NE változtasd meg
 ; többé jövőbeli verzióknál — ez teszi lehetővé, hogy a frissítő telepítő
 ; felismerje és lecserélje a korábbi verziót, ne kettőt telepítsen egymás mellé.
-AppId={{EC2D9245-81AE-4D3F-85AD-8C690ED5DEEF}
+AppId={{B5D9F1A2-4C3E-4A8B-9F1D-2E6C8A0D5F31}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
@@ -78,11 +83,15 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 [Code]
 { ============================================================================
   Előfeltétel-ellenőrzés: figyelmeztet (de NEM blokkolja a telepítést), ha
-  hiányzik egy böngésző (Web modulhoz) vagy az Android SDK (Mobil modulhoz).
-  Szándékosan csak FIGYELMEZTETÉS, nem kényszerített megállítás — a felhasználó
-  dönthet úgy, hogy csak a Desktop modult fogja használni (aminek nincs ilyen
-  külső függősége, lásd DesktopAutomationDriver.cs, FlaUI-alapú, nincs Winium),
-  és nem szeretne emiatt megszakítani egy egyébként sikeres telepítést.
+  hiányzik egy böngésző (Web modulhoz). Szándékosan csak FIGYELMEZTETÉS, nem
+  kényszerített megállítás — a felhasználó dönthet úgy, hogy csak a Desktop
+  modult fogja használni (aminek nincs ilyen külső függősége, lásd
+  DesktopAutomationDriver.cs, FlaUI-alapú, nincs Winium), és nem szeretne
+  emiatt megszakítani egy egyébként sikeres telepítést.
+
+  Az Android SDK ellenőrzése/telepítése itt SZÁNDÉKOSAN NINCS — azt a program
+  saját maga végzi a Mobil nézetre navigáláskor (lásd MainViewModel.cs,
+  AndroidSdkSetupWindow, README_AndroidSdk_ProgramBelul.md).
   ============================================================================ }
 
 function IsChromeInstalled(): Boolean;
@@ -105,29 +114,6 @@ begin
     or RegKeyExists(HKCU, 'SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\firefox.exe');
 end;
 
-function IsAndroidSdkPresent(): Boolean;
-var
-  SdkRootValue, SdkHomeValue: String;
-begin
-  // A DesktopAutomationDriver/MobileAutomationDriver az ANDROID_SDK_ROOT vagy
-  // ANDROID_HOME környezeti változóra, illetve a szokásos telepítési helyre
-  // esik vissza (lásd AndroidSdkLocator.cs a projektben) — itt csak a
-  // leggyakoribb jeleket nézzük meg, ez egy "valószínűleg megvan" ellenőrzés,
-  // nem egy teljes, hiteles validáció.
-  //
-  // Inno Setup Pascal Script-ben a környezeti változó olvasásának beépített
-  // módja az ExpandConstant '{%VAR}' szintaxisa (NEM egy GetEnvironmentVariable
-  // nevű függvény, ami itt nem létezik) — ha a változó nincs beállítva, az
-  // ExpandConstant magát a '{%VAR}' stringet adja vissza változatlanul, ezt
-  // kell összehasonlítani, nem üres stringgel.
-  SdkRootValue := ExpandConstant('{%ANDROID_SDK_ROOT}');
-  SdkHomeValue := ExpandConstant('{%ANDROID_HOME}');
-
-  Result := (SdkRootValue <> '{%ANDROID_SDK_ROOT}')
-    or (SdkHomeValue <> '{%ANDROID_HOME}')
-    or DirExists(ExpandConstant('{localappdata}\Android\Sdk'));
-end;
-
 function InitializeSetup(): Boolean;
 var
   MissingItems: String;
@@ -140,9 +126,6 @@ begin
   if not HasAnyBrowser then
     MissingItems := MissingItems + '  • Böngésző (Chrome, Firefox vagy Edge) — a Web tesztelés modulhoz szükséges' + #13#10;
 
-  if not IsAndroidSdkPresent() then
-    MissingItems := MissingItems + '  • Android SDK — a Mobil (Android) tesztelés modulhoz szükséges' + #13#10;
-
   if MissingItems <> '' then
   begin
     MsgBox(
@@ -150,8 +133,8 @@ begin
       'összetevőt nem találtuk a gépeden:' + #13#10 + #13#10 +
       MissingItems + #13#10 +
       'A Windows desktop modul ezek nélkül is teljes egészében működik. ' +
-      'A hiányzó összetevőket később, a modulok tényleges használatba vétele ' +
-      'előtt bármikor telepítheted.',
+      'Az Android SDK-t (Mobil modulhoz) a program maga fel fogja ajánlani ' +
+      'telepíteni, amikor először a "Mobil (Android)" nézetre navigálsz.',
       mbInformation, MB_OK);
   end;
 end;

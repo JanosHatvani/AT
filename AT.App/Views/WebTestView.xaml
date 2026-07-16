@@ -257,8 +257,7 @@
         <!-- ===================== LÉPÉSLISTA ===================== -->
         <!-- IsSharedSizeScope: a fejléc és a sor-sablon oszlopai külön Grid-ek, ezért
              önmagában az Auto/Width nem garantálja az igazodásukat — a SharedSizeGroup
-             (lásd lent, mindkét Grid ColumnDefinition-jein) kényszeríti ki, hogy azonos
-             nevű oszlopcsoportok mindig ugyanazt a szélességet kapják. -->
+             kényszeríti ki, hogy azonos nevű oszlopcsoportok mindig ugyanazt a szélességet kapják. -->
         <Border Style="{StaticResource CardStyle}" Padding="0" Margin="0,0,0,20" Grid.IsSharedSizeScope="True">
             <StackPanel>
                 <Grid Margin="20,20,20,8">

@@ -8,23 +8,23 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace AT.App.Views;
 
-/// <summary>
-/// Az ütemezés paramétereinek (cadence, időpont, napok/hónap-nap) bekérése.
-///
-/// LÉTREHOZÁS módban (Show) a hívó (Web/Desktop/Mobil ViewModel ScheduleTaskCommand-ja)
-/// adja át a teszt nevét, a célmodult és a már összeállított lépéssort.
-///
-/// SZERKESZTÉS módban (ShowForEdit) egy meglévő ScheduledTask időzítését lehet módosítani —
-/// a teszt neve, célmodul és lépéssor NEM szerkeszthető innen (azokhoz a Web/Desktop/Mobil
-/// nézeten kell új ütemezést létrehozni), csak a cadence/időpont/napok.
-///
-/// Mindkét módban a statikus Show/ShowForEdit metódus ModalDialog-ként nyitja meg az
-/// ablakot, és a bezáráskor null-t ad vissza, ha a felhasználó Mégse-t nyomott, egyébként
-/// a kész ScheduledTask-ot.
-/// </summary>
+
+// Az ütemezés paramétereinek (cadence, időpont, napok/hónap-nap) bekérése.
+//
+// LÉTREHOZÁS módban (Show) a hívó (Web/Desktop/Mobil ViewModel ScheduleTaskCommand-ja)
+// adja át a teszt nevét, a célmodult és a már összeállított lépéssort.
+//
+// SZERKESZTÉS módban (ShowForEdit) egy meglévő ScheduledTask időzítését lehet módosítani —
+// a teszt neve, célmodul és lépéssor NEM szerkeszthető innen (azokhoz a Web/Desktop/Mobil
+// nézeten kell új ütemezést létrehozni), csak a cadence/időpont/napok.
+//
+// Mindkét módban a statikus Show/ShowForEdit metódus ModalDialog-ként nyitja meg az
+// ablakot, és a bezáráskor null-t ad vissza, ha a felhasználó Mégse-t nyomott, egyébként
+// a kész ScheduledTask-ot.
+
 public partial class ScheduleTaskDialog : Window
 {
-    /// <summary>A Window saját DataContext-je — csak ehhez az ablakhoz tartozó, egyszerű bekérő állapot.</summary>
+    // Window saját DataContext-je — csak ehhez az ablakhoz tartozó, egyszerű bekérő állapot.
     public sealed partial class DialogState : ObservableObject
     {
         [ObservableProperty] private ScheduleCadence selectedCadence = ScheduleCadence.Daily;
@@ -64,9 +64,9 @@ public partial class ScheduleTaskDialog : Window
     private readonly IReadOnlyList<TestStep> _steps;
     private readonly BrowserType? _browser;
 
-    /// <summary>Ha ez nem null, a dialógus szerkesztő módban van — a Result összeállításakor
-    /// ennek az Id/IsEnabled/LastRunAt mezőit őrzi meg (nem hoz létre új Id-t, nem kapcsolja
-    /// vissza be a feladatot, ha az ki volt kapcsolva).</summary>
+    // Ha ez nem null, a dialógus szerkesztő módban van — a Result összeállításakor
+    // ennek az Id/IsEnabled/LastRunAt mezőit őrzi meg (nem hoz létre új Id-t, nem kapcsolja
+    // vissza be a feladatot, ha az ki volt kapcsolva)
     private readonly ScheduledTask? _editingTask;
 
     public DialogState State { get; } = new();
@@ -89,7 +89,7 @@ public partial class ScheduleTaskDialog : Window
             LoadFromExistingTask(editingTask);
     }
 
-    /// <summary>Szerkesztő módban a mezők a meglévő feladat aktuális beállításaival töltődnek elő.</summary>
+    // Szerkesztő módban a mezők a meglévő feladat aktuális beállításaival töltődnek elő
     private void LoadFromExistingTask(ScheduledTask task)
     {
         Title = "Ütemezés szerkesztése";
@@ -108,10 +108,10 @@ public partial class ScheduleTaskDialog : Window
         State.IsSunday = task.DaysOfWeek.Contains(DayOfWeek.Sunday);
     }
 
-    /// <summary>
-    /// Megnyitja a dialógust modálisan, ÚJ ütemezés létrehozásához. Visszaadja a kész
-    /// ScheduledTask-ot, vagy null-t, ha a felhasználó Mégse-t választott / bezárta az ablakot.
-    /// </summary>
+
+    // Megnyitja a dialógust modálisan, ÚJ ütemezés létrehozásához. Visszaadja a kész
+    // ScheduledTask-ot, vagy null-t, ha a felhasználó Mégse-t választott / bezárta az ablakot.
+
     public static ScheduledTask? Show(Window owner, string testName, string categoryId, AutomationTarget target, IReadOnlyList<TestStep> steps, BrowserType? browser = null)
     {
         var dialog = new ScheduleTaskDialog(testName, categoryId, target, steps, browser, editingTask: null) { Owner = owner };
@@ -119,12 +119,12 @@ public partial class ScheduleTaskDialog : Window
         return dialog.Result;
     }
 
-    /// <summary>
-    /// Megnyitja a dialógust modálisan, egy MEGLÉVŐ ütemezés időzítésének (cadence, időpont,
-    /// napok) szerkesztéséhez — a teszt neve, célmodul és lépéssor nem szerkeszthető innen,
-    /// azokhoz a Web/Desktop/Mobil nézeten kell új ütemezést létrehozni. A visszaadott
-    /// ScheduledTask ugyanazt az Id-t, IsEnabled és LastRunAt értéket őrzi meg, mint az eredeti.
-    /// </summary>
+
+    // Megnyitja a dialógust modálisan, egy MEGLÉVŐ ütemezés időzítésének (cadence, időpont,
+    // napok) szerkesztéséhez — a teszt neve, célmodul és lépéssor nem szerkeszthető innen,
+    // azokhoz a Web/Desktop/Mobil nézeten kell új ütemezést létrehozni. A visszaadott
+    // ScheduledTask ugyanazt az Id-t, IsEnabled és LastRunAt értéket őrzi meg, mint az eredeti.
+
     public static ScheduledTask? ShowForEdit(Window owner, ScheduledTask existingTask)
     {
         var dialog = new ScheduleTaskDialog(existingTask.Name, existingTask.CategoryId, existingTask.Target, existingTask.Steps, null, existingTask) { Owner = owner };
@@ -211,6 +211,7 @@ public partial class ScheduleTaskDialog : Window
         // öröklődik (a Browser mezőt ez a dialógus szerkesztéskor nem kéri be újra, mert
         // a célmodul/böngésző a lépéssorral együtt "lezárt" adat — csak az időzítés
         // szerkeszthető itt, lásd az osztály doksi-kommentjét és a ShowForEdit metódust).
+
         var newTask = new ScheduledTask
         {
             Id = _editingTask?.Id ?? Guid.NewGuid().ToString("N"),

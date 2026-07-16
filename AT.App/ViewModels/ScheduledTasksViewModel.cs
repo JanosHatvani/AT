@@ -8,9 +8,10 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace AT.App.ViewModels;
 
-/// <summary>Platform-szűrő opció az Ütemezett feladatok/Előzmények listájához — "Mind" esetén
-/// minden platform és minden kategória látszik, egyébként csak az adott platformhoz tartozó
-/// kategóriák jelennek meg választhatóként, és csak az annak megfelelő elemek a listában.</summary>
+// Platform-szűrő opció az Ütemezett feladatok/Előzmények listájához — "Mind" esetén
+// minden platform és minden kategória látszik, egyébként csak az adott platformhoz tartozó
+// kategóriák jelennek meg választhatóként, és csak az annak megfelelő elemek a listában.
+
 public enum PlatformFilter
 {
     All,
@@ -19,14 +20,14 @@ public enum PlatformFilter
     Mobile
 }
 
-/// <summary>
-/// Az "Ütemezett feladatok" nézet ViewModel-je — kártyás listában jeleníti meg a
-/// ScheduledTaskService-ben tárolt feladatokat, minden kártya lenyitható (a beágyazott
-/// lépéssor megtekintésére), és soronként be/kikapcsolható vagy törölhető. A tényleges
-/// létrehozás a Web/Desktop/Mobil nézetek "Ütemezés létrehozása" gombjával, a
-/// ScheduleTaskDialog-on keresztül történik — ez a nézet elsősorban áttekintésre és
-/// karbantartásra való. Platform + kategória szerint szűrhető (két ComboBox a lista felett).
-/// </summary>
+
+// Az "Ütemezett feladatok" nézet ViewModel-je — kártyás listában jeleníti meg a
+// ScheduledTaskService-ben tárolt feladatokat, minden kártya lenyitható (a beágyazott
+// lépéssor megtekintésére), és soronként be/kikapcsolható vagy törölhető. A tényleges
+// létrehozás a Web/Desktop/Mobil nézetek "Ütemezés létrehozása" gombjával, a
+// ScheduleTaskDialog-on keresztül történik — ez a nézet elsősorban áttekintésre és
+// karbantartásra való. Platform + kategória szerint szűrhető (két ComboBox a lista felett).
+
 public sealed partial class ScheduledTasksViewModel : ObservableObject
 {
     private readonly IScheduledTaskService _scheduledTaskService;
@@ -51,9 +52,10 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject
     [ObservableProperty]
     private PlatformFilter selectedPlatformFilter = PlatformFilter.All;
 
-    /// <summary>"Mind" opció + a kiválasztott platformra (vagy minden platformra, ha "Mind"
-    /// van kiválasztva) engedélyezett kategóriák. A "Mind" kategória-opciót null Id
-    /// reprezentálja a listában (lásd CategoryFilterOption).</summary>
+    // "Mind" opció + a kiválasztott platformra (vagy minden platformra, ha "Mind"
+    // van kiválasztva) engedélyezett kategóriák. A "Mind" kategória-opciót null Id
+    // reprezentálja a listában (lásd CategoryFilterOption)
+
     public ObservableCollection<CategoryFilterOption> AvailableCategoryFilters { get; } = new();
 
     [ObservableProperty]
@@ -88,6 +90,7 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject
         // Ha az előzőleg kiválasztott kategória még mindig szerepel az (esetleg megváltozott)
         // listában, megtartjuk — egyébként visszaesünk "Mind"-ra, hogy sose maradjon egy
         // érvénytelen, a listában nem is szereplő kiválasztás.
+
         SelectedCategoryFilter = AvailableCategoryFilters.FirstOrDefault(c => c.CategoryId == previousSelectionId)
             ?? CategoryFilterOption.AllOption;
     }
@@ -107,15 +110,15 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject
         LoadRows();
     }
 
-    /// <summary>
-    /// A ScheduledTaskService.LoadAsync-ot az App.xaml.cs induláskor egyszer meghívja —
-    /// ez a metódus csak a már betöltött, memóriában lévő Tasks listából építi fel a
-    /// UI-sorokat, a jelenlegi platform+kategória szűrő szerint. A "Frissítés" gomb
-    /// (lásd ScheduledTasksView.xaml) erre a parancsra kötődik — mivel a
-    /// ScheduledTasksViewModel Singleton (csak egyszer épül fel a konstruktorban), ha a
-    /// Web/Desktop/Mobil nézeten közben új ütemezés jön létre, azt csak egy explicit
-    /// frissítéssel látja meg ez a nézet.
-    /// </summary>
+
+    // A ScheduledTaskService.LoadAsync-ot az App.xaml.cs induláskor egyszer meghívja —
+    // ez a metódus csak a már betöltött, memóriában lévő Tasks listából építi fel a
+    // UI-sorokat, a jelenlegi platform+kategória szűrő szerint. A "Frissítés" gomb
+    // (lásd ScheduledTasksView.xaml) erre a parancsra kötődik — mivel a
+    // ScheduledTasksViewModel Singleton (csak egyszer épül fel a konstruktorban), ha a
+    // Web/Desktop/Mobil nézeten közben új ütemezés jön létre, azt csak egy explicit
+    // frissítéssel látja meg ez a nézet.
+
     [RelayCommand]
     private void LoadRows()
     {
@@ -168,6 +171,7 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject
         // ezért a legegyszerűbb, hibamentes frissítés a teljes lista újraépítése a
         // frissen elmentett állapotból — ez a lenyitott Expander-eket visszazárja, de a
         // Toggle/Delete amúgy sem gyakori, egymást követő művelet, úgyhogy ez elfogadható.
+
         LoadRows();
 
         _notificationService.Show(
@@ -175,12 +179,12 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject
             NotificationType.Info);
     }
 
-    /// <summary>
-    /// Megnyitja a ScheduleTaskDialog-ot szerkesztő módban (ShowForEdit) — csak a cadence,
-    /// időpont és napok módosíthatók innen; a teszt neve, célmodul és lépéssor nem (azokhoz
-    /// a Web/Desktop/Mobil nézeten kell új ütemezést létrehozni). Mégse esetén (null Result)
-    /// semmi nem változik.
-    /// </summary>
+
+    // Megnyitja a ScheduleTaskDialog-ot szerkesztő módban (ShowForEdit) — csak a cadence,
+    // időpont és napok módosíthatók innen; a teszt neve, célmodul és lépéssor nem (azokhoz
+    // a Web/Desktop/Mobil nézeten kell új ütemezést létrehozni). Mégse esetén (null Result)
+    // semmi nem változik.
+
     [RelayCommand]
     private async Task EditAsync(ScheduledTaskRow? row)
     {
@@ -225,14 +229,14 @@ public sealed partial class ScheduledTasksViewModel : ObservableObject
     }
 }
 
-/// <summary>UI-oldali wrapper egy ScheduledTask köré — a kártyás megjelenítéshez előfeldolgozott,
-/// olvasható szövegekkel (cadence, időpont, napok, lépésszám, kategória-név).</summary>
+// >UI-oldali wrapper egy ScheduledTask köré — a kártyás megjelenítéshez előfeldolgozott,
+// olvasható szövegekkel (cadence, időpont, napok, lépésszám, kategória-név).
 public sealed class ScheduledTaskRow
 {
     public ScheduledTask Task { get; }
 
-    /// <summary>Előre feloldott kategória-név (a TestCategory.Id alapján) — mert a
-    /// ScheduledTaskRow-nak magának nincs hozzáférése a ITestCategoryService-hez.</summary>
+    // Előre feloldott kategória-név (a TestCategory.Id alapján) — mert a
+    // ScheduledTaskRow-nak magának nincs hozzáférése a ITestCategoryService-hez
     public string CategoryLabel { get; }
 
     public ScheduledTaskRow(ScheduledTask task, string categoryLabel)
@@ -300,8 +304,8 @@ public sealed class ScheduledTaskRow
     };
 }
 
-/// <summary>Egy elem a kategória-szűrő ComboBox-ban — a "Mind" opciót null CategoryId
-/// reprezentálja (ilyenkor minden kategória átmegy a szűrőn, lásd MatchesFilter).</summary>
+// Egy elem a kategória-szűrő ComboBox-ban — a "Mind" opciót null CategoryId
+// reprezentálja (ilyenkor minden kategória átmegy a szűrőn, lásd MatchesFilter)
 public sealed class CategoryFilterOption
 {
     public static readonly CategoryFilterOption AllOption = new(null, "Mind");

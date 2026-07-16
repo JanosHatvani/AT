@@ -2,17 +2,17 @@ using System.Windows;
 
 namespace AT.App.Services;
 
-/// <summary>
-/// A világos/sötét téma alkalmazása: lecseréli a színpalettát tartalmazó resource
-/// dictionary-t (Colors.xaml / Colors.Dark.xaml) az Application.Resources
-/// MergedDictionaries[0] pozíciójában.
-///
-/// FONTOS: mivel a StaticResource binding WPF-ben egyszeri, betöltéskori feloldás,
-/// ez a dictionary-csere ÖNMAGÁBAN nem frissítené a már megjelenített UI-t — ezért
-/// a ThemeChanged eseményre feliratkozva a MainWindow teljesen újranyitja saját magát
-/// (lásd MainWindow.RequestReopen), hogy minden elem elsőként, a friss dictionary-ből
-/// oldódjon fel. Ez egy garantáltan megbízható, egyszerű megoldás.
-/// </summary>
+
+// A világos/sötét téma alkalmazása: lecseréli a színpalettát tartalmazó resource
+// dictionary-t (Colors.xaml / Colors.Dark.xaml) az Application.Resources
+// MergedDictionaries[0] pozíciójában.
+
+// FONTOS: mivel a StaticResource binding WPF-ben egyszeri, betöltéskori feloldás,
+// ez a dictionary-csere ÖNMAGÁBAN nem frissítené a már megjelenített UI-t — ezért
+// a ThemeChanged eseményre feliratkozva a MainWindow teljesen újranyitja saját magát
+// (lásd MainWindow.RequestReopen), hogy minden elem elsőként, a friss dictionary-ből
+// oldódjon fel. Ez egy garantáltan megbízható, egyszerű megoldás.
+
 public sealed class ThemeService : IThemeService
 {
     private const string LightThemeUri = "Themes/Colors.xaml";

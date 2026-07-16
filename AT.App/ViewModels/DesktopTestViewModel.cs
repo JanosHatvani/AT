@@ -26,10 +26,10 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     private readonly ISchedulerService _schedulerService;
     private readonly ITestCategoryService _categoryService;
 
-    /// <summary>A folyamatban lévő (vagy legutóbb befejezett) futtatás képernyőkép-mappája — null, ha ehhez a futtatáshoz nem készül kép.</summary>
+    // A folyamatban lévő (vagy legutóbb befejezett) futtatás képernyőkép-mappája — null, ha ehhez a futtatáshoz nem készül kép.
     private string? _currentRunScreenshotFolder;
 
-    /// <summary>A legutóbbi futtatás összegzése — a "Riport exportálása" gomb ezt írja ki HTML-be.</summary>
+    // A legutóbbi futtatás összegzése — a "Riport exportálása" gomb ezt írja ki HTML-be.
     private TestRunRecord? _lastRunRecord;
 
     public bool HasLastRun => _lastRunRecord is not null;
@@ -60,7 +60,7 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     [ObservableProperty]
     private string selectedCategoryId = "";
 
-    /// <summary>Csak a Desktop platformra engedélyezett kategóriák — lásd Beállítások, Teszt-kategóriák.</summary>
+    // Csak a Desktop platformra engedélyezett kategóriák — lásd Beállítások, Teszt-kategóriák.
     public ObservableCollection<TestCategory> AvailableCategories { get; } = new();
 
     private void LoadAvailableCategories()
@@ -99,38 +99,38 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     [ObservableProperty]
     private int newTimeoutSeconds = 10;
 
-    /// <summary>Ha be van jelölve, a lépés hibája NEM szakítja meg a futtatást.</summary>
+    // Ha be van jelölve, a lépés hibája NEM szakítja meg a futtatást.
     [ObservableProperty]
     private bool newContinueOnError;
 
-    /// <summary>Ha be van jelölve, a lépést a futtatás átugorja — meg sem kísérli végrehajtani.</summary>
+    // Ha be van jelölve, a lépést a futtatás átugorja — meg sem kísérli végrehajtani.
     [ObservableProperty]
     private bool newSkip;
 
-    /// <summary>A lépés saját azonosító címkéje — automatikusan generált, felülírható.</summary>
+    // A lépés saját azonosító címkéje — automatikusan generált, felülírható.
     [ObservableProperty]
     private string newLabel = "";
 
-    /// <summary>Siker esetén ugrás célja (másik lépés Label-je) — üresen a normál, következő lépés jön.</summary>
+    // Siker esetén ugrás célja (másik lépés Label-je) — üresen a normál, következő lépés jön.
     [ObservableProperty]
     private string? newOnSuccessGoToLabel;
 
-    /// <summary>Hiba esetén ugrás célja (másik lépés Label-je) — üresen a ContinueOnError dönt.</summary>
+    // Hiba esetén ugrás célja (másik lépés Label-je) — üresen a ContinueOnError dönt.
     [ObservableProperty]
     private string? newOnFailureGoToLabel;
 
-    /// <summary>A lépéslistában szereplő Label-ek + egy "— következő —" opció, ugrás-célpont választáshoz a ComboBox-okban.</summary>
+    // A lépéslistában szereplő Label-ek + egy "— következő —" opció, ugrás-célpont választáshoz a ComboBox-okban.
     public IEnumerable<string> AvailableGoToLabels =>
         new[] { "" }.Concat(Steps.Select(s => s.Step.Label).Where(l => !string.IsNullOrWhiteSpace(l)));
 
     [ObservableProperty]
     private bool isRunning;
 
-    /// <summary>
-    /// A lépéslistában kijelölt sor — sorra kattintva állítódik be (lásd DesktopTestView.xaml,
-    /// SelectStepCommand). A billentyűparancsok (Delete, Ctrl+D, Ctrl+↑/↓) ezen keresztül
-    /// tudják, melyik lépésre vonatkozzanak.
-    /// </summary>
+
+    // A lépéslistában kijelölt sor — sorra kattintva állítódik be (lásd DesktopTestView.xaml,
+    // SelectStepCommand). A billentyűparancsok (Delete, Ctrl+D, Ctrl+↑/↓) ezen keresztül
+    // tudják, melyik lépésre vonatkozzanak.
+
     [ObservableProperty]
     private TestStepRow? selectedStep;
 
@@ -294,11 +294,11 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         OnPropertyChanged(nameof(AddButtonLabel));
     }
 
-    /// <summary>
-    /// "Új teszt" — teljesen letisztázza a nézetet: kiüríti a lépéslistát, a teszt
-    /// nevét, és megszakít egy esetleg folyamatban lévő szerkesztést. Ha már van
-    /// felvett lépés, előbb megerősítést kér.
-    /// </summary>
+
+    // "Új teszt" — teljesen letisztázza a nézetet: kiüríti a lépéslistát, a teszt
+    // nevét, és megszakít egy esetleg folyamatban lévő szerkesztést. Ha már van
+    // felvett lépés, előbb megerősítést kér.
+
     [RelayCommand]
     private void NewTest()
     {
@@ -379,7 +379,7 @@ public sealed partial class DesktopTestViewModel : ObservableObject
             Steps.Move(index, index + 1);
     }
 
-    /// <summary>Egy lépés áthelyezése tetszőleges pozícióra — a drag&amp;drop átrendezéshez.</summary>
+    // Egy lépés áthelyezése tetszőleges pozícióra — a drag&amp;drop átrendezéshez
     public void MoveStepTo(TestStepRow row, int targetIndex)
     {
         var currentIndex = Steps.IndexOf(row);
@@ -421,11 +421,11 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRun))]
     private Task RunStepsAsync() => RunStepsCoreAsync(startIndex: 0);
 
-    /// <summary>
-    /// "Futtatás innentől" — a kijelölt lépéstől kezdve fut le a sor vége felé, a
-    /// megelőző lépéseket kihagyva. Hasznos hibakereséskor, ha nem szeretnéd az egész
-    /// sort újra lefuttatni egyetlen lépés ellenőrzéséhez.
-    /// </summary>
+
+    // "Futtatás innentől" — a kijelölt lépéstől kezdve fut le a sor vége felé, a
+    // megelőző lépéseket kihagyva. Hasznos hibakereséskor, ha nem szeretnéd az egész
+    // sort újra lefuttatni egyetlen lépés ellenőrzéséhez.
+
     [RelayCommand(CanExecute = nameof(CanRun))]
     private Task RunFromStepAsync(TestStepRow? row)
     {
@@ -548,11 +548,11 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         }
     }
 
-    /// <summary>
-    /// Létrehozza (ha a Beállítások szerint egyáltalán készül kép) a futtatáshoz tartozó,
-    /// a teszt nevét és időbélyeget tartalmazó almappát. Null-t ad vissza, ha a screenshot
-    /// mód "Soha" — ilyenkor sem mappa, sem kép nem jön létre.
-    /// </summary>
+
+    // Létrehozza (ha a Beállítások szerint egyáltalán készül kép) a futtatáshoz tartozó,
+    // a teszt nevét és időbélyeget tartalmazó almappát. Null-t ad vissza, ha a screenshot
+    // mód "Soha" — ilyenkor sem mappa, sem kép nem jön létre.
+
     private string? ResolveRunScreenshotFolder(DateTime startedAt)
     {
         if (_settingsService.Current.ScreenshotCaptureMode == AT.Infrastructure.ScreenshotCaptureMode.Never)
@@ -565,7 +565,7 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         return ScreenshotFolderResolver.CreateRunFolder(baseFolder, TestName, startedAt);
     }
 
-    /// <summary>Összeállítja és elmenti a futtatás összegzését a közös history-tárolóba, majd riport-exportálhatóvá teszi.</summary>
+    // Összeállítja és elmenti a futtatás összegzését a közös history-tárolóba, majd riport-exportálhatóvá teszi
     private async Task SaveRunToHistoryAsync(DateTime startedAt, DateTime finishedAt)
     {
         var record = new TestRunRecord
@@ -603,7 +603,7 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         }
     }
 
-    /// <summary>A legutóbbi futtatás HTML riportjának exportálása fájlba, majd megnyitása böngészőben.</summary>
+    // A legutóbbi futtatás HTML riportjának exportálása fájlba, majd megnyitása böngészőben
     [RelayCommand]
     private void ExportReport()
     {
@@ -640,8 +640,9 @@ public sealed partial class DesktopTestViewModel : ObservableObject
 
     private bool CanRun() => !IsRunning && Steps.Count > 0 && !string.IsNullOrWhiteSpace(SelectedCategoryId);
 
-    /// <summary>A Beállításokban választott mód szerint (soha / csak hiba / minden lépés) ment képernyőképet,
-    /// a futtatáshoz tartozó, ResolveRunScreenshotFolder által létrehozott almappába.</summary>
+    // A Beállításokban választott mód szerint (soha / csak hiba / minden lépés) ment képernyőképet,
+    // a futtatáshoz tartozó, ResolveRunScreenshotFolder által létrehozott almappába.
+
     private async Task CaptureScreenshotIfNeededAsync(TestStepRow row, bool isFailure)
     {
         var mode = _settingsService.Current.ScreenshotCaptureMode;
@@ -770,51 +771,51 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     // használva "a kijelölt lépés" gyanánt. A metódusok szándékosan tolerálják a
     // hiányzó kijelölést (null SelectedStep esetén egyszerűen nem csinálnak semmit).
 
-    /// <summary>Ctrl+S — a kijelölt lépéstől függetlenül mindig a teljes lépéssort menti.</summary>
+    // Ctrl+S — a kijelölt lépéstől függetlenül mindig a teljes lépéssort menti.
     public void HandleSaveShortcut() => SaveStepsCommand.Execute(null);
 
-    /// <summary>Ctrl+O — lépéssor betöltése.</summary>
+    // Ctrl+O — lépéssor betöltése.</summary>
     public void HandleLoadShortcut() => LoadStepsCommand.Execute(null);
 
-    /// <summary>F5 — teljes futtatás az elejétől.</summary>
+    // F5 — teljes futtatás az elejétől.</summary>
     public void HandleRunShortcut()
     {
         if (RunStepsCommand.CanExecute(null))
             RunStepsCommand.Execute(null);
     }
 
-    /// <summary>Shift+F5 — leállítás (a Desktop modulban ez az alkalmazás bezárását jelenti).</summary>
+    // Shift+F5 — leállítás (a Desktop modulban ez az alkalmazás bezárását jelenti).
     public void HandleStopShortcut() => CloseAppCommand.Execute(null);
 
-    /// <summary>Delete — a kijelölt lépés törlése.</summary>
+    // Delete — a kijelölt lépés törlése.
     public void HandleDeleteShortcut()
     {
         if (SelectedStep is { } row)
             RemoveStepCommand.Execute(row);
     }
 
-    /// <summary>Ctrl+D — a kijelölt lépés duplikálása.</summary>
+    // Ctrl+D — a kijelölt lépés duplikálása.
     public void HandleDuplicateShortcut()
     {
         if (SelectedStep is { } row)
             DuplicateStepCommand.Execute(row);
     }
 
-    /// <summary>Ctrl+↑ — a kijelölt lépés feljebb mozgatása.</summary>
+    // Ctrl+↑ — a kijelölt lépés feljebb mozgatása.
     public void HandleMoveUpShortcut()
     {
         if (SelectedStep is { } row)
             MoveStepUpCommand.Execute(row);
     }
 
-    /// <summary>Ctrl+↓ — a kijelölt lépés lejjebb mozgatása.</summary>
+    // Ctrl+↓ — a kijelölt lépés lejjebb mozgatása
     public void HandleMoveDownShortcut()
     {
         if (SelectedStep is { } row)
             MoveStepDownCommand.Execute(row);
     }
 
-    /// <summary>Esc — folyamatban lévő szerkesztés megszakítása.</summary>
+    // Esc — folyamatban lévő szerkesztés megszakítása.
     public void HandleEscapeShortcut()
     {
         if (IsEditing)

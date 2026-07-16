@@ -12,8 +12,8 @@ public partial class WebTestView : UserControl
         InitializeComponent();
     }
 
-    /// <summary>A lépéssor egy sorára kattintva kijelöli azt — ez adja meg a "kijelölt lépést"
-    /// a Delete/Ctrl+D/Ctrl+↑/↓ billentyűparancsokhoz, és vizuálisan is kiemeli a sort.</summary>
+    // A lépéssor egy sorára kattintva kijelöli azt — ez adja meg a "kijelölt lépést"
+    // a Delete/Ctrl+D/Ctrl+↑/↓ billentyűparancsokhoz, és vizuálisan is kiemeli a sort.
     private void StepRow_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (DataContext is not WebTestViewModel viewModel)
@@ -25,7 +25,7 @@ public partial class WebTestView : UserControl
         Focus();
     }
 
-    /// <summary>A "⋮⋮" fogó ikonra kattintva-húzva indítja el a WPF natív drag&amp;drop műveletét.</summary>
+    // "⋮⋮" fogó ikonra kattintva-húzva indítja el a WPF natív drag&amp;drop műveletét.
     private void DragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: AT.App.Models.TestStepRow row } element)
@@ -35,7 +35,7 @@ public partial class WebTestView : UserControl
         e.Handled = true;
     }
 
-    /// <summary>Engedélyezi az eldobást, ha a húzott adat egy lépéssor.</summary>
+    // Engedélyezi az eldobást, ha a húzott adat egy lépéssor.
     private void StepRow_DragOver(object sender, DragEventArgs e)
     {
         e.Effects = e.Data.GetDataPresent(typeof(AT.App.Models.TestStepRow))
@@ -44,7 +44,7 @@ public partial class WebTestView : UserControl
         e.Handled = true;
     }
 
-    /// <summary>Kiszámítja, hova essen az áthelyezett lépés, majd elvégzi a ViewModel MoveStepTo-jával.</summary>
+    // Kiszámítja, hova essen az áthelyezett lépés, majd elvégzi a ViewModel MoveStepTo-jával.
     private void StepRow_Drop(object sender, DragEventArgs e)
     {
         if (DataContext is not WebTestViewModel viewModel)
@@ -69,15 +69,15 @@ public partial class WebTestView : UserControl
         e.Handled = true;
     }
 
-    /// <summary>
-    /// Billentyűparancsok: F5 futtatás, Shift+F5 leállítás, Ctrl+S mentés, Ctrl+O
-    /// betöltés, Ctrl+N fókusz az Új lépés form Művelet mezőjére, Delete a kijelölt
-    /// lépés törlése, Ctrl+D duplikálás, Ctrl+↑/↓ mozgatás, Esc szerkesztés megszakítása.
-    ///
-    /// A Delete/Ctrl+D/Ctrl+↑/↓ szándékosan kimarad, ha a fókusz épp egy szövegbeviteli
-    /// mezőben (TextBox/ComboBox) van — enélkül pl. egy TextBox-ban a Delete billentyű
-    /// karakter törlése helyett véletlenül egy egész lépést törölne ki a listából.
-    /// </summary>
+
+    // Billentyűparancsok: F5 futtatás, Shift+F5 leállítás, Ctrl+S mentés, Ctrl+O
+    // betöltés, Ctrl+N fókusz az Új lépés form Művelet mezőjére, Delete a kijelölt
+    // lépés törlése, Ctrl+D duplikálás, Ctrl+↑/↓ mozgatás, Esc szerkesztés megszakítása.
+    //
+    // A Delete/Ctrl+D/Ctrl+↑/↓ szándékosan kimarad, ha a fókusz épp egy szövegbeviteli
+    // mezőben (TextBox/ComboBox) van — enélkül pl. egy TextBox-ban a Delete billentyű
+    // karakter törlése helyett véletlenül egy egész lépést törölne ki a listából.
+
     private void WebTestView_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (DataContext is not WebTestViewModel viewModel)

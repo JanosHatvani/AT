@@ -2,7 +2,7 @@
 
 namespace AT.App.Interop;
 
-/// <summary>Csak a kurzor képernyő-pozíciójának lekérdezéséhez kell — a delay-alapú elem-kereső ezt hívja.</summary>
+// Csak a kurzor képernyő-pozíciójának lekérdezéséhez kell — a delay-alapú elem-kereső ezt hívja.
 internal static class Win32
 {
     [DllImport("user32.dll")]

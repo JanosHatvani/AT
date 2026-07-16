@@ -14,13 +14,13 @@ public enum InspectorPlatform
     Desktop
 }
 
-/// <summary>
-/// Egy adott platformhoz (Web VAGY Desktop — a hívó dönti el, melyikhez, nincs váltás
-/// az ablakon belül) rögzített elem-kereső. 3 másodperce van a felhasználónak, hogy a
-/// kurzort/egeret a kívánt elem fölé vigye — kattintás vagy gyorsbillentyű nélkül.
-/// Az Android/iOS elem-keresés máshogy működik (a Mobil oldal élő kijelzőjére kattintva),
-/// ezért ez az ablak nem is ismeri azt a platformot.
-/// </summary>
+
+// Egy adott platformhoz (Web VAGY Desktop — a hívó dönti el, melyikhez, nincs váltás
+// az ablakon belül) rögzített elem-kereső. 3 másodperce van a felhasználónak, hogy a
+// kurzort/egeret a kívánt elem fölé vigye — kattintás vagy gyorsbillentyű nélkül.
+// Az Android/iOS elem-keresés máshogy működik (a Mobil oldal élő kijelzőjére kattintva),
+// ezért ez az ablak nem is ismeri azt a platformot.
+
 public sealed partial class InspectorWindowViewModel : ObservableObject
 {
     private const int CountdownSeconds = 3;
@@ -46,13 +46,13 @@ public sealed partial class InspectorWindowViewModel : ObservableObject
 
     public bool HasCandidates => Candidates.Count > 0;
 
-    /// <summary>Az ablak fejlécében megjelenő platform-név.</summary>
+    // Az ablak fejlécében megjelenő platform-név.
     public string PlatformTitle => _platform == InspectorPlatform.Web ? "Web" : "Windows desktop";
 
-    /// <summary>Nem "számoláson kívüli és nem rögzített" — ez az alap, indítás-előtti állapot.</summary>
+    // Nem "számoláson kívüli és nem rögzített" — ez az alap, indítás-előtti állapot.
     public bool IsIdle => !IsCountingDown && !IsCaptured;
 
-    /// <summary>Igaz, ha ehhez a platformhoz van csatlakoztatott driver.</summary>
+    // Igaz, ha ehhez a platformhoz van csatlakoztatott driver.
     public bool IsPlatformReady => _platform switch
     {
         InspectorPlatform.Desktop => _desktopDriver is not null,

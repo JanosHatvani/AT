@@ -8,10 +8,10 @@ using System.Collections.ObjectModel;
 
 namespace AT.App.ViewModels;
 
-/// <summary>
-/// A modulok alapértelmezéseit kezeli — ez váltja ki a régi kódban hardcode-olt
-/// útvonalakat (pl. az APK elérési útját), és helyben, a gépeden tárolja őket.
-/// </summary>
+
+// A modulok alapértelmezéseit kezeli — ez váltja ki a régi kódban hardcode-olt
+// útvonalakat (pl. az APK elérési útját), és helyben, a gépeden tárolja őket.
+
 public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly ISettingsService _settingsService;
@@ -25,11 +25,11 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public IReadOnlyList<string> AvailableBrowsers { get; } = new[] { "Chrome", "Firefox", "Edge" };
 
-    /// <summary>
-    /// A sötét téma azonnal alkalmazódik (nem várja meg a Mentés gombot) és rögtön
-    /// el is mentődik — egy vizuális beállításnál ez jobb élmény, mint a "Mentés"-re
-    /// várakozás, hiszen a hatása amúgy is azonnal látszik.
-    /// </summary>
+
+    // A sötét téma azonnal alkalmazódik (nem várja meg a Mentés gombot) és rögtön
+    // el is mentődik — egy vizuális beállításnál ez jobb élmény, mint a "Mentés"-re
+    // várakozás, hiszen a hatása amúgy is azonnal látszik.
+
     [ObservableProperty]
     private bool isDarkTheme;
 
@@ -58,7 +58,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string? defaultDesktopAppPath;
 
-    /// <summary>Soha / csak hiba esetén / minden lépés után készítsen-e képernyőképet.</summary>
+    // Soha / csak hiba esetén / minden lépés után készítsen-e képernyőképet
     [ObservableProperty]
     private ScreenshotCaptureMode screenshotCaptureMode = ScreenshotCaptureMode.Never;
 
@@ -80,7 +80,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         set { if (value) ScreenshotCaptureMode = ScreenshotCaptureMode.Always; }
     }
 
-    /// <summary>A mappa-mező csak akkor szerkeszthető, ha egyáltalán készül képernyőkép.</summary>
+    // A mappa-mező csak akkor szerkeszthető, ha egyáltalán készül képernyőkép.
     public bool IsFolderPathEditable => ScreenshotCaptureMode != ScreenshotCaptureMode.Never;
 
     partial void OnScreenshotCaptureModeChanged(ScreenshotCaptureMode value)
@@ -91,23 +91,23 @@ public sealed partial class SettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsFolderPathEditable));
     }
 
-    /// <summary>Ha üres, a képernyőképek az Asztalra kerülnek.</summary>
+    // Ha üres, a képernyőképek az Asztalra kerülnek.
     [ObservableProperty]
     private string? screenshotFolderPath;
 
-    /// <summary>Ha üres, a futtatási előzmények (riportok alapja) az Asztalra kerülnek.</summary>
+    // Ha üres, a futtatási előzmények (riportok alapja) az Asztalra kerülnek
     [ObservableProperty]
     private string? testHistoryFolderPath;
 
     // ===================== RIPORT-EMAIL (ütemezett futtatás hibája esetén) =====================
 
-    /// <summary>Ha be van kapcsolva, egy ütemezett (automatikus) futtatás hibája esetén
-    /// riport-emailt küld. Kézi futtatás hibája esetén nem küld.</summary>
+    // Ha be van kapcsolva, egy ütemezett (automatikus) futtatás hibája esetén
+    // riport-emailt küld. Kézi futtatás hibája esetén nem küld.
     [ObservableProperty]
     private bool emailNotificationsEnabled;
 
-    /// <summary>Csak akkor szerkeszthetők az SMTP-mezők, ha az email-küldés be van kapcsolva —
-    /// enélkül a kikapcsolt állapotban is aktívnak tűnnének a mezők, ami félrevezető lenne.</summary>
+    // Csak akkor szerkeszthetők az SMTP-mezők, ha az email-küldés be van kapcsolva —
+    // enélkül a kikapcsolt állapotban is aktívnak tűnnének a mezők, ami félrevezető lenne.
     public bool AreEmailFieldsEditable => EmailNotificationsEnabled;
 
     partial void OnEmailNotificationsEnabledChanged(bool value) => OnPropertyChanged(nameof(AreEmailFieldsEditable));
@@ -130,14 +130,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string? emailFrom;
 
-    /// <summary>Vesszővel/pontosvesszővel/soronként elválasztott címzett-lista, pl. "a@x.hu, b@y.hu".</summary>
+    // Vesszővel/pontosvesszővel/soronként elválasztott címzett-lista, pl. "a@x.hu, b@y.hu".
     [ObservableProperty]
     private string? emailRecipients;
 
     // ===================== TESZT-KATEGÓRIÁK =====================
 
-    /// <summary>A meglévő kategóriák listája — mindegyik sor saját platform-checkboxokkal
-    /// (Web/Desktop/Mobil), amiket közvetlenül szerkesztve azonnal menti a változást.</summary>
+    // A meglévő kategóriák listája — mindegyik sor saját platform-checkboxokkal
+    // (Web/Desktop/Mobil), amiket közvetlenül szerkesztve azonnal menti a változást.
     public ObservableCollection<CategoryRow> Categories { get; } = new();
 
     public bool HasCategories => Categories.Count > 0;
@@ -217,8 +217,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         _notificationService.Show("Kategória létrehozva.", NotificationType.Success);
     }
 
-    /// <summary>A CategoryRow hívja, amikor egy platform-checkbox vagy a név megváltozik —
-    /// azonnal menti a változást, nincs külön "Mentés" gomb soronként.</summary>
+    // A CategoryRow hívja, amikor egy platform-checkbox vagy a név megváltozik —
+    // azonnal menti a változást, nincs külön "Mentés" gomb soronként.
     internal async Task UpdateCategoryAsync(TestCategory category)
     {
         await _categoryService.UpdateAsync(category);
@@ -273,6 +273,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         // mert az OnIsDarkThemeChanged újra elmentené a beállítást és újra alkalmazná a témát —
         // ez az app induláskor már megtörtént (lásd App.xaml.cs OnStartup), itt csak a UI-t
         // szinkronizáljuk a tényleges állapottal, mentés/alkalmazás kiváltása nélkül.
+
         isDarkTheme = s.IsDarkTheme;
         OnPropertyChanged(nameof(IsDarkTheme));
     }
@@ -352,13 +353,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         _notificationService.Show("Beállítások mentve.", NotificationType.Success);
     }
 
-    /// <summary>
-    /// A jelenleg beírt (de esetleg még nem mentett) SMTP-adatokkal próbál küldeni egy teszt
-    /// emailt — előbb ideiglenesen elmenti a mezőket a Settings-be, hogy az
-    /// EmailNotificationService (ami a Settings.Current-ből olvas) a friss értékeket lássa,
-    /// majd visszaküldi az eredményt toast-ként. Ha a küldés sikeres volt, a beállítások
-    /// (amiket úgyis menteni kellett a küldéshez) a lemezen is maradnak.
-    /// </summary>
+
+    // A jelenleg beírt (de esetleg még nem mentett) SMTP-adatokkal próbál küldeni egy teszt
+    // emailt — előbb ideiglenesen elmenti a mezőket a Settings-be, hogy az
+    // EmailNotificationService (ami a Settings.Current-ből olvas) a friss értékeket lássa,
+    // majd visszaküldi az eredményt toast-ként. Ha a küldés sikeres volt, a beállítások
+    // (amiket úgyis menteni kellett a küldéshez) a lemezen is maradnak.
+
     [RelayCommand]
     private async Task SendTestEmailAsync()
     {
@@ -368,8 +369,8 @@ public sealed partial class SettingsViewModel : ObservableObject
             return;
         }
 
-        // Elmentjük a jelenlegi mezőket, hogy az EmailNotificationService a beírt (nem
-        // feltétlenül még "Mentés"-sel megerősített) adatokkal próbálkozzon.
+        // Elmentjük a jelenlegi mezőket, hogy az EmailNotificationService a beírt (nem  feltétlenül még "Mentés"-sel megerősített) adatokkal próbálkozzon.
+
         await SaveAsync();
 
         var success = await _emailNotificationService.SendTestEmailAsync();
@@ -408,12 +409,12 @@ public sealed partial class SettingsViewModel : ObservableObject
     private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 }
 
-/// <summary>
-/// UI-oldali wrapper egy TestCategory köré — a platform-checkboxok (Web/Desktop/Mobil)
-/// és a név közvetlen szerkesztését teszi lehetővé a listában, azonnali mentéssel (nincs
-/// külön "Mentés" gomb soronként, mint a fő Beállítások szekciónál). Legalább egy platform
-/// kiválasztva kell maradjon — ha az utolsót is levennék, a checkbox visszaáll.
-/// </summary>
+
+// UI-oldali wrapper egy TestCategory köré — a platform-checkboxok (Web/Desktop/Mobil)
+// és a név közvetlen szerkesztését teszi lehetővé a listában, azonnali mentéssel (nincs
+// külön "Mentés" gomb soronként, mint a fő Beállítások szekciónál). Legalább egy platform
+// kiválasztva kell maradjon — ha az utolsót is levennék, a checkbox visszaáll.
+
 public sealed partial class CategoryRow : ObservableObject
 {
     private readonly TestCategory _category;

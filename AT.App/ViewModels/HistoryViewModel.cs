@@ -10,13 +10,13 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace AT.App.ViewModels;
 
-/// <summary>
-/// Az összes korábbi futtatás listázása (Web/Desktop/Mobil közösen) — a közös
-/// ITestRunHistoryService-ből olvassa be a mentett TestRunRecord-okat, és
-/// soronként lehetővé teszi a HTML riport exportálását. Platform + kategória szerint
-/// szűrhető (két ComboBox a lista felett — ugyanaz a PlatformFilter/CategoryFilterOption
-/// minta, mint az Ütemezett feladatok nézeten, lásd ScheduledTasksViewModel.cs).
-/// </summary>
+
+// Az összes korábbi futtatás listázása (Web/Desktop/Mobil közösen) — a közös
+// ITestRunHistoryService-ből olvassa be a mentett TestRunRecord-okat, és
+// soronként lehetővé teszi a HTML riport exportálását. Platform + kategória szerint
+// szűrhető (két ComboBox a lista felett — ugyanaz a PlatformFilter/CategoryFilterOption
+// minta, mint az Ütemezett feladatok nézeten, lásd ScheduledTasksViewModel.cs).
+
 public sealed partial class HistoryViewModel : ObservableObject
 {
     private readonly ITestRunHistoryService _historyService;
@@ -200,12 +200,12 @@ public sealed partial class HistoryViewModel : ObservableObject
     }
 }
 
-/// <summary>UI-oldali wrapper egy TestRunRecord köré, olvasható, előfeldolgozott mezőkkel a listához.</summary>
+// UI-oldali wrapper egy TestRunRecord köré, olvasható, előfeldolgozott mezőkkel a listához
 public sealed class TestRunSummaryRow
 {
     public TestRunRecord Record { get; }
 
-    /// <summary>Előre feloldott kategória-név (a TestCategory.Id alapján).</summary>
+    // Előre feloldott kategória-név (a TestCategory.Id alapján).
     public string CategoryLabel { get; }
 
     public TestRunSummaryRow(TestRunRecord record, string categoryLabel)

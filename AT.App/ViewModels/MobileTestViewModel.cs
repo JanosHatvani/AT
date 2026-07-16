@@ -29,6 +29,34 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
     private readonly IScheduledTaskService _scheduledTaskService;
     private readonly ISchedulerService _schedulerService;
     private readonly ITestCategoryService _categoryService;
+    private readonly IAndroidSdkInstallerService _androidSdkInstallerService;
+
+    /// <summary>
+    /// Igaz, ha nincs telepített/beállított Android SDK — a nézet ekkor egy
+    /// figyelmeztető sávot mutat, és a Futtatás/Mentés/Ütemezés gombok inaktívak
+    /// maradnak (lásd CanRun()). A MainViewModel navigáláskor (RefreshAndroidSdkStatusCommand)
+    /// és a felvett SDK-telepítő dialógus lezárása után is frissíti ezt az állapotot.
+    /// </summary>
+    [ObservableProperty]
+    private bool isAndroidSdkMissing;
+
+    partial void OnIsAndroidSdkMissingChanged(bool value) => RunStepsCommand.NotifyCanExecuteChanged();
+
+    [RelayCommand]
+    private void RefreshAndroidSdkStatus()
+    {
+        IsAndroidSdkMissing = !_androidSdkInstallerService.IsInstalled();
+    }
+
+    /// <summary>A figyelmeztető sáv "Telepítés most" gombja — ugyanazt a dialógust nyitja meg,
+    /// mint a navigáció-elfogás (MainViewModel), hogy a nézeten belül maradva is pótolható
+    /// legyen a hiányzó SDK, nem csak a menüpontra való (újra-)kattintással.</summary>
+    [RelayCommand]
+    private void OpenAndroidSdkSetup()
+    {
+        AT.App.Views.AndroidSdkSetupWindow.Show(Application.Current.MainWindow, _androidSdkInstallerService);
+        RefreshAndroidSdkStatus();
+    }
 
     /// <summary>A folyamatban lévő (vagy legutóbb befejezett) futtatás képernyőkép-mappája — null, ha ehhez a futtatáshoz nem készül kép.</summary>
     private string? _currentRunScreenshotFolder;
@@ -37,6 +65,60 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
     private TestRunRecord? _lastRunRecord;
 
     public bool HasLastRun => _lastRunRecord is not null;
+
+    // ===================== ESZKÖZ-ÁLLAPOT (Csatlakoztatva: <telefon neve> sáv) =====================
+
+    /// <summary>Igaz, ha az utolsó ellenőrzéskor volt egy használható (nem unauthorized/offline)
+    /// ADB-eszköz csatlakoztatva. A nézet ez alapján dönt zöld/piros jelző-pötty között.</summary>
+    [ObservableProperty]
+    private bool isDeviceConnected;
+
+    /// <summary>Emberi olvasásra szánt állapot-szöveg, pl. "Csatlakoztatva: SM-S911B (R58N70ABCDE)",
+    /// "Az eszköz engedélyre vár a telefonon" vagy "Nincs csatlakoztatott eszköz".</summary>
+    [ObservableProperty]
+    private string deviceStatusText = "Eszközállapot ellenőrzése…";
+
+    /// <summary>
+    /// Újra lekérdezi az ADB-n keresztül csatlakoztatott eszköz állapotát — a nézet
+    /// betöltésekor (konstruktor) és a "Frissítés" gomb kattintására hívódik, NEM
+    /// automatikusan időzítve, hogy ne fusson feleslegesen a háttérben.
+    /// </summary>
+    [RelayCommand]
+    private async Task RefreshDeviceStatusAsync()
+    {
+        DeviceStatusText = "Eszközállapot ellenőrzése…";
+
+        MobileDeviceInfo info;
+        try
+        {
+            info = await _driver.GetConnectedDeviceInfoAsync();
+        }
+        catch (Exception ex)
+        {
+            IsDeviceConnected = false;
+            DeviceStatusText = $"Eszközállapot lekérdezése sikertelen: {ex.Message}";
+            return;
+        }
+
+        if (info.IsConnected)
+        {
+            IsDeviceConnected = true;
+            DeviceStatusText = string.IsNullOrWhiteSpace(info.DeviceModel)
+                ? $"Csatlakoztatva ({info.SerialNumber})"
+                : $"Csatlakoztatva: {info.DeviceModel} ({info.SerialNumber})";
+        }
+        else if (info.IsUnauthorizedOrOffline)
+        {
+            IsDeviceConnected = false;
+            DeviceStatusText = $"Az eszköz ({info.SerialNumber}) csatlakoztatva van, de engedélyre vár — " +
+                                "fogadd el az USB-hibakeresési engedélykérést a telefon képernyőjén.";
+        }
+        else
+        {
+            IsDeviceConnected = false;
+            DeviceStatusText = "Nincs csatlakoztatott eszköz — csatlakoztass egy telefont USB-n, és engedélyezd rajta az USB-hibakeresést.";
+        }
+    }
 
     // StartEmulator/StopEmulator kikommentelve: jelenleg valós, USB-n csatlakoztatott
     // Android eszközzel dolgozunk emulátor helyett, nincs szükség AVD-indításra.
@@ -192,7 +274,8 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         ITestReportService reportService,
         IScheduledTaskService scheduledTaskService,
         ISchedulerService schedulerService,
-        ITestCategoryService categoryService)
+        ITestCategoryService categoryService,
+        IAndroidSdkInstallerService androidSdkInstallerService)
     {
         _driver = driver;
         _notificationService = notificationService;
@@ -204,6 +287,7 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         _scheduledTaskService = scheduledTaskService;
         _schedulerService = schedulerService;
         _categoryService = categoryService;
+        _androidSdkInstallerService = androidSdkInstallerService;
         _mirrorWindowService.Closed += OnMirrorWindowClosed;
 
         Steps.CollectionChanged += (_, _) =>
@@ -223,6 +307,8 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         _driver.SdkRootOverride = defaults.AndroidSdkRoot;
 
         LoadAvailableCategories();
+        RefreshAndroidSdkStatus();
+        _ = RefreshDeviceStatusAsync();
 
         // Az Élő kijelző ablak a nézet betöltésekor automatikusan megnyílik.
         OpenMirrorWindow();
@@ -584,6 +670,17 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
             return;
         }
 
+        // Proaktív SDK-ellenőrzés a futtatás elindítása ELŐTT — enélkül a felhasználó
+        // csak akkor szembesülne a hiányzó Android SDK-val, amikor egy StartEmulator/
+        // LaunchApp lépés menet közben elhasal, ami sokkal kevésbé egyértelmű, mint egy
+        // azonnali, konkrét figyelmeztetés még azelőtt, hogy bármi elindulna.
+        var missingSdkReason = AT.Automation.Mobile.AndroidSdkLocator.TryDescribeMissingSdk(_settingsService.Current.AndroidSdkRoot);
+        if (missingSdkReason is not null)
+        {
+            _notificationService.Show(missingSdkReason, NotificationType.Error);
+            return;
+        }
+
         IsRunning = true;
 
         _schedulerService.SetModuleBusy(AutomationTarget.Android, true);
@@ -646,7 +743,14 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
                     row.Duration = stopwatch.Elapsed;
                     row.Status = TestStatus.Failed;
                     row.Message = ex.Message;
-                    _notificationService.Show($"Lépés sikertelen: {row.Step.Name}", NotificationType.Error);
+
+                    // A hiba pontos szövegét (pl. "Nem található Android SDK...") a toast
+                    // is megkapja, nem csak a lépés-sor alatti, könnyen elnézhető apró
+                    // szöveg — enélkül a felhasználó csak annyit látna, hogy "Lépés
+                    // sikertelen", a tényleges, cselekvésre ösztönző okot meg kellene
+                    // keresnie a lépéslistában.
+                    _notificationService.Show($"Lépés sikertelen: {row.Step.Name} — {ex.Message}", NotificationType.Error);
+
                     await CaptureScreenshotIfNeededAsync(row, isFailure: true);
                     wasSuccess = false;
                 }
@@ -778,7 +882,7 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         }
     }
 
-    private bool CanRun() => !IsRunning && Steps.Count > 0 && !string.IsNullOrWhiteSpace(SelectedCategoryId);
+    private bool CanRun() => !IsRunning && Steps.Count > 0 && !string.IsNullOrWhiteSpace(SelectedCategoryId) && !IsAndroidSdkMissing;
 
     /// <summary>A Beállításokban választott mód szerint (soha / csak hiba / minden lépés) ment képernyőképet,
     /// a futtatáshoz tartozó, ResolveRunScreenshotFolder által létrehozott almappába.</summary>

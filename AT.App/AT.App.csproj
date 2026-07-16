@@ -38,12 +38,37 @@
     A Link segítségével a fájlok a kimeneti struktúrában "AppiumRuntime\..." alá
     kerülnek, függetlenül attól, hogy a forrásban a solution gyökeréhez képest hol
     helyezkednek el.
+
+    FONTOS: ez a blokk (CopyToOutputDirectory) csak a sima BUILD kimenetét (bin\...)
+    tölti fel megbízhatóan — a PUBLISH-hez lásd a fájl alján lévő
+    "CopyAppiumRuntimeAfterPublish" Target-et, mert a self-contained + RuntimeIdentifier +
+    PublishSingleFile kombináció miatt a .NET SDK a publish-listából automatikusan kizárja
+    a .exe kiterjesztésű None-elemeket (pl. node.exe), "apphost-jelöltnek" tekintve őket.
   -->
 	<ItemGroup>
 		<None Include="..\AT.AppiumRuntime\**\*.*">
 			<Link>AppiumRuntime\%(RecursiveDir)%(Filename)%(Extension)</Link>
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</None>
 	</ItemGroup>
+
+	<!--
+    Lásd a fenti kommentet: a self-contained/RID/single-file publish az SDK belső
+    logikája miatt automatikusan kizárja a .exe kiterjesztésű None-elemeket (pl.
+    node.exe) a publish-fájllistából, "apphost-jelöltnek" feltételezve őket — ez az SDK
+    egy dokumentált, de nem konfigurálható mellékhatása, nem hiba a fenti None-blokkban.
+    Ez a Target ezt kerüli meg: a Publish target lezárása UTÁN, egy sima, MSBuild belső
+    fájllistától FÜGGETLEN Copy taskkal másolja át a teljes AT.AppiumRuntime mappa
+    tartalmát a $(PublishDir)-be — ide a node.exe is beleértve.
+  -->
+	<Target Name="CopyAppiumRuntimeAfterPublish" AfterTargets="Publish">
+		<ItemGroup>
+			<AppiumRuntimeFiles Include="..\AT.AppiumRuntime\**\*.*" />
+		</ItemGroup>
+		<Copy SourceFiles="@(AppiumRuntimeFiles)"
+		      DestinationFiles="@(AppiumRuntimeFiles -> '$(PublishDir)AppiumRuntime\%(RecursiveDir)%(Filename)%(Extension)')"
+		      SkipUnchangedFiles="true" />
+	</Target>
 
 </Project>

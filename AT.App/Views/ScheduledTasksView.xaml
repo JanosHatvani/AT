@@ -24,10 +24,8 @@
         </Style>
 
         <!-- A Szerkesztés/Be-kikapcsolás/Törlés gombsor saját, elkülönült "mini kártyája"
-             a fő-kártyán belül — halványabb háttér (Brush.Background — ez a program
-             alap-háttere, ami sötétebb tónusú, mint a Brush.Surface-ből épülő fő-kártya,
-             így vizuálisan elválik tőle) és vékony szegély, hogy egyértelműen egy önálló,
-             csoportosított vezérlő-elemként hasson, ne csak lazán elszórt linkgombokként. -->
+             a fő-kártyán belül
+         -->
         <Style x:Key="ScheduleActionsCardStyle" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource Brush.Background}" />
             <Setter Property="BorderBrush" Value="{StaticResource Brush.Border}" />
@@ -41,9 +39,8 @@
 
         <!-- Kártyafejléc-elrendezés: név, alatta a badge-ek (WrapPanel, saját sorban),
              alatta az időzítés-infó — mind balra. Jobbra a Szerkesztés/Be-kikapcsolás/
-             Törlés gombsor, egy elkülönült, saját hátterű "mini kártyában". Ha a
-             felhasználó szűkíti az ablakot, mind a badge-sor, mind a gombsoron belüli
-             WrapPanel törik, hogy sose vágódjon le vagy csússzon egymásra semmi. -->
+             Törlés gombsor, egy elkülönült, saját hátterű "mini kártyában"
+        -->
     </UserControl.Resources>
 
     <Grid>
@@ -106,14 +103,7 @@
                             <Border Style="{StaticResource CardStyle}" Margin="0,0,0,14">
                                 <Expander>
                                     <Expander.Header>
-                                        <!-- Az Expander fejléce SAJÁT szélességi korlátozás nélkül nyúlik a kártya
-                                             teljes szélességéig (Grid, nem StackPanel), hogy keskeny ablaknál is
-                                             a jobb oldali gombsor WrapPanel-be törhessen, ahelyett hogy levágódna
-                                             vagy kilógna a kártyából. A név és a badge-ek KÜLÖN SORBAN vannak
-                                             (nem egy StackPanel Horizontal-ban) — egy StackPanel Horizontal nem
-                                             tördel automatikusan, ezért keskenyebb ablaknál/hosszabb névnél a
-                                             badge-ek egymásra csúsztak volna a névvel; egy WrapPanel a badge-eknek
-                                             saját sorban ezt strukturálisan kizárja. -->
+
                                         <Grid Margin="0,0,16,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" MinWidth="200" />
@@ -150,9 +140,7 @@
                                                 </TextBlock>
                                             </StackPanel>
 
-                                            <!-- A gombsor egy elkülönült, saját hátterű/szegélyű "mini kártyában"
-                                                 jelenik meg a fő-kártyán belül, jobbra igazítva — nem csak sima,
-                                                 egymás melletti linkgombokként. -->
+
                                             <Border Grid.Column="1" Style="{StaticResource ScheduleActionsCardStyle}">
                                                 <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                                     <Button Content="Szerkesztés"

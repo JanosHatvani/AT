@@ -34,6 +34,11 @@ public partial class App : Application
         // stateless szolgáltatás — nincs saját, hosszú életű állapota.
         services.AddSingleton<IEmailNotificationService, EmailNotificationService>();
 
+        // Android SDK program-belüli, felhasználó-vezérelt telepítése — a Mobil nézetre
+        // navigáláskor (MainViewModel.OnNavigateRequested) ellenőrizzük vele, van-e SDK,
+        // és ha nincs, ez indítja a letöltést/telepítést (AndroidSdkSetupWindow-n keresztül).
+        services.AddSingleton<IAndroidSdkInstallerService, AndroidSdkInstallerService>();
+
         // ---- Ütemezés (ütemezett/automatikus futtatás) ----
         // A ScheduledTaskService (tiszta adatmodell + JSON-perzisztencia) az AT.Infrastructure
         // projektben van, mert nincs WPF- vagy Automation-függősége. A SchedulerService és a

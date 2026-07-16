@@ -8,27 +8,28 @@ namespace AT.App.Services;
 
 public interface IEmailNotificationService
 {
-    /// <summary>
-    /// Elküld egy egyszerű, szöveges riport-emailt egy hibás futtatásról a Beállításokban
-    /// megadott SMTP-szerveren és címzett-listára. Nem dob kivételt hívási hiba esetén —
-    /// a hívó (SchedulerService/TestExecutionService) egy bool-t kap vissza, hogy sikerült-e,
-    /// és ez alapján dönt a toast-üzenetről. Ez azért fontos, mert egy felügyelet nélküli,
-    /// éjszakai ütemezett futtatást nem szabad, hogy egy rossz SMTP-jelszó megállítson vagy
-    /// kivétellel elszálljon — legfeljebb a riport-email marad el.
-    /// </summary>
+
+    // Elküld egy egyszerű, szöveges riport-emailt egy hibás futtatásról a Beállításokban
+    // megadott SMTP-szerveren és címzett-listára. Nem dob kivételt hívási hiba esetén —
+    // a hívó (SchedulerService/TestExecutionService) egy bool-t kap vissza, hogy sikerült-e,
+    // és ez alapján dönt a toast-üzenetről. Ez azért fontos, mert egy felügyelet nélküli,
+    // éjszakai ütemezett futtatást nem szabad, hogy egy rossz SMTP-jelszó megállítson vagy
+    // kivétellel elszálljon — legfeljebb a riport-email marad el.
+
     Task<bool> SendFailureReportAsync(TestRunRecord record);
 
-    /// <summary>Egy rövid, "ez egy teszt email" tartalmú üzenetet küld — a Beállítások oldal
-    /// "Teszt email küldése" gombjához, hogy az SMTP-adatok helyessége gyorsan ellenőrizhető legyen.</summary>
+    // Egy rövid, "ez egy teszt email" tartalmú üzenetet küld — a Beállítások oldal
+    // "Teszt email küldése" gombjához, hogy az SMTP-adatok helyessége gyorsan ellenőrizhető legyen.</summary>
+
     Task<bool> SendTestEmailAsync();
 }
 
-/// <summary>
-/// A .NET beépített System.Net.Mail.SmtpClient-jét használja — nincs hozzá külön NuGet-csomag.
-/// Az SmtpClient a .NET-ben elavultként (obsolete) van jelölve újabb, aszinkron-natív
-/// megoldások (pl. MailKit) javára, de egyszerű, alkalmi email-küldéshez (nem nagy
-/// volumenű, nem teljesítménykritikus) még mindig működik és a legkevesebb új függőséggel jár.
-/// </summary>
+
+// A .NET beépített System.Net.Mail.SmtpClient-jét használja — nincs hozzá külön NuGet-csomag.
+// Az SmtpClient a .NET-ben elavultként (obsolete) van jelölve újabb, aszinkron-natív
+// megoldások (pl. MailKit) javára, de egyszerű, alkalmi email-küldéshez (nem nagy
+// volumenű, nem teljesítménykritikus) még mindig működik és a legkevesebb új függőséggel jár.
+
 public sealed class EmailNotificationService : IEmailNotificationService
 {
     private readonly AT.Infrastructure.ISettingsService _settingsService;
@@ -117,8 +118,8 @@ public sealed class EmailNotificationService : IEmailNotificationService
         }
     }
 
-    /// <summary>A címzett-listát vesszővel és/vagy soronkénti tördeléssel is elfogadja,
-    /// hogy a Beállítások mezőjébe akár egy sorba, akár soronként egyet írva is működjön.</summary>
+    // A címzett-listát vesszővel és/vagy soronkénti tördeléssel is elfogadja,
+    // hogy a Beállítások mezőjébe akár egy sorba, akár soronként egyet írva is működjön.
     private static List<string> ParseRecipients(string raw)
     {
         return raw

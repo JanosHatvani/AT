@@ -49,14 +49,23 @@
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
 
-        <!-- Kompaktabb stílus a lépéssor jobb szélén lévő művelet-linkekhez,
-             hogy 5 gomb (↑ ↓ Duplikálás Szerkesztés Törlés) is kényelmesen
-             kiférjen egy keskenyebb sávban is. A meglévő LinkButtonStyle-t
-             örökli, csak a paddinget/fontméretet szűkíti. -->
         <Style x:Key="StepActionLinkButtonStyle" TargetType="Button" BasedOn="{StaticResource LinkButtonStyle}">
             <Setter Property="Padding" Value="4,2" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Margin" Value="2,2,2,2" />
+        </Style>
+
+        <!-- Az eszköz-állapot sáv jelző-pöttyének stílusa — zöld, ha csatlakoztatva,
+             piros egyébként (nincs eszköz VAGY unauthorized/offline). -->
+        <Style x:Key="DeviceStatusDotStyle" TargetType="Ellipse">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="Height" Value="10" />
+            <Setter Property="Fill" Value="{StaticResource Brush.Danger}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsDeviceConnected}" Value="True">
+                    <Setter Property="Fill" Value="{StaticResource Brush.Success}" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
     </UserControl.Resources>
 
@@ -91,14 +100,59 @@
                             Margin="0,0,10,0"
                             Command="{Binding ScheduleTaskCommand}" />
 
-                    <!-- Csak akkor látszik, ha a felhasználó bezárta az Élő kijelző ablakát —
-         ezzel bármikor visszahozható ugyanaz az ablak-példány. -->
                     <Button Content="Élő kijelző megnyitása"
                             Style="{StaticResource GhostButtonStyle}"
                             Command="{Binding OpenMirrorWindowCommand}"
                             Visibility="{Binding IsMirrorWindowOpen, Converter={x:Static conv:InverseBoolToVisibilityConverter.Instance}}" />
                 </StackPanel>
             </Grid>
+
+            <!-- ===================== ESZKÖZ-ÁLLAPOT SÁV ===================== -->
+            <Border Style="{StaticResource CardStyle}" Padding="14,10" Margin="0,16,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse Style="{StaticResource DeviceStatusDotStyle}" Margin="0,0,10,0" />
+                        <TextBlock Text="{Binding DeviceStatusText}"
+                                   Foreground="{StaticResource Brush.TextPrimary}"
+                                   TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <Button Grid.Column="1" Content="Frissítés"
+                            Style="{StaticResource GhostButtonStyle}"
+                            VerticalAlignment="Center" Margin="14,0,0,0"
+                            Command="{Binding RefreshDeviceStatusCommand}" />
+                </Grid>
+            </Border>
+
+            <!-- ===================== ANDROID SDK HIÁNYZIK - FIGYELMEZTETŐ SÁV ===================== -->
+            <Border Background="{StaticResource Brush.WarningMuted}"
+                    BorderBrush="{StaticResource Brush.Warning}" BorderThickness="1"
+                    CornerRadius="6" Padding="14,10" Margin="0,16,0,0"
+                    Visibility="{Binding IsAndroidSdkMissing, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Nincs telepítve Android SDK ezen a gépen." FontWeight="SemiBold"
+                                   Foreground="{StaticResource Brush.TextPrimary}" TextWrapping="Wrap" />
+                        <TextBlock Text="A Mobil (Android) tesztelés ezen összetevők nélkül nem futtatható — a Futtatás gomb addig inaktív marad. Lépéseket felvenni és menteni SDK nélkül is lehet."
+                                   Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <Button Grid.Column="1" Content="Telepítés most"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            VerticalAlignment="Center" Margin="14,0,0,0"
+                            Command="{Binding OpenAndroidSdkSetupCommand}" />
+                </Grid>
+            </Border>
 
             <Border Style="{StaticResource CardStyle}" Margin="0,24,0,20">
                 <StackPanel>
@@ -253,12 +307,6 @@
         </StackPanel>
 
         <!-- ===================== ROW 1: LÉPÉSLISTA (teljes szélességben) ===================== -->
-        <!-- IsSharedSizeScope: a fejléc és a sor-sablon oszlopai külön Grid-ek, ezért
-             önmagában az Auto/Width nem garantálja az igazodásukat — a SharedSizeGroup
-             (lásd lent, mindkét Grid ColumnDefinition-jein) kényszeríti ki, hogy azonos
-             nevű oszlopcsoportok mindig ugyanazt a szélességet kapják. Az oszlopszélességek
-             (90/110 az Idő/Státusznak, Auto a Műveleteknek) pontosan a Web/Desktop nézet
-             mintáját követik, hogy mindhárom modulban azonos elrendezés legyen. -->
         <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="0" Margin="0,20,0,20" Grid.IsSharedSizeScope="True">
             <StackPanel>
                 <Grid Margin="20,20,20,8">
@@ -275,8 +323,6 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Oszlop-fejléc — minden cella jobb szélén egy elválasztó vonal (kivéve az utolsót),
-                     hogy táblázatszerű, rácsozott megjelenést adjon, pontosan úgy mint a Web/Desktop nézetben. -->
                 <Grid Margin="20,0,20,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" SharedSizeGroup="StepDragHandle" />
@@ -382,9 +428,6 @@
                                                        VerticalAlignment="Center" />
                                     </Border>
 
-                                    <!-- WrapPanel: ha az 5 gomb nem fér ki egy sorban,
-                                             automatikusan tördeli új sorba, így semmi nem
-                                             vágódik le vagy csúszik a szomszéd oszlopokba. -->
                                     <WrapPanel Grid.Column="4" Margin="12,0,0,0"
                                                    Orientation="Horizontal"
                                                    HorizontalAlignment="Right"

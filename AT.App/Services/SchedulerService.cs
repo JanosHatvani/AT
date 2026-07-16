@@ -5,30 +5,29 @@ namespace AT.App.Services;
 
 public interface ISchedulerService
 {
-    /// <summary>Elindítja a percenkénti ellenőrzést. Az App.xaml.cs induláskor egyszer hívja meg.</summary>
+    // Elindítja a percenkénti ellenőrzést. Az App.xaml.cs induláskor egyszer hívja meg.
+
+    // Leállítja az időzítőt (pl. az alkalmazás bezárásakor)
+    void Stop();
     void Start();
 
-    /// <summary>Leállítja az időzítőt (pl. az alkalmazás bezárásakor).</summary>
-    void Stop();
+    // Jelzi, hogy egy adott modul jelenleg kézzel foglalt-e (pl. a felhasználó épp futtat
+    // valamit a Web nézetben). A ViewModel-ek RunStepsCoreAsync eleje/vége jelentkezik be/ki
+    // ezen keresztül — a scheduler ez alapján dönt a sorba állításról.
 
-    /// <summary>
-    /// Jelzi, hogy egy adott modul jelenleg kézzel foglalt-e (pl. a felhasználó épp futtat
-    /// valamit a Web nézetben). A ViewModel-ek RunStepsCoreAsync eleje/vége jelentkezik be/ki
-    /// ezen keresztül — a scheduler ez alapján dönt a sorba állításról.
-    /// </summary>
     void SetModuleBusy(AT.Core.Models.AutomationTarget target, bool isBusy);
 
-    /// <summary>Kényszeríti egy adott feladat NextRunAt mezőjének újraszámítását (pl. létrehozás/szerkesztés után).</summary>
+    // Kényszeríti egy adott feladat NextRunAt mezőjének újraszámítását (pl. létrehozás/szerkesztés után).
     void RecalculateNextRun(ScheduledTask task);
 }
 
-/// <summary>
-/// Belső, DispatcherTimer-alapú ütemező: az AT.App-nak futnia/megnyitva kell lennie ahhoz,
-/// hogy egy ütemezett feladat lefusson (nincs Windows Task Scheduler-integráció, nincs
-/// külön szolgáltatás-folyamat). Percenként ellenőrzi, van-e esedékes (IsEnabled és
-/// NextRunAt &lt;= Now) feladat; ha a célmodul épp foglalt, egy belső várólistába teszi,
-/// és a modul felszabadulásakor futtatja le.
-/// </summary>
+
+// Belső, DispatcherTimer-alapú ütemező: az AT.App-nak futnia/megnyitva kell lennie ahhoz,
+// hogy egy ütemezett feladat lefusson (nincs Windows Task Scheduler-integráció, nincs
+// külön szolgáltatás-folyamat). Percenként ellenőrzi, van-e esedékes (IsEnabled és
+// NextRunAt &lt;= Now) feladat; ha a célmodul épp foglalt, egy belső várólistába teszi,
+// és a modul felszabadulásakor futtatja le.
+
 public sealed class SchedulerService : ISchedulerService
 {
     private readonly DispatcherTimer _timer;
@@ -39,13 +38,13 @@ public sealed class SchedulerService : ISchedulerService
     private readonly Queue<ScheduledTask> _pendingQueue = new();
     private bool _isProcessingQueue;
 
-    /// <summary>
-    /// Igaz, ha a ProcessQueueAsync egy futó példánya alatt érkezett egy újabb "próbáld
-    /// meg feldolgozni a sort" igény (pl. egy modul épp most szabadult fel) — enélkül ez
-    /// az igény elveszne, mert a párhuzamosan induló ProcessQueueAsync hívás az
-    /// _isProcessingQueue miatt azonnal visszatérne, anélkül hogy bármit csinálna. A futó
-    /// példány a finally ágában ellenőrzi ezt a jelzőt, és ha igaz, újraindítja magát.
-    /// </summary>
+
+    // Igaz, ha a ProcessQueueAsync egy futó példánya alatt érkezett egy újabb "próbáld
+    // meg feldolgozni a sort" igény (pl. egy modul épp most szabadult fel) — enélkül ez
+    // az igény elveszne, mert a párhuzamosan induló ProcessQueueAsync hívás az
+    // _isProcessingQueue miatt azonnal visszatérne, anélkül hogy bármit csinálna. A futó
+    // példány a finally ágában ellenőrzi ezt a jelzőt, és ha igaz, újraindítja magát.
+
     private bool _reprocessRequested;
 
     public SchedulerService(IScheduledTaskService scheduledTaskService, ITestExecutionService executionService)
@@ -110,15 +109,15 @@ public sealed class SchedulerService : ISchedulerService
             await ProcessQueueAsync();
     }
 
-    /// <summary>
-    /// A várólistában lévő feladatok közül azokat, amiknek a célmodulja épp szabad,
-    /// EGYSZERRE (párhuzamosan) indítja el — pl. egy esedékes Web- és egy esedékes
-    /// Desktop-teszt egy időben fut, mert a driverjeik függetlenek egymástól. Egy adott
-    /// célmodulon belül viszont mindig csak egy futtatás mehet egyszerre (ugyanazt a
-    /// driver-példányt nem lehet két helyről egyszerre használni) — ha egy modul már
-    /// foglalt (akár egy másik ütemezett feladat, akár egy kézi futtatás miatt — lásd
-    /// SetModuleBusy), az adott célmodulú feladat a sorban marad, amíg fel nem szabadul.
-    /// </summary>
+
+    // A várólistában lévő feladatok közül azokat, amiknek a célmodulja épp szabad,
+    // EGYSZERRE (párhuzamosan) indítja el — pl. egy esedékes Web- és egy esedékes
+    // Desktop-teszt egy időben fut, mert a driverjeik függetlenek egymástól. Egy adott
+    // célmodulon belül viszont mindig csak egy futtatás mehet egyszerre (ugyanazt a
+    // driver-példányt nem lehet két helyről egyszerre használni) — ha egy modul már
+    // foglalt (akár egy másik ütemezett feladat, akár egy kézi futtatás miatt — lásd
+    // SetModuleBusy), az adott célmodulú feladat a sorban marad, amíg fel nem szabadul.
+
     private async Task ProcessQueueAsync()
     {
         if (_isProcessingQueue)
@@ -183,9 +182,9 @@ public sealed class SchedulerService : ISchedulerService
         }
     }
 
-    /// <summary>Lefuttat egy feladatot, majd garantáltan felszabadítja a célmodult és
-    /// újra megpróbálja feldolgozni a várólistát — akkor is, ha a futtatás közben
-    /// kivétel történt (bár az ITestExecutionService.RunAsync normál esetben nem dob).</summary>
+    // Lefuttat egy feladatot, majd garantáltan felszabadítja a célmodult és
+    // újra megpróbálja feldolgozni a várólistát — akkor is, ha a futtatás közben
+    // kivétel történt (bár az ITestExecutionService.RunAsync normál esetben nem dob)
     private async Task RunAndReleaseAsync(ScheduledTask task)
     {
         try
@@ -199,10 +198,10 @@ public sealed class SchedulerService : ISchedulerService
         }
     }
 
-    /// <summary>
-    /// Kiszámítja a cadence, óra:perc és nap-specifikáció alapján a legközelebbi jövőbeli
-    /// időpontot, amikor a feladatnak le kell futnia — mindig szigorúan 'from' után.
-    /// </summary>
+
+    // Kiszámítja a cadence, óra:perc és nap-specifikáció alapján a legközelebbi jövőbeli
+    // időpontot, amikor a feladatnak le kell futnia — mindig szigorúan 'from' után.
+
     public static DateTime ComputeNextRunAt(ScheduledTask task, DateTime from)
     {
         switch (task.Cadence)

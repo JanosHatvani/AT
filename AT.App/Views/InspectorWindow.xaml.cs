@@ -7,10 +7,10 @@ using AT.Core.Contracts;
 
 namespace AT.App.Views;
 
-/// <summary>
-/// Nem-modális, sosem aktiválódó ablak (ShowActivated="False") — szándékosan NEM
-/// ShowDialog()-gal nyitjuk meg, mert az elvenné a fókuszt a vizsgált alkalmazástól/felugró ablaktól.
-/// </summary>
+
+// Nem-modális, sosem aktiválódó ablak (ShowActivated="False") — szándékosan NEM
+// ShowDialog()-gal nyitjuk meg, mert az elvenné a fókuszt a vizsgált alkalmazástól/felugró ablaktól.
+
 public partial class InspectorWindow : Window
 {
     public InspectorWindow(

@@ -3,8 +3,8 @@ using System.Windows.Data;
 
 namespace AT.App.Converters;
 
-/// <summary>A ScheduledTasksView kártyáján lévő be/kikapcsoló gomb feliratát adja vissza:
-/// ha a feladat épp be van kapcsolva, "Kikapcsolás"-t mutat (mert erre kattintva kikapcsolódna), és fordítva.</summary>
+// A ScheduledTasksView kártyáján lévő be/kikapcsoló gomb feliratát adja vissza:
+// ha a feladat épp be van kapcsolva, "Kikapcsolás"-t mutat (mert erre kattintva kikapcsolódna), és fordítva.
 public sealed class EnabledToToggleLabelConverter : IValueConverter
 {
     public static readonly EnabledToToggleLabelConverter Instance = new();

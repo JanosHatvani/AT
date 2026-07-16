@@ -22,13 +22,13 @@ public partial class MainWindow : Window
         _themeService.ThemeChanged += OnThemeChanged;
     }
 
-    /// <summary>
-    /// A StaticResource binding WPF-ben egyszeri, betöltéskori feloldás — egy futásidejű
-    /// dictionary-csere (lásd ThemeService.ApplyTheme) NEM frissíti a már megjelenített
-    /// UI-elemeket. A garantáltan megbízható megoldás: teljesen újranyitjuk az ablakot,
-    /// hogy minden elem elsőként, a friss színekkel oldódjon fel. A MainViewModel Singleton,
-    /// tehát az állapot (aktuális nézet, stb.) megmarad az új ablakban is.
-    /// </summary>
+
+    // A StaticResource binding WPF-ben egyszeri, betöltéskori feloldás — egy futásidejű
+    // dictionary-csere (lásd ThemeService.ApplyTheme) NEM frissíti a már megjelenített
+    // UI-elemeket. A garantáltan megbízható megoldás: teljesen újranyitjuk az ablakot,
+    // hogy minden elem elsőként, a friss színekkel oldódjon fel. A MainViewModel Singleton,
+    // tehát az állapot (aktuális nézet, stb.) megmarad az új ablakban is.
+
     private void OnThemeChanged(object? sender, EventArgs e)
     {
         if (_isReopening)
@@ -47,11 +47,11 @@ public partial class MainWindow : Window
         Close();
     }
 
-    /// <summary>
-    /// Mivel WindowStyle="None" (nincs natív címsor), a sidebar-ra kattintva-húzva
-    /// lehet mozgatni az ablakot. A navigációs gombok saját kattintás-kezelése
-    /// elsőbbséget élvez, ez csak az üres sidebar-területre kattintáskor sül el.
-    /// </summary>
+
+    // Mivel WindowStyle="None" (nincs natív címsor), a sidebar-ra kattintva-húzva
+    // lehet mozgatni az ablakot. A navigációs gombok saját kattintás-kezelése
+    // elsőbbséget élvez, ez csak az üres sidebar-területre kattintáskor sül el.
+
     private void DragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.LeftButton == MouseButtonState.Pressed)

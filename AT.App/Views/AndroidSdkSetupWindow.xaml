@@ -1,0 +1,118 @@
+<Window x:Class="AT.App.Views.AndroidSdkSetupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Android SDK telepítése"
+        Width="480" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{StaticResource Brush.Surface}"
+        BorderBrush="{StaticResource Brush.Border}"
+        BorderThickness="1"
+        Closing="Window_Closing">
+
+    <!--
+        Két üzemmódban jelenik meg (a code-behind váltja ShowConfirmation()/ShowProgress()):
+        1. Megerősítés: "Nincs Android SDK — szeretnéd telepíteni?" Igen/Nem gombokkal.
+        2. Progress: élő %-os sáv (letöltésnél) vagy határozatlan sáv (a többi fázisnál),
+           fázis-szöveggel és — ha ismert — hátralévő idővel.
+    -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="40" CornerRadius="8" GlassFrameThickness="0" ResizeBorderThickness="4" />
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <Style x:Key="DialogTitleBarStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Brush.Background}" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="CornerRadius" Value="8,8,0,0" />
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ===================== FEJLÉC-SÁV ===================== -->
+        <Border Grid.Row="0" Style="{StaticResource DialogTitleBarStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Android SDK telepítése"
+                           FontWeight="SemiBold" FontSize="14"
+                           Foreground="{StaticResource Brush.TextPrimary}"
+                           VerticalAlignment="Center" Margin="16,0,0,0"
+                           WindowChrome.IsHitTestVisibleInChrome="False" />
+
+                <Button x:Name="CloseIconButton" Grid.Column="1" Content="✕"
+                        Style="{StaticResource GhostButtonStyle}"
+                        Width="32" Height="32" Padding="0" Margin="0,0,6,0"
+                        Click="CloseButton_Click"
+                        WindowChrome.IsHitTestVisibleInChrome="True" />
+            </Grid>
+        </Border>
+
+        <!-- ===================== TARTALOM: MEGERŐSÍTÉS ===================== -->
+        <StackPanel x:Name="ConfirmationPanel" Grid.Row="1" Margin="24,20,24,0">
+            <TextBlock Text="Nincs telepítve Android SDK ezen a gépen."
+                       FontSize="15" FontWeight="SemiBold"
+                       Foreground="{StaticResource Brush.TextPrimary}"
+                       TextWrapping="Wrap" Margin="0,0,0,10" />
+            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,0,0,10">
+                A Mobil (Android) tesztelés modul használatához szükség van az Android SDK
+                alapvető eszközeire (platform-tools, emulator), egy Android rendszerképre és
+                egy virtuális eszközre. Szeretnéd, hogy ezt most, automatikusan telepítsük?
+            </TextBlock>
+            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource Brush.TextMuted}" FontSize="12" Margin="0,0,0,4">
+                A letöltés mérete kb. 1.5–2.5 GB, és néhány percig tarthat — internetkapcsolat szükséges.
+            </TextBlock>
+        </StackPanel>
+
+        <!-- ===================== TARTALOM: PROGRESS ===================== -->
+        <StackPanel x:Name="ProgressPanel" Grid.Row="1" Margin="24,20,24,0" Visibility="Collapsed">
+            <TextBlock x:Name="PhaseLabelText" Text="Előkészítés…"
+                       FontSize="14" FontWeight="SemiBold"
+                       Foreground="{StaticResource Brush.TextPrimary}"
+                       TextWrapping="Wrap" Margin="0,0,0,12" />
+
+            <ProgressBar x:Name="ProgressBarControl" Height="10" Minimum="0" Maximum="100"
+                         IsIndeterminate="True" Margin="0,0,0,8" />
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="PercentText" Grid.Column="0" Text=""
+                           Foreground="{StaticResource Brush.TextMuted}" FontSize="12" />
+                <TextBlock x:Name="EtaText" Grid.Column="1" Text=""
+                           Foreground="{StaticResource Brush.TextMuted}" FontSize="12" />
+            </Grid>
+
+            <TextBlock x:Name="ErrorText" Foreground="{StaticResource Brush.Danger}"
+                       TextWrapping="Wrap" Margin="0,14,0,0" Visibility="Collapsed" />
+        </StackPanel>
+
+        <!-- ===================== GOMBOK ===================== -->
+        <StackPanel x:Name="ConfirmationButtons" Grid.Row="2" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="24,16,24,20">
+            <Button Content="Nem, most nem" Style="{StaticResource GhostButtonStyle}" Margin="0,0,10,0"
+                    Click="DeclineButton_Click" />
+            <Button Content="Telepítés indítása" Style="{StaticResource PrimaryButtonStyle}"
+                    Click="InstallButton_Click" />
+        </StackPanel>
+
+        <StackPanel x:Name="ProgressButtons" Grid.Row="2" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="24,16,24,20" Visibility="Collapsed">
+            <Button x:Name="CancelInstallButton" Content="Megszakítás" Style="{StaticResource GhostButtonStyle}"
+                    Click="CancelInstallButton_Click" />
+            <Button x:Name="CloseAfterFinishButton" Content="Bezárás" Style="{StaticResource PrimaryButtonStyle}"
+                    Visibility="Collapsed" Click="CloseButton_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

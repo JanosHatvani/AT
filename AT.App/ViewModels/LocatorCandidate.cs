@@ -2,7 +2,7 @@
 
 namespace AT.App.ViewModels;
 
-/// <summary>Egy lehetséges lokátor a rögzített elemhez — az Elem-kereső ezekből listáz.</summary>
+// Egy lehetséges lokátor a rögzített elemhez — az Elem-kereső ezekből listáz.
 public sealed class LocatorCandidate
 {
     public required LocatorType Type { get; init; }

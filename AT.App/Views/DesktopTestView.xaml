@@ -265,8 +265,7 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Oszlop-fejléc — minden cella jobb szélén egy elválasztó vonal (kivéve az utolsót),
-                     hogy táblázatszerű, rácsozott megjelenést adjon. -->
+
                 <Grid Margin="20,0,20,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" SharedSizeGroup="StepDragHandle" />

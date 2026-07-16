@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using AT.Core.Contracts;
 using AT.Core.Models;
 using OpenQA.Selenium;
@@ -256,8 +258,8 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
     {
         var action = Enum.Parse<MobileStepAction>(step.Action);
 
-        if (action == MobileStepAction.StartEmulator)
-            return StartEmulatorAsync(step.Value ?? string.Empty, cancellationToken).ContinueWith(_ => (string?)null, cancellationToken);
+        //if (action == MobileStepAction.StartEmulator)
+        //    return StartEmulatorAsync(step.Value ?? string.Empty, cancellationToken).ContinueWith(_ => (string?)null, cancellationToken);
 
         if (action == MobileStepAction.LaunchApp)
             return LaunchAppAsync(step.Value ?? string.Empty, cancellationToken).ContinueWith(_ => (string?)null, cancellationToken);
@@ -468,6 +470,75 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
         var output = process.StandardOutput.ReadToEnd();
         process.WaitForExit();
         return output;
+    }
+
+    // ===================== ESZKÖZ-ÁLLAPOT (Mobil nézet eszköz-sávja) =====================
+
+    /// <summary>
+    /// Lekérdezi az ADB-n keresztül látott, elsőként csatlakoztatott eszköz állapotát és
+    /// (ha elérhető) a hardver-modell nevét. A Mobil nézet "Csatlakoztatva: Samsung Galaxy S23"
+    /// jellegű állapot-sávja hívja, kézi Frissítés gombra vagy a nézet betöltésekor — NEM
+    /// automatikusan, időzítve, hogy ne fusson feleslegesen a háttérben.
+    ///
+    /// Ez a metódus független az aktív Appium session-től (_driver-től) — pusztán az ADB-t
+    /// hívja közvetlenül, ezért akkor is működik, ha még nincs elindítva a StartAsync/
+    /// LaunchApp (vagyis ellenőrizni lehet vele a fizikai kapcsolatot, mielőtt egyáltalán
+    /// elindítanál egy tesztet).
+    /// </summary>
+    public Task<MobileDeviceInfo> GetConnectedDeviceInfoAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.Run(() =>
+        {
+            string adbPath;
+            try
+            {
+                adbPath = AndroidSdkLocator.ResolveAdbPath(SdkRootOverride);
+            }
+            catch (InvalidOperationException)
+            {
+                // Nincs elérhető adb.exe (SDK hiányzik/hiányos) — ez nem hiba ebben a
+                // kontextusban, egyszerűen "nincs csatlakoztatott eszköz" állapotot jelent,
+                // a felhasználó úgyis kap külön figyelmeztetést a hiányzó SDK-ról.
+                return new MobileDeviceInfo { IsConnected = false };
+            }
+
+            var devicesOutput = RunAdb(adbPath, "devices");
+
+            // Az "adb devices" kimenete soronként: "<serial>\t<state>", az első sor egy
+            // fejléc ("List of devices attached"), amit át kell ugrani.
+            var deviceLine = devicesOutput
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Skip(1)
+                .FirstOrDefault(line => line.Contains('\t'));
+
+            if (deviceLine is null)
+                return new MobileDeviceInfo { IsConnected = false };
+
+            var parts = deviceLine.Split('\t', StringSplitOptions.TrimEntries);
+            var serialNumber = parts[0];
+            var state = parts.Length > 1 ? parts[1] : "";
+
+            if (state != "device")
+            {
+                // "unauthorized" (az USB-hibakeresési engedélykérés még nincs elfogadva a
+                // telefonon) vagy "offline" — látszik az eszköz, de nem használható.
+                return new MobileDeviceInfo
+                {
+                    IsConnected = false,
+                    IsUnauthorizedOrOffline = true,
+                    SerialNumber = serialNumber
+                };
+            }
+
+            var deviceModel = RunAdb(adbPath, $"-s {serialNumber} shell getprop ro.product.model").Trim();
+
+            return new MobileDeviceInfo
+            {
+                IsConnected = true,
+                SerialNumber = serialNumber,
+                DeviceModel = string.IsNullOrWhiteSpace(deviceModel) ? null : deviceModel
+            };
+        }, cancellationToken);
     }
 
     private void StopEmulatorProcess()

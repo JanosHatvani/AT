@@ -2,11 +2,11 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace AT.App.Services;
 
-/// <summary>
-/// ViewModel-first navigáció: a MainWindow nem tud semmit az egyes oldalakról,
-/// csak azt figyeli, hogy melyik ViewModel az aktuális — a DataTemplate-ek
-/// (App.xaml) döntik el, melyik View tartozik hozzá.
-/// </summary>
+
+// ViewModel-first navigáció: a MainWindow nem tud semmit az egyes oldalakról,
+// csak azt figyeli, hogy melyik ViewModel az aktuális — a DataTemplate-ek
+// (App.xaml) döntik el, melyik View tartozik hozzá.
+
 public interface INavigationService
 {
     event EventHandler<ObservableObject>? CurrentViewModelChanged;

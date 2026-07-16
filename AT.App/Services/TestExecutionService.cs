@@ -12,12 +12,12 @@ namespace AT.App.Services;
 
 public interface ITestExecutionService
 {
-    /// <summary>
-    /// Lefuttat egy lépéssort a megadott célmodulon — pontosan úgy, mint a Web/Desktop/Mobil
-    /// nézetek "Futtatás" gombja: driver indítása, lépésenkénti végrehajtás, StepFlowResolver-alapú
-    /// ugrás-feloldás, opcionális screenshot, majd history-mentés. A hívó (pl. SchedulerService)
-    /// kapja vissza az eredmény-összegzést, hogy toast-ot vagy egyéb jelzést adhasson.
-    /// </summary>
+
+    // Lefuttat egy lépéssort a megadott célmodulon — pontosan úgy, mint a Web/Desktop/Mobil
+    // nézetek "Futtatás" gombja: driver indítása, lépésenkénti végrehajtás, StepFlowResolver-alapú
+    // ugrás-feloldás, opcionális screenshot, majd history-mentés. A hívó (pl. SchedulerService)
+    // kapja vissza az eredmény-összegzést, hogy toast-ot vagy egyéb jelzést adhasson.
+
     /// <param name="browserName">Web célmodul esetén a böngésző neve (pl. "Chrome") — a
     /// BrowserType enum string-alakja. String, nem BrowserType, hogy a hívó (SchedulerService,
     /// ami az AT.Infrastructure-ből kapja a ScheduledTask.Browser stringet) ne függjön az
@@ -27,17 +27,17 @@ public interface ITestExecutionService
     Task<TestRunRecord> RunAsync(string testName, AutomationTarget target, IReadOnlyList<TestStep> steps, string categoryId, string? browserName = null);
 }
 
-/// <summary>
-/// A Web/Desktop/Mobil ViewModel-ekben lévő RunStepsCoreAsync logika modul-független
-/// kiszervezése. Ezt használja a ScheduledTask-ok automatikus futtatása, hogy a lépéssor
-/// pontosan úgy fusson le, mintha a felhasználó kézzel indította volna el a megfelelő
-/// modulban — ugyanaz a driver, ugyanaz az ugrás-feloldás, ugyanaz a history-bejegyzés.
-///
-/// FONTOS: ez a szolgáltatás nem ismeri a UI-oldali TestStepRow-t (Status/Duration/Message
-/// megjelenítést) — csak a nyers TestStep-eket hajtja végre és egy TestRunRecord-ot ad
-/// vissza. Ha egy ütemezett teszt éppen akkor futna, amikor a felhasználó ugyanabban a
-/// modulban kézzel is dolgozik, a hívó (SchedulerService) felelőssége a sorba állítás.
-/// </summary>
+
+// A Web/Desktop/Mobil ViewModel-ekben lévő RunStepsCoreAsync logika modul-független
+// kiszervezése. Ezt használja a ScheduledTask-ok automatikus futtatása, hogy a lépéssor
+// pontosan úgy fusson le, mintha a felhasználó kézzel indította volna el a megfelelő
+// modulban — ugyanaz a driver, ugyanaz az ugrás-feloldás, ugyanaz a history-bejegyzés.
+
+// FONTOS: ez a szolgáltatás nem ismeri a UI-oldali TestStepRow-t (Status/Duration/Message
+// megjelenítést) — csak a nyers TestStep-eket hajtja végre és egy TestRunRecord-ot ad
+// vissza. Ha egy ütemezett teszt éppen akkor futna, amikor a felhasználó ugyanabban a
+// modulban kézzel is dolgozik, a hívó (SchedulerService) felelőssége a sorba állítás.
+
 public sealed class TestExecutionService : ITestExecutionService
 {
     private readonly WebAutomationDriver _webDriver;
@@ -191,6 +191,7 @@ public sealed class TestExecutionService : ITestExecutionService
         // Mobil ViewModel-ek kézi futtatása a saját RunStepsCoreAsync-jüket használja, nem ezt),
         // tehát minden ide érkező futtatás definíció szerint ütemezett — nincs szükség külön
         // isScheduled paraméterre ahhoz, hogy csak ütemezett hibánál küldjön emailt.
+
         if (hasFailed)
         {
             try
@@ -203,6 +204,7 @@ public sealed class TestExecutionService : ITestExecutionService
                 // ott a try-catch-et), de ez egy extra biztonsági háló, hogy egy esetleges,
                 // előre nem látott hiba az email-küldésben semmiképp ne akassza meg vagy
                 // buktassa el az egész ütemezett futtatást.
+
                 _notificationService.Show($"Riport-email küldése váratlan hibával leállt ({testName}): {ex.Message}", NotificationType.Warning);
             }
         }
@@ -302,7 +304,7 @@ public sealed class TestExecutionService : ITestExecutionService
         return sanitized.Length > 40 ? sanitized[..40] : sanitized;
     }
 
-    /// <summary>Egy lépés futásközbeni állapota — a UI-independens megfelelője a TestStepRow-nak.</summary>
+    // Egy lépés futásközbeni állapota — a UI-independens megfelelője a TestStepRow-nak.
     private sealed class StepRunState
     {
         public StepRunState(TestStep step) => Step = step;
