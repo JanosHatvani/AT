@@ -60,21 +60,29 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
 
         return Task.Run(() =>
         {
+            // Az Appium driver-nyilvántartása (extensions.yml) a becsomagolt
+            // runtime mappájában él, nem a felhasználó globális %APPDATA%\.appium
+            // mappájában — így a végfelhasználónak sosem kell driver-t telepítenie.
+            Environment.SetEnvironmentVariable("APPIUM_HOME", BundledRuntimeRoot);
+
+            // A UiAutomator2 driver saját (Node.js-oldali) folyamatában olvassa ki
+            // ezeket — teljesen független attól, hogy a C# kód honnan tudja az SDK
+            // útvonalát. Enélkül a driver "Neither ANDROID_HOME nor ANDROID_SDK_ROOT..."
+            // hibával elszáll, még akkor is, ha az SdkRootOverride be van állítva.
+            var sdkRoot = AndroidSdkLocator.ResolveSdkRoot(SdkRootOverride);
+            Environment.SetEnvironmentVariable("ANDROID_HOME", sdkRoot);
+            Environment.SetEnvironmentVariable("ANDROID_SDK_ROOT", sdkRoot);
+
             var builder = new AppiumServiceBuilder()
                 .WithIPAddress("127.0.0.1")
                 .UsingAnyFreePort();
 
             if (File.Exists(BundledNodePath) && File.Exists(BundledAppiumMainJsPath))
             {
-                // Becsomagolt runtime használata — a végfelhasználónak nem kell
-                // semmit telepítenie, teljesen önállóan működik.
                 builder = builder
                     .UsingDriverExecutable(new FileInfo(BundledNodePath))
                     .WithAppiumJS(new FileInfo(BundledAppiumMainJsPath));
             }
-            // Ha a becsomagolt runtime hiányzik, a builder a rendszer PATH-ján
-            // keresi a node-ot és a globálisan telepített appium-ot (a korábbi,
-            // "telepítsd magad" viselkedés) — ez a fallback fejlesztői gépeken hasznos.
 
             _appiumService = builder.Build();
             _appiumService.Start();
@@ -118,6 +126,7 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
     }
 
     /// <summary>APK telepítése (ha kell) és az alkalmazás indítása — az "LaunchApp" lépés hívja.</summary>
+
     public Task LaunchAppAsync(string apkPath, CancellationToken cancellationToken = default)
     {
         if (_appiumService is null)
@@ -131,13 +140,90 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
             var options = new AppiumOptions
             {
                 PlatformName = "Android",
-                AutomationName = "UiAutomator2"
+                AutomationName = "UiAutomator2",
+                App = apkPath
             };
-            options.AddAdditionalAppiumOption("app", apkPath);
             options.AddAdditionalAppiumOption("noReset", false);
 
-            _driver = new AndroidDriver(_appiumService!.ServiceUrl, options, TimeSpan.FromSeconds(90));
+            try
+            {
+                _driver = new AndroidDriver(_appiumService!.ServiceUrl, options, TimeSpan.FromSeconds(90));
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(TranslateLaunchError(ex.Message, apkPath), ex);
+            }
         }, cancellationToken);
+    }
+
+    /// <summary>
+    /// A UiAutomator2/adb néhány gyakori, kriptikus hibaüzenetét emberi, magyar nyelvű,
+    /// tettre-ösztönző szöveggé fordítja — a nyers eredeti üzenet az InnerException-ben
+    /// (és a naplóban) megmarad, csak a felhasználó felé megjelenő szöveg lesz barátságosabb.
+    /// </summary>
+    private static string TranslateLaunchError(string rawMessage, string apkPath)
+    {
+        if (rawMessage.Contains("INSTALL_FAILED_NO_MATCHING_ABIS"))
+        {
+            return "Az APK nem telepíthető erre a telefonra, mert nem a telefon processzor-" +
+                   "architektúrájához (ARM: arm64-v8a / armeabi-v7a) készült — valószínűleg egy " +
+                   "x86/x86_64 emulátorhoz buildelt APK-t próbáltál valódi telefonra telepíteni. " +
+                   "Kérj vagy buildelj egy ARM-kompatibilis APK-t (a build.gradle 'abiFilters' vagy " +
+                   $"'splits.abi' beállítását kell bővíteni), majd próbáld újra.{Environment.NewLine}" +
+                   $"Fájl: {apkPath}";
+        }
+
+        if (rawMessage.Contains("device unauthorized") || rawMessage.Contains("device 'unauthorized'"))
+        {
+            return "A telefon csatlakozva van, de nincs elfogadva rajta az USB hibakeresési " +
+                   "engedélykérés. Nézd meg a telefon képernyőjét, fogadd el a felugró ablakot " +
+                   "(pipáld be a \"Mindig engedélyezés erről a gépről\" opciót is), majd próbáld újra.";
+        }
+
+        if (rawMessage.Contains("INSTALL_FAILED_INSUFFICIENT_STORAGE"))
+        {
+            return "Nincs elég szabad tárhely a telefonon az alkalmazás telepítéséhez. " +
+                   "Szabadíts fel helyet, majd próbáld újra.";
+        }
+
+        if (rawMessage.Contains("INSTALL_FAILED_VERSION_DOWNGRADE"))
+        {
+            return "A telefonon már egy újabb verziója van telepítve ennek az alkalmazásnak, " +
+                   "mint amit most telepíteni próbálsz. Előbb távolítsd el a régebbi verziót a " +
+                   "telefonról, vagy állítsd be a lépésnél a \"noReset\"/újratelepítést engedélyező " +
+                   "opciót, majd próbáld újra.";
+        }
+
+        if (rawMessage.Contains("INSTALL_FAILED_UPDATE_INCOMPATIBLE") || rawMessage.Contains("signatures do not match"))
+        {
+            return "A telefonon már telepítve van ez az alkalmazás, de más aláírással (más " +
+                   "kulccsal) lett buildelve, mint a most telepíteni kívánt APK. Távolítsd el " +
+                   "kézzel a telefonról a meglévő alkalmazást, majd próbáld újra.";
+        }
+
+        if (rawMessage.Contains("Could not find a driver"))
+        {
+            return "Az Appium UiAutomator2 driver nincs telepítve a becsomagolt runtime-hoz. " +
+                   "Ez telepítési/csomagolási hiba, nem a teszt-lépés problémája — jelezd a " +
+                   "fejlesztőnek.";
+        }
+
+        if (rawMessage.Contains("Could not find 'aapt2.exe'") || rawMessage.Contains("aapt2"))
+        {
+            return "Hiányoznak az Android Build Tools az SDK-ból (aapt2.exe nem található). " +
+                   "Ez telepítési hiba — jelezd a fejlesztőnek, hogy az Android SDK telepítője " +
+                   "nem futtatta le a build-tools telepítését.";
+        }
+
+        if (rawMessage.Contains("Neither ANDROID_HOME nor ANDROID_SDK_ROOT"))
+        {
+            return "A program nem találja az Android SDK útvonalát a háttérben futó Appium " +
+                   "folyamat számára. Ellenőrizd a Beállítások oldalon az Android SDK " +
+                   "gyökérmappáját.";
+        }
+
+        // Ismeretlen hiba — az eredeti nyers üzenetet adjuk tovább, hogy semmi ne vesszen el.
+        return $"Az alkalmazás indítása sikertelen: {rawMessage}";
     }
 
     /// <summary>Az IAutomationDriver szerződés kötelező tagja — a mobil modulban ez a LaunchApp-ra delegál.</summary>
@@ -262,7 +348,13 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
         //    return StartEmulatorAsync(step.Value ?? string.Empty, cancellationToken).ContinueWith(_ => (string?)null, cancellationToken);
 
         if (action == MobileStepAction.LaunchApp)
-            return LaunchAppAsync(step.Value ?? string.Empty, cancellationToken).ContinueWith(_ => (string?)null, cancellationToken);
+            return LaunchAppAsync(step.Value ?? string.Empty, cancellationToken)
+                .ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                        throw t.Exception!.GetBaseException();
+                    return (string?)null;
+                }, cancellationToken);
 
         if (action == MobileStepAction.StopEmulator)
             return Task.Run(() => { StopEmulatorProcess(); return (string?)null; }, cancellationToken);

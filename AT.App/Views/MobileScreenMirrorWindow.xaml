@@ -4,7 +4,7 @@
         xmlns:conv="clr-namespace:AT.App.Converters"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Élő kijelző — Mobil (Android) tesztelés"
-        Width="420" Height="720"
+        Width="420" Height="850"
         WindowStyle="None"
         ResizeMode="CanResize"
         MinWidth="340" MinHeight="480"

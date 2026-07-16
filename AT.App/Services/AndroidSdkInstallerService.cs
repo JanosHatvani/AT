@@ -20,6 +20,7 @@ public enum AndroidSdkInstallPhase
     InstallingPlatformTools,
     InstallingEmulator,
     InstallingPlatform,
+    InstallingBuildTools,      
     InstallingSystemImage,
     CreatingVirtualDevice,
     Finished
@@ -51,6 +52,7 @@ public sealed class AndroidSdkInstallProgress
         AndroidSdkInstallPhase.InstallingPlatformTools => "Platform-tools (adb) telepítése",
         AndroidSdkInstallPhase.InstallingEmulator => "Emulátor telepítése",
         AndroidSdkInstallPhase.InstallingPlatform => "Android platform telepítése",
+        AndroidSdkInstallPhase.InstallingBuildTools => "Build Tools telepítése",
         AndroidSdkInstallPhase.InstallingSystemImage => "Rendszerkép letöltése (ez tart a legtovább)",
         AndroidSdkInstallPhase.CreatingVirtualDevice => "Virtuális eszköz létrehozása",
         AndroidSdkInstallPhase.Finished => "Kész",
@@ -260,7 +262,34 @@ public sealed class AndroidSdkInstallerService : IAndroidSdkInstallerService
         WriteLog($"--- sdkmanager --licenses STDOUT ---{Environment.NewLine}{licensesResult.StandardOutput}");
         WriteLog($"--- sdkmanager --licenses STDERR ---{Environment.NewLine}{licensesResult.StandardError}");
 
-        // ---- 4. Komponensek telepítése ----
+        // ---- 4 Build Tools telepítése ----
+        // A UiAutomator2 Appium driver session-indításkor "aapt2.exe"-t hív az APK
+        // vizsgálatához (csomagnév/aktivitás kiolvasása) — enélkül a "Could not find
+        // 'aapt2.exe'..." hibával elszáll a LaunchApp lépés, még akkor is, ha a
+        // platform-tools/emulator/platform már rendben települt.
+        const string BuildToolsPackage = "build-tools;34.0.0";
+        progress.Report(new AndroidSdkInstallProgress { Phase = AndroidSdkInstallPhase.InstallingBuildTools });
+        WriteLog($"{BuildToolsPackage} telepítése...");
+        var buildToolsResult = await RunSdkManagerAsync(sdkManagerPath, sdkRoot, $"\"{BuildToolsPackage}\"", sendYesRepeatedly: false, cancellationToken);
+        WriteLog($"build-tools telepítés — exit code: {buildToolsResult.ExitCode}");
+        WriteLog($"--- sdkmanager build-tools STDOUT ---{Environment.NewLine}{buildToolsResult.StandardOutput}");
+        WriteLog($"--- sdkmanager build-tools STDERR ---{Environment.NewLine}{buildToolsResult.StandardError}");
+
+        var aapt2Path = Path.Combine(sdkRoot, "build-tools", "34.0.0", "aapt2.exe");
+        if (!File.Exists(aapt2Path))
+        {
+            WriteLog($"HIBA: a build-tools telepítés lefutott, de az aapt2.exe mégsem jött létre itt: {aapt2Path}");
+            throw new InvalidOperationException(
+                $"A Build Tools telepítése nem sikerült (az aapt2.exe nem jött létre). " +
+                $"Részletes napló: {LogFilePath}");
+        }
+        WriteLog("aapt2.exe létrejött, build-tools telepítés sikeres.");
+
+        progress.Report(new AndroidSdkInstallProgress { Phase = AndroidSdkInstallPhase.InstallingSystemImage });
+        WriteLog("system image telepítése (ez tart a legtovább)...");
+
+
+        // ---- 5. Komponensek telepítése ----
         progress.Report(new AndroidSdkInstallProgress { Phase = AndroidSdkInstallPhase.InstallingPlatformTools });
         WriteLog("platform-tools telepítése...");
         var platformToolsResult = await RunSdkManagerAsync(sdkManagerPath, sdkRoot, "\"platform-tools\"", sendYesRepeatedly: false, cancellationToken);
@@ -305,7 +334,7 @@ public sealed class AndroidSdkInstallerService : IAndroidSdkInstallerService
         WriteLog($"--- sdkmanager system-image STDOUT ---{Environment.NewLine}{systemImageResult.StandardOutput}");
         WriteLog($"--- sdkmanager system-image STDERR ---{Environment.NewLine}{systemImageResult.StandardError}");
 
-        // ---- 5. AVD létrehozása ----
+        // ---- 6. AVD létrehozása ----
         progress.Report(new AndroidSdkInstallProgress { Phase = AndroidSdkInstallPhase.CreatingVirtualDevice });
         if (File.Exists(avdManagerPath))
         {
@@ -324,7 +353,7 @@ public sealed class AndroidSdkInstallerService : IAndroidSdkInstallerService
             WriteLog($"FIGYELMEZTETÉS: avdmanager.bat nem található ({avdManagerPath}) — az AVD-létrehozás kimaradt.");
         }
 
-        // ---- 6. Beállítások frissítése ----
+        // ---- 7. Beállítások frissítése ----
         _settingsService.Current.AndroidSdkRoot = sdkRoot;
         await _settingsService.SaveAsync();
         WriteLog("Beállítások frissítve, telepítés sikeresen befejeződött.");
