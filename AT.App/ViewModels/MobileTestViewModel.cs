@@ -26,6 +26,8 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
     private readonly ITestRunHistoryService _historyService;
     private readonly ITestReportService _reportService;
     private readonly DispatcherTimer _mirrorTimer;
+    private bool _isRefreshingDeviceStatus;
+    private readonly DispatcherTimer _deviceStatusTimer;
     private readonly IScheduledTaskService _scheduledTaskService;
     private readonly ISchedulerService _schedulerService;
     private readonly ITestCategoryService _categoryService;
@@ -80,43 +82,57 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
 
     /// <summary>
     /// Újra lekérdezi az ADB-n keresztül csatlakoztatott eszköz állapotát — a nézet
-    /// betöltésekor (konstruktor) és a "Frissítés" gomb kattintására hívódik, NEM
-    /// automatikusan időzítve, hogy ne fusson feleslegesen a háttérben.
+    /// betöltésekor (konstruktor), a "Frissítés" gomb kattintására, VALAMINT a
+    /// _deviceStatusTimer-en keresztül automatikusan, 3 másodpercenként. A
+    /// _isRefreshingDeviceStatus reentrancy-védelem biztosítja, hogy egyszerre
+    /// legfeljebb egy lekérdezés (adb-folyamat) fusson — ha egy korábbi hívás még
+    /// nem fejeződött be, a következő tick/kattintás egyszerűen kimarad.
     /// </summary>
     [RelayCommand]
     private async Task RefreshDeviceStatusAsync()
     {
-        DeviceStatusText = "Eszközállapot ellenőrzése…";
+        if (_isRefreshingDeviceStatus)
+            return;
 
-        MobileDeviceInfo info;
+        _isRefreshingDeviceStatus = true;
         try
         {
-            info = await _driver.GetConnectedDeviceInfoAsync();
-        }
-        catch (Exception ex)
-        {
-            IsDeviceConnected = false;
-            DeviceStatusText = $"Eszközállapot lekérdezése sikertelen: {ex.Message}";
-            return;
-        }
+            DeviceStatusText = "Eszközállapot ellenőrzése…";
 
-        if (info.IsConnected)
-        {
-            IsDeviceConnected = true;
-            DeviceStatusText = string.IsNullOrWhiteSpace(info.DeviceModel)
-                ? $"Csatlakoztatva ({info.SerialNumber})"
-                : $"Csatlakoztatva: {info.DeviceModel} ({info.SerialNumber})";
+            MobileDeviceInfo info;
+            try
+            {
+                info = await _driver.GetConnectedDeviceInfoAsync();
+            }
+            catch (Exception ex)
+            {
+                IsDeviceConnected = false;
+                DeviceStatusText = $"Eszközállapot lekérdezése sikertelen: {ex.Message}";
+                return;
+            }
+
+            if (info.IsConnected)
+            {
+                IsDeviceConnected = true;
+                DeviceStatusText = string.IsNullOrWhiteSpace(info.DeviceModel)
+                    ? $"Csatlakoztatva ({info.SerialNumber})"
+                    : $"Csatlakoztatva: {info.DeviceModel} ({info.SerialNumber})";
+            }
+            else if (info.IsUnauthorizedOrOffline)
+            {
+                IsDeviceConnected = false;
+                DeviceStatusText = $"Az eszköz ({info.SerialNumber}) csatlakoztatva van, de engedélyre vár — " +
+                                    "fogadd el az USB-hibakeresési engedélykérést a telefon képernyőjén.";
+            }
+            else
+            {
+                IsDeviceConnected = false;
+                DeviceStatusText = "Nincs csatlakoztatott eszköz — csatlakoztass egy telefont USB-n, és engedélyezd rajta az USB-hibakeresést.";
+            }
         }
-        else if (info.IsUnauthorizedOrOffline)
+        finally
         {
-            IsDeviceConnected = false;
-            DeviceStatusText = $"Az eszköz ({info.SerialNumber}) csatlakoztatva van, de engedélyre vár — " +
-                                "fogadd el az USB-hibakeresési engedélykérést a telefon képernyőjén.";
-        }
-        else
-        {
-            IsDeviceConnected = false;
-            DeviceStatusText = "Nincs csatlakoztatott eszköz — csatlakoztass egy telefont USB-n, és engedélyezd rajta az USB-hibakeresést.";
+            _isRefreshingDeviceStatus = false;
         }
     }
 
@@ -193,6 +209,25 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
 
     [ObservableProperty]
     private int newTimeoutSeconds = 10;
+
+    /// <summary>Ha a lokátor több elemre is illik (pl. egy lista minden sorában ugyanaz az
+    /// AutomationId ismétlődik), ez adja meg, hányadik találattal dolgozzon a lépés
+    /// — 1-alapú, EMBERI számozás (1 = első elem) — üresen az első találat. Szövegként tárolva, mert szabad
+    /// szöveges beviteli mező; az AddStep-ben alakul TestStep.ElementIndex-szé.</summary>
+    [ObservableProperty]
+    private string newElementIndex = "";
+
+    /// <summary>Hiba esetén ennyiszer próbálja újra a lépést, mielőtt véglegesen hibásnak
+    /// jelölné — lásd TestStep.RetryCount.</summary>
+    [ObservableProperty]
+    private int newRetryCount;
+
+    /// <summary>"Self-healing" tartalék lokátor — lásd TestStep.FallbackLocator.</summary>
+    [ObservableProperty]
+    private string newFallbackLocator = "";
+
+    [ObservableProperty]
+    private LocatorType newFallbackLocatorType = LocatorType.Id;
 
     /// <summary>Ha be van jelölve, a lépés hibája NEM szakítja meg a futtatást.</summary>
     [ObservableProperty]
@@ -299,6 +334,13 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         _mirrorTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
         _mirrorTimer.Tick += async (_, _) => await RefreshScreenAsync();
 
+        // Az eszközállapot (Csatlakoztatva: ... sáv) automatikus, időzített frissítése —
+        // 3 másodperces intervallum: elég gyors ahhoz, hogy csatlakoztatás/kihúzás/
+        // engedélyezés után hamar frissüljön a UI, de nem terheli feleslegesen az adb-t
+        // (minden tick egy külön "adb devices" + esetleg "adb shell getprop" folyamatindítás).
+        _deviceStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _deviceStatusTimer.Tick += async (_, _) => await RefreshDeviceStatusAsync();
+
         var defaults = settingsService.Current;
         _defaultTimeoutSeconds = defaults.DefaultTimeoutSeconds;
         _defaultAvdName = defaults.DefaultAvdName;
@@ -309,6 +351,7 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         LoadAvailableCategories();
         RefreshAndroidSdkStatus();
         _ = RefreshDeviceStatusAsync();
+        _deviceStatusTimer.Start();
 
         // Az Élő kijelző ablak a nézet betöltésekor automatikusan megnyílik.
         OpenMirrorWindow();
@@ -349,8 +392,9 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
     /// A NavigationService hívja meg, mielőtt ezt a ViewModel-t lecseréli egy másikra
     /// (pl. a felhasználó egy másik oldalra navigál). A MobileTestViewModel Singleton,
     /// tehát ugyanaz a példány marad meg — itt csak azt kell leállítani, ami zavaró
-    /// lenne, amíg a felhasználó másik oldalon van: a háttérben futó mirror-timert,
-    /// és el kell rejteni a mirror-ablakot, hogy ne látszódjon feleslegesen.
+    /// lenne, amíg a felhasználó másik oldalon van: a háttérben futó mirror- és
+    /// eszközállapot-timert, és el kell rejteni a mirror-ablakot, hogy ne látszódjon
+    /// feleslegesen.
     /// FONTOS: nem iratkozunk le a Closed eseményről itt — mivel ez a ViewModel
     /// Singleton, a konstruktorban történő feliratkozás egyszeri és végleges kell
     /// legyen; egy itteni leiratkozás visszavonhatatlanul megszüntetné a Closed
@@ -359,6 +403,7 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
     public void OnNavigatedFrom()
     {
         _mirrorTimer.Stop();
+        _deviceStatusTimer.Stop();
         _mirrorWindowService.Hide();
     }
 
@@ -367,9 +412,11 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
     // ===================== ÉLŐ KIJELZŐ-TÜKRÖZÉS =====================
     // A régi DeviceDisplayManager egy sosem írt fájlt (device_screen.png) figyelt —
     // itt ténylegesen az Appium driver ad vissza egy valódi PNG-t minden ütemben.
+    // Session nélkül (LaunchApp előtt) az adb-alapú TryGetScreenshotViaAdbAsync veszi
+    // át a szerepet, amíg csak csatlakoztatott eszköz van, aktív Appium-session nincs.
 
     [RelayCommand]
-    private void ToggleMirroring()
+    private async Task ToggleMirroring()
     {
         if (IsMirroring)
         {
@@ -379,8 +426,11 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         }
 
         if (!_driver.IsRunning)
+            await RefreshDeviceStatusAsync();
+
+        if (!_driver.IsRunning && !IsDeviceConnected)
         {
-            _notificationService.Show("Nincs aktív session — indíts előbb egy alkalmazást (LaunchApp).", NotificationType.Warning);
+            _notificationService.Show("Nincs csatlakoztatott eszköz és nincs aktív session sem.", NotificationType.Warning);
             return;
         }
 
@@ -390,14 +440,23 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
 
     private async Task RefreshScreenAsync()
     {
-        if (!_driver.IsRunning)
+        byte[]? bytes;
+
+        if (_driver.IsRunning)
+        {
+            bytes = await _driver.TryGetScreenshotAsync();
+        }
+        else if (IsDeviceConnected)
+        {
+            bytes = await _driver.TryGetScreenshotViaAdbAsync();
+        }
+        else
         {
             _mirrorTimer.Stop();
             IsMirroring = false;
             return;
         }
 
-        var bytes = await _driver.TryGetScreenshotAsync();
         if (bytes is null)
             return; // átmeneti hiba - egy frame-et kihagyunk, nem szakítjuk meg a tükrözést
 
@@ -447,6 +506,11 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
             LocatorType = NewLocatorType,
             Value = NewValue,
             TimeoutSeconds = NewTimeoutSeconds,
+            ElementIndex = string.IsNullOrWhiteSpace(NewElementIndex) ? null
+                : (int.TryParse(NewElementIndex, out var parsedIndex) ? parsedIndex : null),
+            RetryCount = Math.Max(0, NewRetryCount),
+            FallbackLocator = string.IsNullOrWhiteSpace(NewFallbackLocator) ? null : NewFallbackLocator,
+            FallbackLocatorType = NewFallbackLocatorType,
             ContinueOnError = NewContinueOnError,
             Skip = NewSkip,
             Label = string.IsNullOrWhiteSpace(NewLabel)
@@ -482,6 +546,10 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         NewLocator = row.Step.Locator ?? string.Empty;
         NewValue = row.Step.Value ?? string.Empty;
         NewTimeoutSeconds = row.Step.TimeoutSeconds;
+        NewElementIndex = row.Step.ElementIndex?.ToString() ?? "";
+        NewRetryCount = row.Step.RetryCount;
+        NewFallbackLocator = row.Step.FallbackLocator ?? string.Empty;
+        NewFallbackLocatorType = row.Step.FallbackLocatorType;
         NewContinueOnError = row.Step.ContinueOnError;
         NewSkip = row.Step.Skip;
         NewLabel = row.Step.Label;
@@ -504,6 +572,10 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         NewLocator = string.Empty;
         NewValue = string.Empty;
         NewTimeoutSeconds = _defaultTimeoutSeconds;
+        NewElementIndex = "";
+        NewRetryCount = 0;
+        NewFallbackLocator = "";
+        NewFallbackLocatorType = LocatorType.Id;
         NewContinueOnError = false;
         NewSkip = false;
         NewLabel = "";
@@ -725,34 +797,74 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
                 var stopwatch = Stopwatch.StartNew();
                 bool wasSuccess;
 
-                try
+                // A RetryCount 0 esetén pontosan 1 kísérletet jelent (a régi viselkedéssel
+                // megegyezően) — maxAttempts = RetryCount + 1. A ciklus csak akkor dob
+                // tovább/jelöl Failed-nek, ha az UTOLSÓ kísérlet is elhasal; a köztes
+                // sikertelen kísérletek csendben, egy figyelmeztető toast-tal jeleznek,
+                // és azonnal újrapróbálkoznak (a stopwatch a teljes, összes kísérletet
+                // átfogó időt méri, hogy a riportban lásd, mennyi ideig "küzdött" a lépés).
+                var maxAttempts = Math.Max(1, row.Step.RetryCount + 1);
+                var attempt = 0;
+                string? lastErrorMessage = null;
+
+                while (true)
                 {
-                    var result = await _driver.ExecuteStepAsync(row.Step);
-                    stopwatch.Stop();
-                    row.Duration = stopwatch.Elapsed;
-                    row.Status = TestStatus.Passed;
-                    await CaptureScreenshotIfNeededAsync(row, isFailure: false);
-                    wasSuccess = true;
+                    attempt++;
+                    try
+                    {
+                        var result = await _driver.ExecuteStepAsync(row.Step);
+                        stopwatch.Stop();
+                        row.Duration = stopwatch.Elapsed;
+                        row.Status = TestStatus.Passed;
+                        await CaptureScreenshotIfNeededAsync(row, isFailure: false);
+                        wasSuccess = true;
 
-                    if (!string.IsNullOrEmpty(result))
-                        _notificationService.Show($"{row.Step.Name} → {result}", NotificationType.Info);
-                }
-                catch (Exception ex)
-                {
-                    stopwatch.Stop();
-                    row.Duration = stopwatch.Elapsed;
-                    row.Status = TestStatus.Failed;
-                    row.Message = ex.Message;
+                        if (!string.IsNullOrEmpty(result))
+                            _notificationService.Show($"{row.Step.Name} → {result}", NotificationType.Info);
 
-                    // A hiba pontos szövegét (pl. "Nem található Android SDK...") a toast
-                    // is megkapja, nem csak a lépés-sor alatti, könnyen elnézhető apró
-                    // szöveg — enélkül a felhasználó csak annyit látna, hogy "Lépés
-                    // sikertelen", a tényleges, cselekvésre ösztönző okot meg kellene
-                    // keresnie a lépéslistában.
-                    _notificationService.Show($"Lépés sikertelen: {row.Step.Name} — {ex.Message}", NotificationType.Error);
+                        if (attempt > 1)
+                            _notificationService.Show($"{row.Step.Name} — sikerült a(z) {attempt}. próbálkozásra.", NotificationType.Info);
 
-                    await CaptureScreenshotIfNeededAsync(row, isFailure: true);
-                    wasSuccess = false;
+                        // "Self-healing" jelzés — az elsődleges lokátor nem volt megtalálható,
+                        // de a tartalék igen. Ez akkor is fut, ha attempt == 1 (első próbálkozásra
+                        // is a fallback találta meg), mert ez a driver oldali, nem a retry oldali
+                        // jelzés — érdemes frissíteni az elsődleges lokátort a lépésben.
+                        if (_driver.LastStepUsedFallbackLocator)
+                            _notificationService.Show($"{row.Step.Name} — az elsődleges lokátor nem volt megtalálható, a tartalék lokátorral sikerült. Érdemes frissíteni az elsődleges lokátort.", NotificationType.Warning);
+
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        lastErrorMessage = ex.Message;
+
+                        if (attempt < maxAttempts)
+                        {
+                            _notificationService.Show(
+                                $"{row.Step.Name} — {attempt}. próbálkozás sikertelen ({ex.Message}), újrapróbálás ({maxAttempts - attempt} van hátra)…",
+                                NotificationType.Warning);
+                            await Task.Delay(300);
+                            continue;
+                        }
+
+                        stopwatch.Stop();
+                        row.Duration = stopwatch.Elapsed;
+                        row.Status = TestStatus.Failed;
+                        row.Message = attempt > 1 ? $"{lastErrorMessage} ({attempt} próbálkozás után)" : lastErrorMessage;
+
+                        // A hiba pontos szövegét (pl. "Nem található Android SDK...") a toast
+                        // is megkapja, nem csak a lépés-sor alatti, könnyen elnézhető apró
+                        // szöveg — enélkül a felhasználó csak annyit látna, hogy "Lépés
+                        // sikertelen", a tényleges, cselekvésre ösztönző okot meg kellene
+                        // keresnie a lépéslistában.
+                        _notificationService.Show(
+                            $"Lépés sikertelen: {row.Step.Name} — {ex.Message}" + (attempt > 1 ? $" ({attempt} próbálkozás után)" : ""),
+                            NotificationType.Error);
+
+                        await CaptureScreenshotIfNeededAsync(row, isFailure: true);
+                        wasSuccess = false;
+                        break;
+                    }
                 }
 
                 var nextIndex = AT.Infrastructure.StepFlowResolver.ResolveNextIndex(
@@ -988,11 +1100,14 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
     }
 
     [RelayCommand]
-    private void TogglePicking()
+    private async Task TogglePicking()
     {
         if (!_driver.IsRunning)
+            await RefreshDeviceStatusAsync();
+
+        if (!_driver.IsRunning && !IsDeviceConnected)
         {
-            _notificationService.Show("Nincs aktív session — indíts előbb egy LaunchApp lépést, majd kapcsold be a tükrözést.", NotificationType.Warning);
+            _notificationService.Show("Nincs csatlakoztatott eszköz és nincs aktív session sem.", NotificationType.Warning);
             return;
         }
 
@@ -1001,16 +1116,20 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         OnPropertyChanged(nameof(HasInspectorResult));
 
         if (IsPicking && !IsMirroring)
-            ToggleMirroring();
+            await ToggleMirroring();
     }
 
-    /// <summary>Az élő kijelző képére kattintva hívja a code-behind (relatív, 0..1 koordinátával).</summary>
+    /// <summary>Az élő kijelző képére kattintva hívja a code-behind (relatív, 0..1 koordinátával).
+    /// Aktív Appium-session esetén az Appium PageSource-t, egyébként (session nélkül, csak
+    /// csatlakoztatott eszközzel) a közvetlen adb-alapú uiautomator dump-ot használja.</summary>
     public async Task CaptureElementAtAsync(double relativeX, double relativeY)
     {
         if (!IsPicking || relativeX is < 0 or > 1 || relativeY is < 0 or > 1)
             return;
 
-        var info = await _driver.GetElementAtRelativePointAsync(relativeX, relativeY);
+        var info = _driver.IsRunning
+            ? await _driver.GetElementAtRelativePointAsync(relativeX, relativeY)
+            : await _driver.GetElementAtRelativePointViaAdbAsync(relativeX, relativeY);
 
         InspectorCandidates.Clear();
 
@@ -1021,9 +1140,9 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
             return;
         }
 
-        AddInspectorCandidate(LocatorType.Id, "resource-id", info.ResourceId);
-        AddInspectorCandidate(LocatorType.AccessibilityId, "content-desc", info.ContentDesc);
-        AddInspectorCandidate(LocatorType.ClassName, "class", info.ClassName);
+        AddInspectorCandidate(LocatorType.Id, "resource-id", info.ResourceId, info.ResourceIdMatchIndex, info.ResourceIdMatchCount);
+        AddInspectorCandidate(LocatorType.AccessibilityId, "content-desc", info.ContentDesc, info.ContentDescMatchIndex, info.ContentDescMatchCount);
+        AddInspectorCandidate(LocatorType.ClassName, "class", info.ClassName, info.ClassNameMatchIndex, info.ClassNameMatchCount);
 
         OnPropertyChanged(nameof(HasInspectorResult));
 
@@ -1031,10 +1150,25 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
             _notificationService.Show("Az elemnek nincs használható azonosítója.", NotificationType.Warning);
     }
 
-    private void AddInspectorCandidate(LocatorType type, string label, string? value)
+    /// <summary>matchCount &gt; 1 esetén a Label-hez hozzáfűzi a "lokátor N. eleme (összesen M)"
+    /// jelzést,
+    /// és a jelöltbe belekerül a MatchIndex/MatchCount is — ez adja meg a felhasználónak
+    /// (és a lépésbe automatikusan beillesztve az ElementIndex-et), hányadik egyező
+    /// elemre kattintott, amikor a lokátor nem egyedi.</summary>
+    private void AddInspectorCandidate(LocatorType type, string label, string? value, int matchIndex = 0, int matchCount = 0)
     {
-        if (!string.IsNullOrWhiteSpace(value))
-            InspectorCandidates.Add(new LocatorCandidate { Type = type, Label = label, Value = value });
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        var suffix = matchCount > 1 ? $" — lokátor {matchIndex}. eleme (összesen {matchCount})" : "";
+        InspectorCandidates.Add(new LocatorCandidate
+        {
+            Type = type,
+            Label = label + suffix,
+            Value = value,
+            MatchIndex = matchCount > 1 ? matchIndex : null,
+            MatchCount = matchCount > 1 ? matchCount : null
+        });
     }
 
     [RelayCommand]
@@ -1045,10 +1179,13 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
 
         NewLocatorType = candidate.Type;
         NewLocator = candidate.Value;
+        NewElementIndex = candidate.MatchIndex?.ToString() ?? "";
         InspectorCandidates.Clear();
         OnPropertyChanged(nameof(HasInspectorResult));
         IsPicking = false;
-        _notificationService.Show("Lokátor beillesztve az elem-keresőből.", NotificationType.Success);
+
+        var indexNote = candidate.MatchIndex.HasValue ? $" (elem sorszáma: {candidate.MatchIndex})" : "";
+        _notificationService.Show($"Lokátor beillesztve az elem-keresőből{indexNote}.", NotificationType.Success);
     }
 
     [RelayCommand]

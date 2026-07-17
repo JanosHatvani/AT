@@ -20,6 +20,7 @@
         <Setter Property="Foreground" Value="{StaticResource Brush.TextSecondary}" />
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
+        
 
     <!-- ===================== OLDALSÁV NAV GOMB ===================== -->
     <!-- IsEnabled=False jelöli az aktív / kiválasztott menüpontot (nem szürkül, accent színt kap) -->
@@ -224,6 +225,8 @@
             </Setter.Value>
         </Setter>
     </Style>
+    
+    
 
     <!-- ===================== COMBOBOX (alapértelmezett, minden ComboBox-ra vonatkozik) ===================== -->
 

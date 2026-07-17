@@ -102,6 +102,23 @@ public sealed partial class WebTestViewModel : ObservableObject
     [ObservableProperty]
     private int newTimeoutSeconds = 10;
 
+    // Ha a lokátor több elemre is illik (pl. egy táblázat/lista minden sorában ugyanaz
+    // az Id/Name/ClassName ismétlődik), ez adja meg, hányadik találattal dolgozzon a
+    // lépés — 1-alapú, EMBERI számozás (1 = első elem) — üresen az első találat.
+    [ObservableProperty]
+    private string newElementIndex = "";
+
+    // Hiba esetén ennyiszer próbálja újra a lépést — lásd TestStep.RetryCount.
+    [ObservableProperty]
+    private int newRetryCount;
+
+    // "Self-healing" tartalék lokátor — lásd TestStep.FallbackLocator.
+    [ObservableProperty]
+    private string newFallbackLocator = "";
+
+    [ObservableProperty]
+    private LocatorType newFallbackLocatorType = LocatorType.Id;
+
     // Ha be van jelölve, a lépés hibája NEM szakítja meg a futtatást
     [ObservableProperty]
     private bool newContinueOnError;
@@ -226,6 +243,11 @@ public sealed partial class WebTestViewModel : ObservableObject
             TargetLocatorType = NewTargetLocatorType,
             Value = NewValue,
             TimeoutSeconds = NewTimeoutSeconds,
+            ElementIndex = string.IsNullOrWhiteSpace(NewElementIndex) ? null
+                : (int.TryParse(NewElementIndex, out var parsedIndex) ? parsedIndex : null),
+            RetryCount = Math.Max(0, NewRetryCount),
+            FallbackLocator = string.IsNullOrWhiteSpace(NewFallbackLocator) ? null : NewFallbackLocator,
+            FallbackLocatorType = NewFallbackLocatorType,
             ContinueOnError = NewContinueOnError,
             Skip = NewSkip,
             Label = string.IsNullOrWhiteSpace(NewLabel)
@@ -263,6 +285,10 @@ public sealed partial class WebTestViewModel : ObservableObject
         NewTargetLocator = row.Step.TargetLocator ?? string.Empty;
         NewValue = row.Step.Value ?? string.Empty;
         NewTimeoutSeconds = row.Step.TimeoutSeconds;
+        NewElementIndex = row.Step.ElementIndex?.ToString() ?? "";
+        NewRetryCount = row.Step.RetryCount;
+        NewFallbackLocator = row.Step.FallbackLocator ?? string.Empty;
+        NewFallbackLocatorType = row.Step.FallbackLocatorType;
         NewContinueOnError = row.Step.ContinueOnError;
         NewSkip = row.Step.Skip;
         NewLabel = row.Step.Label;
@@ -283,6 +309,10 @@ public sealed partial class WebTestViewModel : ObservableObject
         NewTargetLocator = string.Empty;
         NewValue = string.Empty;
         NewTimeoutSeconds = _defaultTimeoutSeconds;
+        NewElementIndex = "";
+        NewRetryCount = 0;
+        NewFallbackLocator = "";
+        NewFallbackLocatorType = LocatorType.Id;
         NewContinueOnError = false;
         NewSkip = false;
         NewLabel = "";
@@ -493,24 +523,54 @@ public sealed partial class WebTestViewModel : ObservableObject
                 var stopwatch = Stopwatch.StartNew();
                 bool wasSuccess;
 
-                try
+                var maxAttempts = Math.Max(1, row.Step.RetryCount + 1);
+                var attempt = 0;
+                string? lastErrorMessage = null;
+
+                while (true)
                 {
-                    await _driver.ExecuteStepAsync(row.Step);
-                    stopwatch.Stop();
-                    row.Duration = stopwatch.Elapsed;
-                    row.Status = TestStatus.Passed;
-                    await CaptureScreenshotIfNeededAsync(row, isFailure: false);
-                    wasSuccess = true;
-                }
-                catch (Exception ex)
-                {
-                    stopwatch.Stop();
-                    row.Duration = stopwatch.Elapsed;
-                    row.Status = TestStatus.Failed;
-                    row.Message = ex.Message;
-                    _notificationService.Show($"Lépés sikertelen: {row.Step.Name}", NotificationType.Error);
-                    await CaptureScreenshotIfNeededAsync(row, isFailure: true);
-                    wasSuccess = false;
+                    attempt++;
+                    try
+                    {
+                        await _driver.ExecuteStepAsync(row.Step);
+                        stopwatch.Stop();
+                        row.Duration = stopwatch.Elapsed;
+                        row.Status = TestStatus.Passed;
+                        await CaptureScreenshotIfNeededAsync(row, isFailure: false);
+                        wasSuccess = true;
+
+                        if (attempt > 1)
+                            _notificationService.Show($"{row.Step.Name} — sikerült a(z) {attempt}. próbálkozásra.", NotificationType.Info);
+
+                        if (_driver.LastStepUsedFallbackLocator)
+                            _notificationService.Show($"{row.Step.Name} — az elsődleges lokátor nem volt megtalálható, a tartalék lokátorral sikerült. Érdemes frissíteni az elsődleges lokátort.", NotificationType.Warning);
+
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        lastErrorMessage = ex.Message;
+
+                        if (attempt < maxAttempts)
+                        {
+                            _notificationService.Show(
+                                $"{row.Step.Name} — {attempt}. próbálkozás sikertelen ({ex.Message}), újrapróbálás ({maxAttempts - attempt} van hátra)…",
+                                NotificationType.Warning);
+                            await Task.Delay(300);
+                            continue;
+                        }
+
+                        stopwatch.Stop();
+                        row.Duration = stopwatch.Elapsed;
+                        row.Status = TestStatus.Failed;
+                        row.Message = attempt > 1 ? $"{lastErrorMessage} ({attempt} próbálkozás után)" : lastErrorMessage;
+                        _notificationService.Show(
+                            $"Lépés sikertelen: {row.Step.Name}" + (attempt > 1 ? $" ({attempt} próbálkozás után)" : ""),
+                            NotificationType.Error);
+                        await CaptureScreenshotIfNeededAsync(row, isFailure: true);
+                        wasSuccess = false;
+                        break;
+                    }
                 }
 
                 var nextIndex = AT.Infrastructure.StepFlowResolver.ResolveNextIndex(
@@ -541,7 +601,7 @@ public sealed partial class WebTestViewModel : ObservableObject
         finally
         {
             IsRunning = false;
-            
+
             RunStepsCommand.NotifyCanExecuteChanged();
 
             _schedulerService.SetModuleBusy(AutomationTarget.Web, false);
@@ -755,13 +815,33 @@ public sealed partial class WebTestViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenElementFinderAsync()
     {
-        await _driver.StartAsync();
+        // Ha már fut egy session (akár egy korábbi Futtatás-tól, akár egy korábbi
+        // Elem-kereső-megnyitástól), egyszerűen azt használjuk — nem indítunk/
+        // csatlakozunk semmi újhoz. Ha nincs aktív session, CSATLAKOZUNK egy már
+        // megnyitott (vagy egyszeri alkalommal, most elindított) böngészőhöz,
+        // ahelyett hogy egy külön, kizárólag automatizálásra szánt új példányt
+        // nyitnánk — lásd AttachToRunningBrowserAsync dokumentációját.
+        if (!_driver.IsRunning)
+        {
+            try
+            {
+                await _driver.AttachToRunningBrowserAsync();
+            }
+            catch (Exception ex)
+            {
+                _notificationService.Show($"Nem sikerült csatlakozni a böngészőhöz: {ex.Message}", NotificationType.Error);
+                return;
+            }
+        }
 
-        var window = new AT.App.Views.InspectorWindow(null, _driver, AT.App.ViewModels.InspectorPlatform.Web, (type, value) =>
+        var window = new AT.App.Views.InspectorWindow(null, _driver, AT.App.ViewModels.InspectorPlatform.Web, (type, value, matchIndex) =>
         {
             NewLocatorType = type;
             NewLocator = value;
-            _notificationService.Show("Lokátor beillesztve az elem-keresőből.", NotificationType.Success);
+            NewElementIndex = matchIndex?.ToString() ?? "";
+
+            var indexNote = matchIndex.HasValue ? $" (elem sorszáma: {matchIndex})" : "";
+            _notificationService.Show($"Lokátor beillesztve az elem-keresőből{indexNote}.", NotificationType.Success);
         });
 
         window.Show();

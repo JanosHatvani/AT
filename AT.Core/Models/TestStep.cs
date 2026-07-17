@@ -34,6 +34,14 @@ public sealed class TestStep
     public string? TargetLocator { get; set; }
     public LocatorType TargetLocatorType { get; set; } = LocatorType.Id;
 
+    /// <summary>
+    /// Ha a lokátor több elemre is illik (pl. egy lista minden sorában ugyanaz az
+    /// AutomationId/Id/Name/ClassName ismétlődik), ez választja ki, hányadik találattal
+    /// dolgozzon a lépés — 1-alapú, EMBERI számozás (1 = első elem, 2 = második, stb.).
+    /// Null vagy 1 esetén az első találat.
+    /// </summary>
+    public int? ElementIndex { get; set; }
+
     public int TimeoutSeconds { get; set; } = 10;
 
     /// <summary>Ha true, a lépés hibája nem szakítja meg a futtatást — a lista folytatódik.</summary>
@@ -50,6 +58,18 @@ public sealed class TestStep
     /// (lassú betöltés, animáció, hálózati késés), és a retry ezekre ad esélyt.
     /// </summary>
     public int RetryCount { get; set; } = 0;
+
+    /// <summary>
+    /// "Self-healing" tartalék lokátor — ha az elsődleges (Locator/LocatorType) a
+    /// Timeout-on belül nem található, a driver EZZEL próbálkozik újra, mielőtt hibásnak
+    /// jelölné a lépést. Hasznos, ha egy fejlesztő átnevezett egy AutomationId-t/
+    /// resource-id-t/Id-t, és nem szeretnéd emiatt azonnal újra felvenni (vagy manuálisan
+    /// javítani) az összes érintett tesztlépést — elég egy második, alternatív lokátort
+    /// megadni ugyanahhoz az elemhez (pl. Name vagy XPath alapján). Null/üres esetén a
+    /// viselkedés változatlan: csak az elsődleges lokátorral próbálkozik.
+    /// </summary>
+    public string? FallbackLocator { get; set; }
+    public LocatorType FallbackLocatorType { get; set; } = LocatorType.Id;
 
     /// <summary>
     /// A lépés saját, egyedi azonosító címkéje — más lépések ezt hivatkozzák ugrás

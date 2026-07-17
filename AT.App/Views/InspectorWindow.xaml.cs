@@ -17,7 +17,7 @@ public partial class InspectorWindow : Window
         DesktopAutomationDriver? desktopDriver,
         WebAutomationDriver? webDriver,
         InspectorPlatform initialPlatform,
-        Action<LocatorType, string> onChosen)
+        Action<LocatorType, string, int?> onChosen)
     {
         InitializeComponent();
         DataContext = new InspectorWindowViewModel(desktopDriver, webDriver, initialPlatform, onChosen);
@@ -38,5 +38,20 @@ public partial class InspectorWindow : Window
             DragMove();
     }
 
-    private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+    private async void CloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is InspectorWindowViewModel viewModel)
+            await viewModel.HandleWindowClosingAsync();
+
+        Close();
+    }
+
+    /// <summary>A címsor natív ✕ gombja (vagy Alt+F4) is a Window Closing eseményén
+    /// keresztül fut, nem a CloseButton_Click-en — enélkül csak a "Bezárás" gomb zárná
+    /// le rendesen a böngésző-session-t, az X gomb "csendben" hagyná futni a háttérben.</summary>
+    private async void InspectorWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (DataContext is InspectorWindowViewModel viewModel)
+            await viewModel.HandleWindowClosingAsync();
+    }
 }

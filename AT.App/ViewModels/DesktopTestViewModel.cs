@@ -99,6 +99,23 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     [ObservableProperty]
     private int newTimeoutSeconds = 10;
 
+    // Ha a lokátor több elemre is illik (pl. egy lista/rács minden sorában ugyanaz az
+    // AutomationId/Name/ClassName ismétlődik), ez adja meg, hányadik találattal
+    // dolgozzon a lépés — 1-alapú, EMBERI számozás (1 = első elem) — üresen az első találat.
+    [ObservableProperty]
+    private string newElementIndex = "";
+
+    // Hiba esetén ennyiszer próbálja újra a lépést — lásd TestStep.RetryCount.
+    [ObservableProperty]
+    private int newRetryCount;
+
+    // "Self-healing" tartalék lokátor — lásd TestStep.FallbackLocator.
+    [ObservableProperty]
+    private string newFallbackLocator = "";
+
+    [ObservableProperty]
+    private LocatorType newFallbackLocatorType = LocatorType.Id;
+
     // Ha be van jelölve, a lépés hibája NEM szakítja meg a futtatást.
     [ObservableProperty]
     private bool newContinueOnError;
@@ -227,6 +244,11 @@ public sealed partial class DesktopTestViewModel : ObservableObject
             TargetLocatorType = NewTargetLocatorType,
             Value = NewValue,
             TimeoutSeconds = NewTimeoutSeconds,
+            ElementIndex = string.IsNullOrWhiteSpace(NewElementIndex) ? null
+                : (int.TryParse(NewElementIndex, out var parsedIndex) ? parsedIndex : null),
+            RetryCount = Math.Max(0, NewRetryCount),
+            FallbackLocator = string.IsNullOrWhiteSpace(NewFallbackLocator) ? null : NewFallbackLocator,
+            FallbackLocatorType = NewFallbackLocatorType,
             ContinueOnError = NewContinueOnError,
             Skip = NewSkip,
             Label = string.IsNullOrWhiteSpace(NewLabel)
@@ -264,6 +286,10 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         NewTargetLocator = row.Step.TargetLocator ?? string.Empty;
         NewValue = row.Step.Value ?? string.Empty;
         NewTimeoutSeconds = row.Step.TimeoutSeconds;
+        NewElementIndex = row.Step.ElementIndex?.ToString() ?? "";
+        NewRetryCount = row.Step.RetryCount;
+        NewFallbackLocator = row.Step.FallbackLocator ?? string.Empty;
+        NewFallbackLocatorType = row.Step.FallbackLocatorType;
         NewContinueOnError = row.Step.ContinueOnError;
         NewSkip = row.Step.Skip;
         NewLabel = row.Step.Label;
@@ -284,6 +310,10 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         NewTargetLocator = string.Empty;
         NewValue = string.Empty;
         NewTimeoutSeconds = _defaultTimeoutSeconds;
+        NewElementIndex = "";
+        NewRetryCount = 0;
+        NewFallbackLocator = "";
+        NewFallbackLocatorType = LocatorType.Id;
         NewContinueOnError = false;
         NewSkip = false;
         NewLabel = "";
@@ -488,27 +518,57 @@ public sealed partial class DesktopTestViewModel : ObservableObject
                 var stopwatch = Stopwatch.StartNew();
                 bool wasSuccess;
 
-                try
-                {
-                    var result = await _driver.ExecuteStepAsync(row.Step);
-                    stopwatch.Stop();
-                    row.Duration = stopwatch.Elapsed;
-                    row.Status = TestStatus.Passed;
-                    await CaptureScreenshotIfNeededAsync(row, isFailure: false);
-                    wasSuccess = true;
+                var maxAttempts = Math.Max(1, row.Step.RetryCount + 1);
+                var attempt = 0;
+                string? lastErrorMessage = null;
 
-                    if (!string.IsNullOrEmpty(result))
-                        _notificationService.Show($"{row.Step.Name} → {result}", NotificationType.Info);
-                }
-                catch (Exception ex)
+                while (true)
                 {
-                    stopwatch.Stop();
-                    row.Duration = stopwatch.Elapsed;
-                    row.Status = TestStatus.Failed;
-                    row.Message = ex.Message;
-                    _notificationService.Show($"Lépés sikertelen: {row.Step.Name}", NotificationType.Error);
-                    await CaptureScreenshotIfNeededAsync(row, isFailure: true);
-                    wasSuccess = false;
+                    attempt++;
+                    try
+                    {
+                        var result = await _driver.ExecuteStepAsync(row.Step);
+                        stopwatch.Stop();
+                        row.Duration = stopwatch.Elapsed;
+                        row.Status = TestStatus.Passed;
+                        await CaptureScreenshotIfNeededAsync(row, isFailure: false);
+                        wasSuccess = true;
+
+                        if (!string.IsNullOrEmpty(result))
+                            _notificationService.Show($"{row.Step.Name} → {result}", NotificationType.Info);
+
+                        if (attempt > 1)
+                            _notificationService.Show($"{row.Step.Name} — sikerült a(z) {attempt}. próbálkozásra.", NotificationType.Info);
+
+                        if (_driver.LastStepUsedFallbackLocator)
+                            _notificationService.Show($"{row.Step.Name} — az elsődleges lokátor nem volt megtalálható, a tartalék lokátorral sikerült. Érdemes frissíteni az elsődleges lokátort.", NotificationType.Warning);
+
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        lastErrorMessage = ex.Message;
+
+                        if (attempt < maxAttempts)
+                        {
+                            _notificationService.Show(
+                                $"{row.Step.Name} — {attempt}. próbálkozás sikertelen ({ex.Message}), újrapróbálás ({maxAttempts - attempt} van hátra)…",
+                                NotificationType.Warning);
+                            await Task.Delay(300);
+                            continue;
+                        }
+
+                        stopwatch.Stop();
+                        row.Duration = stopwatch.Elapsed;
+                        row.Status = TestStatus.Failed;
+                        row.Message = attempt > 1 ? $"{lastErrorMessage} ({attempt} próbálkozás után)" : lastErrorMessage;
+                        _notificationService.Show(
+                            $"Lépés sikertelen: {row.Step.Name}" + (attempt > 1 ? $" ({attempt} próbálkozás után)" : ""),
+                            NotificationType.Error);
+                        await CaptureScreenshotIfNeededAsync(row, isFailure: true);
+                        wasSuccess = false;
+                        break;
+                    }
                 }
 
                 var nextIndex = AT.Infrastructure.StepFlowResolver.ResolveNextIndex(
@@ -749,11 +809,14 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     {
         await _driver.StartAsync();
 
-        var window = new AT.App.Views.InspectorWindow(_driver, null, AT.App.ViewModels.InspectorPlatform.Desktop, (type, value) =>
+        var window = new AT.App.Views.InspectorWindow(_driver, null, AT.App.ViewModels.InspectorPlatform.Desktop, (type, value, matchIndex) =>
         {
             NewLocatorType = type;
             NewLocator = value;
-            _notificationService.Show("Lokátor beillesztve az elem-keresőből.", NotificationType.Success);
+            NewElementIndex = matchIndex?.ToString() ?? "";
+
+            var indexNote = matchIndex.HasValue ? $" (elem sorszáma: {matchIndex})" : "";
+            _notificationService.Show($"Lokátor beillesztve az elem-keresőből{indexNote}.", NotificationType.Success);
         });
 
         window.Show();

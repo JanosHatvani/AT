@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:conv="clr-namespace:AT.App.Converters"
         Title="Elem-kereső"
-        Width="460"
+        Width="560"
         AllowsTransparency="True"
         Background="Transparent"
         ShowActivated="False"
@@ -12,7 +12,8 @@
         WindowStyle="None"
         ResizeMode="CanResize"
         SizeToContent="Height"
-        WindowStartupLocation="Manual">
+        WindowStartupLocation="Manual"
+        Closing="InspectorWindow_Closing">
 
     <Border Style="{StaticResource CardStyle}" Padding="0">
         <StackPanel>
@@ -68,19 +69,18 @@
                                 <Border BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,0,1" Padding="0,8">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="100" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
-                                        <TextBlock Grid.Column="0" Text="{Binding Label}" FontWeight="SemiBold"
-                                                   VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Value}" Style="{StaticResource SubtleTextStyle}"
+                                                       TextWrapping="Wrap" Margin="0,2,0,0" />
+                                        </StackPanel>
 
-                                        <TextBlock Grid.Column="1" Text="{Binding Value}" VerticalAlignment="Center"
-                                                   Margin="8,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Value}" />
-
-                                        <Button Grid.Column="2" Content="Használat" Style="{StaticResource GhostButtonStyle}"
-                                                Padding="12,5"
+                                        <Button Grid.Column="1" Content="Használat" Style="{StaticResource GhostButtonStyle}"
+                                                VerticalAlignment="Center" Padding="12,5"
                                                 Command="{Binding DataContext.UseCandidateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}" />
                                     </Grid>

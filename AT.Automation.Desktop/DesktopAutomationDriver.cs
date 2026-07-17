@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Linq;
 using System.Runtime.InteropServices;
 using AT.Core.Contracts;
 using AT.Core.Models;
@@ -23,10 +25,26 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
     private Application? _app;
     private Window? _mainWindow;
 
+    /// <summary>Igaz, ha a jelenlegi alkalmazás-folyamatot MI MAGUNK indítottuk (a
+    /// NavigateAsync/LaunchApp lépés indította el, mert a folyamat még nem futott) — ha
+    /// hamis, egy MÁR KORÁBBAN futó, hozzá csatlakoztatott folyamatról van szó (akár az
+    /// AttachOrLaunch csatlakozott hozzá, akár az AttachToWindowAsync). Ez dönti el, hogy
+    /// a StopAsync/Dispose ténylegesen bezárja-e az alkalmazást — egy már korábban is
+    /// futó, csatlakoztatott programot SOSEM zárunk be automatikusan, csak leválasztjuk
+    /// róla a vezérlést, ugyanúgy, ahogy a Web driver teszi a böngészővel.</summary>
+    private bool _weLaunchedApp;
+
     public string PlatformName => "Desktop";
 
     /// <summary>Igaz, ha van kezelt főablak — akár indított, akár csatolt alkalmazásból.</summary>
     public bool IsRunning => _mainWindow is not null;
+
+    /// <summary>Igaz, ha a LEGUTÓBB végrehajtott lépésnél az elsődleges lokátor nem volt
+    /// megtalálható, és a driver a tartalék (FallbackLocator) lokátorral tudta csak
+    /// megtalálni az elemet — a ViewModel ezt ellenőrzi minden sikeres ExecuteStepAsync
+    /// után, hogy figyelmeztető üzenetet mutasson. Minden ExecuteStepAsync hívás elején
+    /// false-ra áll vissza.</summary>
+    public bool LastStepUsedFallbackLocator { get; private set; }
 
     // ===================== ÉLETCIKLUS =====================
 
@@ -42,34 +60,67 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
     {
         var app = _app;
         var automation = _automation;
+        var shouldCloseApp = _weLaunchedApp;
         _app = null;
         _mainWindow = null;
         _automation = null;
+        _weLaunchedApp = false;
 
         if (app is null && automation is null)
             return Task.CompletedTask;
 
         return Task.Run(() =>
         {
-            try { app?.Close(); } catch { /* ha már bezárták, nem gond */ }
+            if (shouldCloseApp)
+            {
+                // Csak akkor zárjuk be TÉNYLEGESEN az alkalmazást, ha mi magunk
+                // indítottuk — egy már korábban is futó, csatlakoztatott programot
+                // sosem zárunk be automatikusan, csak leválasztjuk róla a vezérlést.
+                try { app?.Close(); } catch { /* ha már bezárták, nem gond */ }
+            }
+
             app?.Dispose();
             automation?.Dispose();
         }, cancellationToken);
     }
 
-    /// <summary>Új alkalmazás indítása .exe elérési út alapján — a "LaunchApp" lépés hívja.</summary>
+    /// <summary>
+    /// Alkalmazás elindítása VAGY egy már futó példányhoz csatlakozás .exe elérési út
+    /// alapján — a "LaunchApp" lépés hívja. A FlaUI AttachOrLaunch metódusa dönti el,
+    /// melyik történjen: ha már fut egy ugyanabból a futtatható fájlból induló folyamat,
+    /// AHHOZ csatlakozik (nem indít egy második, párhuzamos példányt) — ha nem fut,
+    /// elindítja. Ez teszi feleslegessé, hogy a felhasználónak külön kelljen
+    /// eldöntenie/beállítania, hogy az alkalmazás fut-e már a gépen: a "LaunchApp" lépés
+    /// mindkét esetben helyesen viselkedik, anélkül hogy külön "AttachToWindow" lépést
+    /// kellene felvenni a lépéssor elejére.
+    /// </summary>
     public Task NavigateAsync(string target, CancellationToken cancellationToken = default)
     {
         EnsureAutomationReady();
         return Task.Run(() =>
         {
-            _app = Application.Launch(target);
+            // Ezt az AttachOrLaunch HÍVÁS ELŐTT kell megnézni — ha itt már fut egy
+            // ugyanilyen nevű folyamat, azt NEM mi indítottuk, tehát a StopAsync sosem
+            // zárhatja be automatikusan.
+            var processName = Path.GetFileNameWithoutExtension(target);
+            var wasAlreadyRunning = !string.IsNullOrEmpty(processName)
+                && Process.GetProcessesByName(processName).Length > 0;
+
+            _app = Application.AttachOrLaunch(new ProcessStartInfo(target));
+            _weLaunchedApp = !wasAlreadyRunning;
+
             _mainWindow = _app.GetMainWindow(_automation!, TimeSpan.FromSeconds(15))
-                ?? throw new TimeoutException("Az alkalmazás elindult, de a főablak nem jelent meg időben.");
+                ?? throw new TimeoutException(
+                    "Az alkalmazás fut, de a főablak nem jelent meg/nem található időben. " +
+                    "Ha az alkalmazásnak több ablaka van, vagy a fő ablak nem azonnal jelenik meg " +
+                    "(pl. betöltő/splash képernyő után), próbáld az 'AttachToWindow' lépést a pontos " +
+                    "ablakcímmel.");
         }, cancellationToken);
     }
 
-    /// <summary>Csatlakozás egy már futó alkalmazás ablakához cím alapján — a régi StartServiceOnly megfelelője.</summary>
+    /// <summary>Csatlakozás egy már futó alkalmazás ablakához cím alapján — a régi StartServiceOnly megfelelője.
+    /// Ezt sosem zárjuk be automatikusan (lásd _weLaunchedApp), mert ez a lépés kifejezetten
+    /// egy MÁR LÉTEZŐ ablakhoz való csatlakozásra szolgál.</summary>
     public Task AttachToWindowAsync(string windowTitle, CancellationToken cancellationToken = default)
     {
         EnsureAutomationReady();
@@ -80,6 +131,7 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
                 throw new InvalidOperationException($"Nem található ablak ezzel a címmel: {windowTitle}");
 
             _app = null; // nem mi indítottuk, ezért nem is mi zárjuk a folyamatot
+            _weLaunchedApp = false;
             _mainWindow = _automation!.FromHandle(handle).AsWindow();
         }, cancellationToken);
     }
@@ -108,6 +160,8 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
     /// </summary>
     public Task<string?> ExecuteStepAsync(TestStep step, CancellationToken cancellationToken = default)
     {
+        LastStepUsedFallbackLocator = false;
+
         var action = Enum.Parse<DesktopStepAction>(step.Action);
 
         if (action == DesktopStepAction.LaunchApp)
@@ -125,7 +179,27 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
         var window = _mainWindow!;
         var timeout = TimeSpan.FromSeconds(Math.Max(1, step.TimeoutSeconds));
 
-        AutomationElement Element() => FindElement(window, RequireLocator(step.Locator), step.LocatorType, timeout);
+        // A TestStep.ElementIndex 1-alapú, emberi számozású (1 = első elem) — itt váltjuk
+        // 0-alapú tömb-indexre, amit a TryFind/FindAllDescendants(...)[index] vár.
+        var elementIndex = Math.Max(0, (step.ElementIndex ?? 1) - 1);
+
+        // "Self-healing": ha az elsődleges lokátor a Timeout-on belül nem található (a
+        // FindElement itt TimeoutException-t dob, nem WebDriverTimeoutException-t, mert
+        // a FlaUI-alapú Retry.WhileNull manuálisan dobja), és van megadva tartalék
+        // lokátor, azzal próbálkozunk újra, mielőtt hibásnak jelölnénk a lépést.
+        AutomationElement Element()
+        {
+            try
+            {
+                return FindElement(window, RequireLocator(step.Locator), step.LocatorType, timeout, elementIndex);
+            }
+            catch (TimeoutException) when (!string.IsNullOrWhiteSpace(step.FallbackLocator))
+            {
+                var fallbackElement = FindElement(window, step.FallbackLocator!, step.FallbackLocatorType, timeout, elementIndex);
+                LastStepUsedFallbackLocator = true;
+                return fallbackElement;
+            }
+        }
 
         switch (action)
         {
@@ -177,49 +251,49 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
                 return null;
 
             case DesktopStepAction.WaitVisible:
-                RetryOrThrow(() => TryFind(window, RequireLocator(step.Locator), step.LocatorType) is { IsOffscreen: false },
+                RetryOrThrow(() => TryFind(window, RequireLocator(step.Locator), step.LocatorType, elementIndex) is { IsOffscreen: false },
                     timeout, $"Az elem nem lett látható időben: {step.Locator}");
                 return null;
 
             case DesktopStepAction.WaitEnabled:
-                RetryOrThrow(() => TryFind(window, RequireLocator(step.Locator), step.LocatorType) is { IsEnabled: true },
+                RetryOrThrow(() => TryFind(window, RequireLocator(step.Locator), step.LocatorType, elementIndex) is { IsEnabled: true },
                     timeout, $"Az elem nem lett elérhető időben: {step.Locator}");
                 return null;
 
             case DesktopStepAction.WaitClickable:
-                RetryOrThrow(() => TryFind(window, RequireLocator(step.Locator), step.LocatorType) is { IsEnabled: true, IsOffscreen: false },
+                RetryOrThrow(() => TryFind(window, RequireLocator(step.Locator), step.LocatorType, elementIndex) is { IsEnabled: true, IsOffscreen: false },
                     timeout, $"Az elem nem lett kattintható időben: {step.Locator}");
                 return null;
 
             case DesktopStepAction.WaitPresent:
-                RetryOrThrow(() => TryFind(window, RequireLocator(step.Locator), step.LocatorType) is not null,
+                RetryOrThrow(() => TryFind(window, RequireLocator(step.Locator), step.LocatorType, elementIndex) is not null,
                     timeout, $"Az elem nem jelent meg időben: {step.Locator}");
                 return null;
 
             case DesktopStepAction.WaitAbsent:
-                RetryOrThrow(() => TryFind(window, RequireLocator(step.Locator), step.LocatorType) is null,
+                RetryOrThrow(() => TryFind(window, RequireLocator(step.Locator), step.LocatorType, elementIndex) is null,
                     timeout, $"Az elem nem tűnt el időben: {step.Locator}");
                 return null;
 
             case DesktopStepAction.WaitSelected:
-                RetryOrThrow(() => IsSelected(TryFind(window, RequireLocator(step.Locator), step.LocatorType)),
+                RetryOrThrow(() => IsSelected(TryFind(window, RequireLocator(step.Locator), step.LocatorType, elementIndex)),
                     timeout, $"Az elem nem lett kiválasztva időben: {step.Locator}");
                 return null;
 
             case DesktopStepAction.WaitHasText:
-                RetryOrThrow(() => (GetPropertyValue(TryFind(window, RequireLocator(step.Locator), step.LocatorType), "Text") ?? string.Empty)
+                RetryOrThrow(() => (GetPropertyValue(TryFind(window, RequireLocator(step.Locator), step.LocatorType, elementIndex), "Text") ?? string.Empty)
                         .Contains(step.Value ?? string.Empty),
                     timeout, $"Az elem nem kapta meg a várt szöveget: {step.Locator}");
                 return null;
 
             case DesktopStepAction.WaitHasValue:
-                RetryOrThrow(() => (GetPropertyValue(TryFind(window, RequireLocator(step.Locator), step.LocatorType), "Value") ?? string.Empty)
+                RetryOrThrow(() => (GetPropertyValue(TryFind(window, RequireLocator(step.Locator), step.LocatorType, elementIndex), "Value") ?? string.Empty)
                         .Contains(step.Value ?? string.Empty),
                     timeout, $"Az elem nem kapta meg a várt értéket: {step.Locator}");
                 return null;
 
             case DesktopStepAction.WaitHasClass:
-                RetryOrThrow(() => (GetPropertyValue(TryFind(window, RequireLocator(step.Locator), step.LocatorType), "ClassName") ?? string.Empty)
+                RetryOrThrow(() => (GetPropertyValue(TryFind(window, RequireLocator(step.Locator), step.LocatorType, elementIndex), "ClassName") ?? string.Empty)
                         .Contains(step.Value ?? string.Empty),
                     timeout, $"Az elem class-a nem egyezett időben: {step.Locator}");
                 return null;
@@ -227,7 +301,7 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
             case DesktopStepAction.WaitHasAttribute:
                 {
                     var (attr, val) = ParseKeyValue(step.Value);
-                    RetryOrThrow(() => (GetPropertyValue(TryFind(window, RequireLocator(step.Locator), step.LocatorType), attr) ?? string.Empty)
+                    RetryOrThrow(() => (GetPropertyValue(TryFind(window, RequireLocator(step.Locator), step.LocatorType, elementIndex), attr) ?? string.Empty)
                             .Contains(val),
                         timeout, $"Az attribútum nem egyezett időben: {step.Locator} ({attr})");
                     return null;
@@ -347,24 +421,43 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
         return (raw[..idx].Trim(), raw[(idx + 1)..].Trim());
     }
 
-    private static AutomationElement FindElement(Window window, string locator, LocatorType type, TimeSpan timeout)
+    private static AutomationElement FindElement(Window window, string locator, LocatorType type, TimeSpan timeout, int elementIndex = 0)
     {
-        var result = Retry.WhileNull(() => TryFind(window, locator, type), timeout, TimeSpan.FromMilliseconds(250));
-        return result.Result ?? throw new TimeoutException($"Az elem nem található: {locator}");
+        var result = Retry.WhileNull(() => TryFind(window, locator, type, elementIndex), timeout, TimeSpan.FromMilliseconds(250));
+        return result.Result ?? throw new TimeoutException(
+            $"Az elem nem található: {locator}" + (elementIndex > 0 ? $" ({elementIndex + 1}. találat)" : ""));
     }
 
-    private static AutomationElement? TryFind(Window window, string locator, LocatorType type) => type switch
+    /// <summary>elementIndex esetén az összes találatot lekéri (FindAllDescendants), és a
+    /// megadott 0-alapú indexűt adja vissza — XPath-nál ez nem támogatott, mert az XPath
+    /// eleve egyetlen, konkrét elemre mutat, nincs értelme "hányadik találat"-ot kérni rá.</summary>
+    private static AutomationElement? TryFind(Window window, string locator, LocatorType type, int elementIndex = 0)
     {
-        LocatorType.Id => window.FindFirstDescendant(cf => cf.ByAutomationId(locator)),
-        LocatorType.Name => window.FindFirstDescendant(cf => cf.ByName(locator)),
-        LocatorType.ClassName => window.FindFirstDescendant(cf => cf.ByClassName(locator)),
-        LocatorType.XPath => window.FindFirstByXPath(locator),
-        _ => throw new NotSupportedException($"'{type}' lokátor-típus nem támogatott desktop automatizálásnál (Id, Name, ClassName, XPath közül választhatsz).")
-    };
+        if (type == LocatorType.XPath)
+        {
+            if (elementIndex > 0)
+                throw new NotSupportedException("XPath lokátornál nem támogatott az elem-index — az XPath eleve egyetlen elemre mutat.");
+            return window.FindFirstByXPath(locator);
+        }
+
+        var matches = type switch
+        {
+            LocatorType.Id => window.FindAllDescendants(cf => cf.ByAutomationId(locator)),
+            LocatorType.Name => window.FindAllDescendants(cf => cf.ByName(locator)),
+            LocatorType.ClassName => window.FindAllDescendants(cf => cf.ByClassName(locator)),
+            _ => throw new NotSupportedException($"'{type}' lokátor-típus nem támogatott desktop automatizálásnál (Id, Name, ClassName, XPath közül választhatsz).")
+        };
+
+        return elementIndex < matches.Length ? matches[elementIndex] : null;
+    }
 
     public void Dispose()
     {
-        try { _app?.Close(); } catch { /* ignore */ }
+        if (_weLaunchedApp)
+        {
+            try { _app?.Close(); } catch { /* ignore */ }
+        }
+
         _app?.Dispose();
         _automation?.Dispose();
     }
@@ -393,12 +486,27 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
                 if (element is null)
                     return null;
 
+                var automationId = SafeGet(() => element.AutomationId);
+                var name = SafeGet(() => element.Name);
+                var className = SafeGet(() => element.ClassName);
+                var controlType = SafeGet(() => element.ControlType.ToString());
+
+                var (automationIdIndex, automationIdCount) = ComputeMatchInfo(element, automationId, e => SafeGet(() => e.AutomationId));
+                var (nameIndex, nameCount) = ComputeMatchInfo(element, name, e => SafeGet(() => e.Name));
+                var (classNameIndex, classNameCount) = ComputeMatchInfo(element, className, e => SafeGet(() => e.ClassName));
+
                 return new DesktopElementNode
                 {
-                    AutomationId = SafeGet(() => element.AutomationId),
-                    Name = SafeGet(() => element.Name),
-                    ClassName = SafeGet(() => element.ClassName),
-                    ControlType = SafeGet(() => element.ControlType.ToString())
+                    AutomationId = automationId,
+                    Name = name,
+                    ClassName = className,
+                    ControlType = controlType,
+                    AutomationIdMatchIndex = automationIdIndex,
+                    AutomationIdMatchCount = automationIdCount,
+                    NameMatchIndex = nameIndex,
+                    NameMatchCount = nameCount,
+                    ClassNameMatchIndex = classNameIndex,
+                    ClassNameMatchCount = classNameCount
                 };
             }
             catch
@@ -406,6 +514,65 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
                 return null;
             }
         }, cancellationToken);
+    }
+
+    /// <summary>Megszámolja, hány elem osztozik ugyanazon a tulajdonság-értéken a target
+    /// ELEM TÉNYLEGES top-level ablakán belül, és hányadik a talált (target) elem
+    /// közöttük. FONTOS: szándékosan NEM a driver _mainWindow mezőjét használja
+    /// keresési körnek, hanem a target szülőláncán felfelé sétálva megkeresi a
+    /// ténylegesen őt tartalmazó Window-t — enélkül több-ablakos vagy lapozott
+    /// alkalmazásoknál (pl. Windows Beállítások, ahol navigáció közben új top-level
+    /// ablak jöhet létre, vagy a tartalom más ablakba kerül) a _mainWindow elavulhat,
+    /// és a keresés hamisan 0 találatot adna vissza olyan elemeknél is, amikből
+    /// ténylegesen több van a képernyőn. Az Index 1-alapú, emberi számozású
+    /// (1 = első találat).</summary>
+    private (int Index, int Count) ComputeMatchInfo(AutomationElement target, string value, Func<AutomationElement, string> selector)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return (0, 0);
+
+        try
+        {
+            var root = FindTopLevelWindow(target) ?? _mainWindow;
+            if (root is null)
+                return (0, 0);
+
+            var all = root.FindAllDescendants();
+            var matches = all.Where(e => selector(e) == value).ToArray();
+            var zeroBasedIndex = Array.FindIndex(matches, e => e.Equals(target));
+            return (Math.Max(0, zeroBasedIndex) + 1, matches.Length);
+        }
+        catch
+        {
+            return (0, 0);
+        }
+    }
+
+    /// <summary>Felfelé sétál a target szülőláncán, amíg egy Window ControlType-ú elemet
+    /// nem talál — ez a target elemet TÉNYLEGESEN tartalmazó, aktuális top-level ablak.
+    /// Null-t ad vissza, ha valamiért nem sikerül (pl. az elem közben eltűnt) — ilyenkor
+    /// a hívó a driver _mainWindow mezőjére esik vissza, tartalék megoldásként.</summary>
+    private static Window? FindTopLevelWindow(AutomationElement element)
+    {
+        try
+        {
+            var current = element;
+            while (current is not null)
+            {
+                if (current.ControlType == FlaUI.Core.Definitions.ControlType.Window)
+                    return current.AsWindow();
+
+                current = current.Parent;
+            }
+        }
+        catch
+        {
+            // ha a szülőlánc bejárása közben bármi hibázik (pl. az elem közben
+            // eltűnt/invalidálódott), csendben null-t adunk vissza — a hívó tud
+            // ezzel mit kezdeni (visszaesik _mainWindow-ra).
+        }
+
+        return null;
     }
 
     private static string SafeGet(Func<string?> getter)

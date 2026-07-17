@@ -64,6 +64,21 @@ public sealed class TestStepDto
     [XmlAttribute("timeoutSeconds")]
     public int TimeoutSeconds { get; set; } = 10;
 
+    /// <summary>Hiba esetén ennyiszer próbálja újra a lépést, mielőtt véglegesen hibásnak
+    /// jelölné — lásd TestStep.RetryCount. Egyszerű, nem-nullable int, ugyanúgy mint a
+    /// TimeoutSeconds, mert alapértelmezetten 0 (nincs retry) — nincs szükség a
+    /// ElementIndex-nél alkalmazott "hiányzó vs. nulla" megkülönböztetésre.</summary>
+    [XmlAttribute("retryCount")]
+    public int RetryCount { get; set; }
+
+    /// <summary>"Self-healing" tartalék lokátor — lásd TestStep.FallbackLocator. Ugyanaz a
+    /// minta, mint a TargetLocator/TargetLocatorType párnál.</summary>
+    [XmlElement("FallbackLocator")]
+    public string? FallbackLocator { get; set; }
+
+    [XmlAttribute("fallbackLocatorType")]
+    public LocatorType FallbackLocatorType { get; set; }
+
     [XmlAttribute("continueOnError")]
     public bool ContinueOnError { get; set; }
 
@@ -81,6 +96,53 @@ public sealed class TestStepDto
     /// <summary>Hiba esetén ugrás célja (Label) — lásd TestStep.OnFailureGoToLabel.</summary>
     [XmlElement("OnFailureGoToLabel")]
     public string? OnFailureGoToLabel { get; set; }
+
+    /// <summary>Hányadik találattal dolgozzon a lépés, ha a lokátor több elemre is illik —
+    /// 1-alapú, emberi számozás. Lásd TestStep.ElementIndex. Az XmlElement-et (nem
+    /// XmlAttribute-ot) azért használjuk, mert nullable int-eknél az XmlAttribute
+    /// problémásabban kezeli a hiányzó/null értéket régi, ElementIndex nélkül mentett
+    /// fájloknál — az XmlElement egyszerűen kimarad a régi XML-ekből, és a
+    /// deserializálás után is null marad, ahogy elvárjuk.
+    ///
+    /// FONTOS: az XmlSerializer BETÖLTÉSKOR közvetlenül ezt a settert hívja (mert ezen
+    /// van az [XmlElement] attribútum) — SOHA nem az ElementIndex wrapper property
+    /// setterét. Ezért a _hasElementIndex flaget itt is be kell állítani, különben
+    /// betöltés után az ElementIndex getter mindig null-t adna vissza, még akkor is,
+    /// ha az érték ténylegesen be lett olvasva az XML-ből.</summary>
+    [XmlElement("ElementIndex")]
+    public int ElementIndexValue
+    {
+        get => _elementIndexValue;
+        set
+        {
+            _elementIndexValue = value;
+            _hasElementIndex = true;
+        }
+    }
+
+    [XmlIgnore]
+    private int _elementIndexValue;
+
+    /// <summary>Igaz, ha az ElementIndexValue-t ténylegesen ki kell írni — az
+    /// XmlSerializer ezt a "ShouldSerialize" mintát keresi automatikusan
+    /// (ShouldSerialize + a mező neve), hogy eldöntse, kiírja-e az elemet. Enélkül
+    /// egy null ElementIndex-ű lépésnél is mindig kiírna egy "&lt;ElementIndex&gt;0&lt;/ElementIndex&gt;"
+    /// sort, ami félrevezető lenne (0 nem ugyanaz, mint "nincs beállítva").</summary>
+    [XmlIgnore]
+    public int? ElementIndex
+    {
+        get => _hasElementIndex ? _elementIndexValue : null;
+        set
+        {
+            _hasElementIndex = value.HasValue;
+            _elementIndexValue = value ?? 0;
+        }
+    }
+
+    [XmlIgnore]
+    private bool _hasElementIndex;
+
+    public bool ShouldSerializeElementIndexValue() => _hasElementIndex;
 }
 
 public static class TestSuiteMapper
@@ -96,11 +158,15 @@ public static class TestSuiteMapper
         TargetLocator = step.TargetLocator,
         TargetLocatorType = step.TargetLocatorType,
         TimeoutSeconds = step.TimeoutSeconds,
+        RetryCount = step.RetryCount,
+        FallbackLocator = step.FallbackLocator,
+        FallbackLocatorType = step.FallbackLocatorType,
         ContinueOnError = step.ContinueOnError,
         Skip = step.Skip,
         Label = step.Label,
         OnSuccessGoToLabel = step.OnSuccessGoToLabel,
-        OnFailureGoToLabel = step.OnFailureGoToLabel
+        OnFailureGoToLabel = step.OnFailureGoToLabel,
+        ElementIndex = step.ElementIndex
     };
 
     public static TestStep ToTestStep(TestStepDto dto, AutomationTarget target) => new()
@@ -115,10 +181,14 @@ public static class TestSuiteMapper
         TargetLocator = dto.TargetLocator,
         TargetLocatorType = dto.TargetLocatorType,
         TimeoutSeconds = dto.TimeoutSeconds,
+        RetryCount = dto.RetryCount,
+        FallbackLocator = dto.FallbackLocator,
+        FallbackLocatorType = dto.FallbackLocatorType,
         ContinueOnError = dto.ContinueOnError,
         Skip = dto.Skip,
         Label = dto.Label,
         OnSuccessGoToLabel = dto.OnSuccessGoToLabel,
-        OnFailureGoToLabel = dto.OnFailureGoToLabel
+        OnFailureGoToLabel = dto.OnFailureGoToLabel,
+        ElementIndex = dto.ElementIndex
     };
 }

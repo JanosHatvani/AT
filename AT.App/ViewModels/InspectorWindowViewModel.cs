@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using AT.App.Interop;
 using AT.Automation.Desktop;
 using AT.Automation.Web;
@@ -28,7 +28,7 @@ public sealed partial class InspectorWindowViewModel : ObservableObject
     private readonly InspectorPlatform _platform;
     private readonly DesktopAutomationDriver? _desktopDriver;
     private readonly WebAutomationDriver? _webDriver;
-    private readonly Action<LocatorType, string> _onChoose;
+    private readonly Action<LocatorType, string, int?> _onChoose;
 
     [ObservableProperty]
     private bool isCountingDown;
@@ -64,7 +64,7 @@ public sealed partial class InspectorWindowViewModel : ObservableObject
         DesktopAutomationDriver? desktopDriver,
         WebAutomationDriver? webDriver,
         InspectorPlatform platform,
-        Action<LocatorType, string> onChoose)
+        Action<LocatorType, string, int?> onChoose)
     {
         _desktopDriver = desktopDriver;
         _webDriver = webDriver;
@@ -125,9 +125,9 @@ public sealed partial class InspectorWindowViewModel : ObservableObject
         ControlType = string.IsNullOrWhiteSpace(node.ControlType) ? "(ismeretlen típus)" : node.ControlType;
         IsCaptured = true;
 
-        AddCandidate(LocatorType.Name, "Name", node.Name);
-        AddCandidate(LocatorType.Id, "AutomationId", node.AutomationId);
-        AddCandidate(LocatorType.ClassName, "ClassName", node.ClassName);
+        AddCandidate(LocatorType.Name, "Name", node.Name, node.NameMatchIndex, node.NameMatchCount);
+        AddCandidate(LocatorType.Id, "AutomationId", node.AutomationId, node.AutomationIdMatchIndex, node.AutomationIdMatchCount);
+        AddCandidate(LocatorType.ClassName, "ClassName", node.ClassName, node.ClassNameMatchIndex, node.ClassNameMatchCount);
 
         var xpath = BuildDesktopXPath(node);
         if (xpath is not null)
@@ -161,9 +161,9 @@ public sealed partial class InspectorWindowViewModel : ObservableObject
         ControlType = string.IsNullOrWhiteSpace(result.Tag) ? "(ismeretlen elem)" : $"<{result.Tag}>";
         IsCaptured = true;
 
-        AddCandidate(LocatorType.Id, "Id", result.Id);
-        AddCandidate(LocatorType.Name, "Name", result.Name);
-        AddCandidate(LocatorType.ClassName, "ClassName", result.ClassName);
+        AddCandidate(LocatorType.Id, "Id", result.Id, result.IdMatchIndex, result.IdMatchCount);
+        AddCandidate(LocatorType.Name, "Name", result.Name, result.NameMatchIndex, result.NameMatchCount);
+        AddCandidate(LocatorType.ClassName, "ClassName", result.ClassName, result.ClassNameMatchIndex, result.ClassNameMatchCount);
         AddCandidate(LocatorType.XPath, "XPath", result.XPath);
 
         if (!string.IsNullOrWhiteSpace(result.Id))
@@ -186,10 +186,25 @@ public sealed partial class InspectorWindowViewModel : ObservableObject
         return $"//{node.ControlType}";
     }
 
-    private void AddCandidate(LocatorType type, string label, string? value)
+    /// <summary>matchCount &gt; 1 esetén a Label-hez hozzáfűzi a "lokátor N. eleme (összesen M)"
+    /// jelzést,
+    /// és a jelöltbe belekerül a MatchIndex/MatchCount is — ez adja meg a felhasználónak
+    /// (és a lépésbe automatikusan beillesztve az ElementIndex-et), hányadik egyező
+    /// elemre kattintott, amikor a lokátor nem egyedi.</summary>
+    private void AddCandidate(LocatorType type, string label, string? value, int matchIndex = 0, int matchCount = 0)
     {
-        if (!string.IsNullOrWhiteSpace(value))
-            Candidates.Add(new LocatorCandidate { Type = type, Label = label, Value = value });
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        var suffix = matchCount > 1 ? $" — lokátor {matchIndex}. eleme (összesen {matchCount})" : "";
+        Candidates.Add(new LocatorCandidate
+        {
+            Type = type,
+            Label = label + suffix,
+            Value = value,
+            MatchIndex = matchCount > 1 ? matchIndex : null,
+            MatchCount = matchCount > 1 ? matchCount : null
+        });
     }
 
     private void ResetCapture()
@@ -206,7 +221,26 @@ public sealed partial class InspectorWindowViewModel : ObservableObject
         if (candidate is null)
             return;
 
-        _onChoose(candidate.Type, candidate.Value);
+        _onChoose(candidate.Type, candidate.Value, candidate.MatchIndex);
         ResetCapture();
+    }
+
+    /// <summary>
+    /// Az InspectorWindow hívja meg bezáráskor (Bezárás gomb VAGY a címsor ✕ gombja) —
+    /// csak Web platformnál van hatása: leállítja a driver böngésző-session-jét, ami —
+    /// a WebAutomationDriver.StopAsync belső logikája alapján — bezárja a böngészőt, HA
+    /// azt kifejezetten az Elem-kereső miatt indítottuk (eldobható debug-példány), de
+    /// érintetlenül hagyja, ha egy MÁR KORÁBBAN is futó, a felhasználó saját böngészőjéhez
+    /// csatlakoztunk. Desktop platformnál nincs teendő — ott a driver session életciklusa
+    /// (attach-elt alkalmazás) független az Elem-kereső ablaktól, azt a "Leállítás" gomb
+    /// kezeli a fő nézeten.
+    /// </summary>
+    public async Task HandleWindowClosingAsync()
+    {
+        if (_platform == InspectorPlatform.Web && _webDriver is not null)
+        {
+            try { await _webDriver.StopAsync(); }
+            catch { /* a felhasználó úgyis zárja az ablakot, egy hiba itt nem blokkolhatja */ }
+        }
     }
 }

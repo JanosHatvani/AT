@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.IO;
+using System.Threading;
 using AT.Core.Contracts;
 using AT.Core.Models;
 using OpenQA.Selenium;
@@ -23,8 +26,36 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
     public string PlatformName => "Web";
     public bool IsRunning => _driver is not null;
 
+    /// <summary>Igaz, ha a LEGUTÓBB végrehajtott lépésnél az elsődleges lokátor nem volt
+    /// megtalálható, és a driver a tartalék (FallbackLocator) lokátorral tudta csak
+    /// megtalálni az elemet — a ViewModel ezt ellenőrzi minden sikeres ExecuteStepAsync
+    /// után, hogy figyelmeztető üzenetet mutasson. Minden ExecuteStepAsync hívás elején
+    /// false-ra áll vissza.</summary>
+    public bool LastStepUsedFallbackLocator { get; private set; }
+
     /// <summary>Melyik böngészőt indítsa a StartAsync — a Web-oldal UI-ja állítja be futtatás előtt.</summary>
     public BrowserType Browser { get; set; } = BrowserType.Chrome;
+
+    /// <summary>
+    /// Igaz, ha a jelenlegi session egy "remote debugging" porton keresztül csatlakozott
+    /// böngészőhöz tartozik (nem egy StartAsync által indított, önálló, kizárólag
+    /// automatizálásra szánt példányhoz). Ez önmagában NEM dönti el, hogy a StopAsync
+    /// ténylegesen bezárja-e a böngészőt — lásd _weLaunchedAttachedBrowser.
+    /// </summary>
+    public bool IsAttachedToExistingBrowser { get; private set; }
+
+    /// <summary>
+    /// Igaz, ha a csatlakoztatott böngészőt MI MAGUNK indítottuk el (mert a debug-porton
+    /// semmi nem futott még), tehát ez egy kizárólag az Elem-kereső miatt létrejött,
+    /// eldobható debug-példány — ilyenkor a StopAsync/Dispose BIZTONSÁGGAL bezárhatja,
+    /// amikor a felhasználó végzett. Ha viszont MÁR KORÁBBAN futott valami ezen a porton
+    /// (pl. a felhasználó saját, parancsikonnal debug-módra állított, mindennapi
+    /// böngészője), ezt false-ra állítjuk — azt a böngészőt SOHA nem zárjuk be
+    /// automatikusan, csak leválasztjuk róla a vezérlést.
+    /// </summary>
+    private bool _weLaunchedAttachedBrowser;
+
+    private const int ChromiumDebugPort = 9222;
 
     // ===================== ÉLETCIKLUS =====================
 
@@ -42,21 +73,140 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
                 BrowserType.Edge => CreateEdge(),
                 _ => throw new ArgumentOutOfRangeException(nameof(Browser), Browser, null)
             };
+            IsAttachedToExistingBrowser = false;
         }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Csatlakozik egy MÁR FUTÓ, "remote debugging" móddal indított Chromium-alapú
+    /// böngészőhöz (Chrome vagy Edge) — NEM indít új, önálló, kizárólag automatizálásra
+    /// szánt böngészőpéldányt. Ha a megadott porton (alapértelmezetten 9222) még nem fut
+    /// ilyen böngésző, EGYETLEN egyszer elindítja (egy teljesen normál, látható ablakként,
+    /// amiben a felhasználó szabadon navigálhat), és megvárja, amíg válaszol. Minden
+    /// további hívás — amíg ez az ablak nyitva van — UGYANEHHEZ csatlakozik, nem nyit
+    /// új ablakot. A Firefox-hoz jelenleg nem támogatott ez a mód (más, nem-CDP-alapú
+    /// remote protokollt használ) — ott a normál StartAsync-ra esik vissza.
+    /// </summary>
+    public Task AttachToRunningBrowserAsync(CancellationToken cancellationToken = default)
+    {
+        if (_driver is not null)
+            return Task.CompletedTask;
+
+        if (Browser == BrowserType.Firefox)
+            return StartAsync(cancellationToken);
+
+        return Task.Run(() =>
+        {
+            var executableName = Browser == BrowserType.Edge ? "msedge" : "chrome";
+
+            // FONTOS: ezt a MI KAPCSOLÁSUNK ELŐTT kell megnézni — ha itt már fut valami,
+            // az egy MÁR KORÁBBAN, nem általunk indított böngésző (pl. a felhasználó saját,
+            // parancsikonnal debug-módra állított Chrome-ja), amit soha nem szabad
+            // automatikusan bezárnunk.
+            var wasAlreadyRunning = IsDebugPortOpen(ChromiumDebugPort);
+
+            if (!wasAlreadyRunning)
+                LaunchDebugModeBrowser(executableName, ChromiumDebugPort);
+
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+            while (!IsDebugPortOpen(ChromiumDebugPort))
+            {
+                if (DateTime.UtcNow > deadline)
+                    throw new InvalidOperationException(
+                        $"A debug módú {(Browser == BrowserType.Edge ? "Edge" : "Chrome")} nem indult el időben. " +
+                        "Ellenőrizd, hogy a böngésző telepítve van-e, és nem blokkolja-e tűzfal/vírusirtó.");
+                Thread.Sleep(300);
+            }
+
+            if (Browser == BrowserType.Edge)
+            {
+                var options = new EdgeOptions { DebuggerAddress = $"127.0.0.1:{ChromiumDebugPort}" };
+                // A HideCommandPromptWindow enélkül egy látható konzolablakot nyitna a
+                // helyi msedgedriver.exe-nek — ez a maga a driver "közvetítő" folyamata,
+                // nem a böngésző, a felhasználónak semmi dolga vele.
+                var service = EdgeDriverService.CreateDefaultService();
+                service.HideCommandPromptWindow = true;
+                _driver = new EdgeDriver(service, options);
+            }
+            else
+            {
+                var options = new ChromeOptions { DebuggerAddress = $"127.0.0.1:{ChromiumDebugPort}" };
+                var service = ChromeDriverService.CreateDefaultService();
+                service.HideCommandPromptWindow = true;
+                _driver = new ChromeDriver(service, options);
+            }
+
+            IsAttachedToExistingBrowser = true;
+            _weLaunchedAttachedBrowser = !wasAlreadyRunning;
+        }, cancellationToken);
+    }
+
+    /// <summary>Gyors, ~500ms-es próbálkozással ellenőrzi, hogy fut-e már valami a megadott
+    /// porton — ha igen, feltételezzük, hogy az a korábban általunk indított debug-módú
+    /// böngésző (mivel ez a port nem szokványos, ütközés esélye elhanyagolható).</summary>
+    private static bool IsDebugPortOpen(int port)
+    {
+        try
+        {
+            using var client = new System.Net.Sockets.TcpClient();
+            var result = client.BeginConnect("127.0.0.1", port, null, null);
+            var connected = result.AsyncWaitHandle.WaitOne(TimeSpan.FromMilliseconds(500));
+            if (connected)
+                client.EndConnect(result);
+            return connected;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Elindít egy Chrome/Edge-et "remote debugging" móddal — ez egy TELJESEN NORMÁL,
+    /// látható böngészőablak, amiben a felhasználó szabadon navigálhat, bejelentkezhet,
+    /// könyvjelzőzhet, stb., mintha csak simán megnyitotta volna a böngészőt. A
+    /// --remote-debugging-port kapcsoló miatt tudunk hozzá utólag csatlakozni (DevTools
+    /// protokollon keresztül) — enélkül a kapcsoló nélkül induló, "hétköznapi" böngészőhöz
+    /// SEMMILYEN automatizálási eszköz nem tud csatlakozni, ez böngésző-biztonsági
+    /// korlátozás. Külön, ideiglenes profilmappát használ, hogy ne ütközzön a felhasználó
+    /// "normál", nem debug-módú böngészőjével (a kettő nem futtatható ugyanazzal a
+    /// profillal egyszerre).
+    /// </summary>
+    private static void LaunchDebugModeBrowser(string executableName, int port)
+    {
+        var profileDir = Path.Combine(Path.GetTempPath(), $"AT-Studio-{executableName}-Debug-Profile");
+        Directory.CreateDirectory(profileDir);
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = executableName,
+            // A --remote-allow-origins=* KÖTELEZŐ Chrome 111+ verziótól — enélkül a
+            // böngésző elutasítja/instabillá teszi a külső DevTools-kapcsolatokat
+            // (amit a Selenium a csatlakozáshoz használ), ami pont olyan, időszakos,
+            // nehezen visszakövethető hibákban nyilvánul meg, mint az ERR_NAME_NOT_RESOLVED
+            // manuálisan beírt URL-eknél — miközben a kezdőlap (helyi, nem hálózati
+            // navigáció) még simán betöltődik, ezért tűnhet úgy, mintha "majdnem" működne.
+            Arguments = $"--remote-debugging-port={port} --remote-allow-origins=* --user-data-dir=\"{profileDir}\" --no-first-run --no-default-browser-check",
+            UseShellExecute = true
+        });
     }
 
     private static IWebDriver CreateChrome()
     {
         var options = new ChromeOptions();
         options.AddArgument("--start-maximized");
-        return new ChromeDriver(options);
+        var service = ChromeDriverService.CreateDefaultService();
+        service.HideCommandPromptWindow = true;
+        return new ChromeDriver(service, options);
     }
 
     private static IWebDriver CreateFirefox()
     {
         var options = new FirefoxOptions();
         options.AddArgument("--start-maximized");
-        var driver = new FirefoxDriver(options);
+        var service = FirefoxDriverService.CreateDefaultService();
+        service.HideCommandPromptWindow = true;
+        var driver = new FirefoxDriver(service, options);
         driver.Manage().Window.Maximize();
         return driver;
     }
@@ -64,7 +214,9 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
     private static IWebDriver CreateEdge()
     {
         var options = new EdgeOptions();
-        var driver = new EdgeDriver(options);
+        var service = EdgeDriverService.CreateDefaultService();
+        service.HideCommandPromptWindow = true;
+        var driver = new EdgeDriver(service, options);
         driver.Manage().Window.Maximize();
         return driver;
     }
@@ -72,13 +224,30 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
         var driver = _driver;
+        // Csak akkor hagyjuk érintetlenül a böngészőt, ha CSATLAKOZTUNK egy MÁR KORÁBBAN
+        // is futó, nem általunk indított böngészőhöz (pl. a felhasználó saját, parancs-
+        // ikonnal debug-módra állított Chrome-ja). Ha MI magunk indítottuk a debug-
+        // böngészőt (mert a porton semmi nem futott még), azt biztonsággal, elvárt módon
+        // bezárjuk — ez egy kizárólag az Elem-kereső miatt létrejött, eldobható példány.
+        var shouldPreserveBrowser = IsAttachedToExistingBrowser && !_weLaunchedAttachedBrowser;
         _driver = null;
+        IsAttachedToExistingBrowser = false;
+        _weLaunchedAttachedBrowser = false;
 
         if (driver is null)
             return Task.CompletedTask;
 
         return Task.Run(() =>
         {
+            if (shouldPreserveBrowser)
+            {
+                // A felhasználó saját, már korábban is futó böngészőjénél NEM hívunk
+                // Quit()-et — az bezárná a böngészőt is. Egyszerűen leválasztjuk a
+                // vezérlést, a böngésző (és a felhasználó tabjai/munkamenete) nyitva
+                // és érintetlenül marad.
+                return;
+            }
+
             driver.Quit();
             driver.Dispose();
         }, cancellationToken);
@@ -103,6 +272,7 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
     /// <summary>Egy összeállított TestStep végrehajtása — ez fedi le a régi WebMethods összes műveletét.</summary>
     public Task ExecuteStepAsync(TestStep step, CancellationToken cancellationToken = default)
     {
+        LastStepUsedFallbackLocator = false;
         EnsureStarted();
         return Task.Run(() => ExecuteStepCore(step), cancellationToken);
     }
@@ -113,7 +283,27 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
         var timeout = TimeSpan.FromSeconds(Math.Max(1, step.TimeoutSeconds));
         var action = Enum.Parse<WebStepAction>(step.Action);
 
-        IWebElement Element() => FindElement(driver, RequireLocator(step.Locator), step.LocatorType, timeout);
+        // A TestStep.ElementIndex 1-alapú, emberi számozású (1 = első elem) — itt váltjuk
+        // 0-alapú tömb-indexre, amit a FindElements(...)[index] vár.
+        var elementIndex = Math.Max(0, (step.ElementIndex ?? 1) - 1);
+
+        // "Self-healing": ha az elsődleges lokátor a Timeout-on belül nem található, és
+        // van megadva tartalék lokátor, azzal próbálkozunk újra, mielőtt hibásnak
+        // jelölnénk a lépést.
+        IWebElement Element()
+        {
+            try
+            {
+                return FindElement(driver, RequireLocator(step.Locator), step.LocatorType, timeout, elementIndex);
+            }
+            catch (WebDriverTimeoutException) when (!string.IsNullOrWhiteSpace(step.FallbackLocator))
+            {
+                var fallbackElement = FindElement(driver, step.FallbackLocator!, step.FallbackLocatorType, timeout, elementIndex);
+                LastStepUsedFallbackLocator = true;
+                return fallbackElement;
+            }
+        }
+
         WebDriverWait Wait() => new(driver, timeout);
 
         switch (action)
@@ -173,11 +363,11 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
                 break;
 
             case WebStepAction.WaitPresent:
-                Wait().Until(d => d.FindElements(ToBy(RequireLocator(step.Locator), step.LocatorType)).Count > 0);
+                Wait().Until(d => d.FindElements(ToBy(RequireLocator(step.Locator), step.LocatorType)).Count > elementIndex);
                 break;
 
             case WebStepAction.WaitAbsent:
-                Wait().Until(d => d.FindElements(ToBy(RequireLocator(step.Locator), step.LocatorType)).Count == 0);
+                Wait().Until(d => d.FindElements(ToBy(RequireLocator(step.Locator), step.LocatorType)).Count <= elementIndex);
                 break;
 
             case WebStepAction.WaitHasText:
@@ -245,12 +435,38 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
             }
             return '/' + parts.join('/');
         }
+        function matchInfo(listFn) {
+            try {
+                var arr = Array.prototype.slice.call(listFn());
+                var idx = arr.indexOf(el);
+                return { count: arr.length, index: idx < 0 ? 0 : (idx + 1) };
+            } catch (e) {
+                return { count: 0, index: 0 };
+            }
+        }
+        var idVal = el.id || '';
+        var nameVal = el.getAttribute('name') || '';
+        var classVal = (typeof el.className === 'string') ? el.className.trim() : '';
+
+        var idInfo = idVal ? matchInfo(function() { return document.querySelectorAll('[id=""' + idVal + '""]'); }) : { count: 0, index: 0 };
+        var nameInfo = nameVal ? matchInfo(function() { return document.getElementsByName(nameVal); }) : { count: 0, index: 0 };
+        var classInfo = classVal ? matchInfo(function() {
+            var sel = '.' + classVal.split(/\s+/).join('.');
+            return document.querySelectorAll(sel);
+        }) : { count: 0, index: 0 };
+
         return JSON.stringify({
             tag: el.tagName.toLowerCase(),
-            id: el.id || '',
-            name: el.getAttribute('name') || '',
-            className: (typeof el.className === 'string') ? el.className.trim() : '',
-            xpath: atXPath(el)
+            id: idVal,
+            name: nameVal,
+            className: classVal,
+            xpath: atXPath(el),
+            idMatchIndex: idInfo.index,
+            idMatchCount: idInfo.count,
+            nameMatchIndex: nameInfo.index,
+            nameMatchCount: nameInfo.count,
+            classNameMatchIndex: classInfo.index,
+            classNameMatchCount: classInfo.count
         });";
 
     /// <summary>Elindítja a böngészőben az egér-figyelést — az Elem-kereső "Inspect indítása" gombja hívja.</summary>
@@ -307,10 +523,14 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
         return (raw[..idx].Trim(), raw[(idx + 1)..].Trim());
     }
 
-    private static IWebElement FindElement(IWebDriver driver, string locator, LocatorType type, TimeSpan timeout)
+    private static IWebElement FindElement(IWebDriver driver, string locator, LocatorType type, TimeSpan timeout, int elementIndex = 0)
     {
         var wait = new WebDriverWait(driver, timeout);
-        return wait.Until(d => d.FindElement(ToBy(locator, type)));
+        return wait.Until(d =>
+        {
+            var matches = d.FindElements(ToBy(locator, type));
+            return elementIndex < matches.Count ? matches[elementIndex] : null;
+        });
     }
 
     private static By ToBy(string locator, LocatorType type) => type switch
@@ -327,5 +547,10 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
     };
 
-    public void Dispose() => _driver?.Quit();
+    public void Dispose()
+    {
+        var shouldPreserveBrowser = IsAttachedToExistingBrowser && !_weLaunchedAttachedBrowser;
+        if (!shouldPreserveBrowser)
+            _driver?.Quit();
+    }
 }

@@ -4,7 +4,7 @@
         xmlns:conv="clr-namespace:AT.App.Converters"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Élő kijelző — Mobil (Android) tesztelés"
-        Width="420" Height="850"
+        Width="420" Height="1000"
         WindowStyle="None"
         ResizeMode="CanResize"
         MinWidth="340" MinHeight="480"
@@ -20,7 +20,8 @@
                              UseAeroCaptionButtons="True" />
     </shell:WindowChrome.WindowChrome>
 
-    <Grid Background="{StaticResource Brush.Surface}">
+    <Grid Background="{StaticResource Brush.Surface}"
+          >
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -30,10 +31,11 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="4">
                     <TextBlock Text="Élő kijelző" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,4" />
-                    <TextBlock Text="A régi verzió egy sosem írt fájlt figyelt — ez most tényleg a driver-től kér képet."
-                               Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap" Margin="0,0,0,12" />
+                    <TextBlock Text="Kattints a képen a kívánt elemre — nem küldi tovább a kattintást az eszköznek, csak leolvassa, mi van ott."
+                               Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap" Margin="0,5,0,5"
+                               Visibility="{Binding IsPicking, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}" />
 
-                    <Border Background="{StaticResource Brush.Background}" CornerRadius="8" Height="360" ClipToBounds="True">
+                    <Border Background="{StaticResource Brush.Background}" CornerRadius="8" Height="500" ClipToBounds="True">
                         <Grid>
                             <Image Source="{Binding ScreenImage}" Stretch="Uniform"
                                    MouseLeftButtonDown="ScreenImage_MouseLeftButtonDown"
@@ -59,24 +61,30 @@
                                 Command="{Binding TogglePickingCommand}" />
                     </StackPanel>
 
-                    <TextBlock Text="Kattints a képen a kívánt elemre — nem küldi tovább a kattintást az eszköznek, csak leolvassa, mi van ott."
-                               Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap" Margin="0,20,0,0"
-                               Visibility="{Binding IsPicking, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}" />
+
 
                     <ItemsControl ItemsSource="{Binding InspectorCandidates}" Margin="0,10,0,0"
                                   Visibility="{Binding HasInspectorResult, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Border BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,0,1" Padding="0,8">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="12" />
-                                        <TextBlock Text="{Binding Value}" Style="{StaticResource SubtleTextStyle}"
-                                                   TextWrapping="Wrap" Margin="0,2,0,6" />
-                                        <Button Content="Használat" Style="{StaticResource GhostButtonStyle}"
-                                                HorizontalAlignment="Left" Padding="12,4"
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="12" />
+                                            <TextBlock Text="{Binding Value}" Style="{StaticResource SubtleTextStyle}"
+                                                       TextWrapping="Wrap" Margin="0,2,0,0" />
+                                        </StackPanel>
+
+                                        <Button Grid.Column="1" Content="Használat" Style="{StaticResource GhostButtonStyle}"
+                                                VerticalAlignment="Center" Padding="12,4"
                                                 Command="{Binding DataContext.UseInspectorCandidateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}" />
-                                    </StackPanel>
+                                    </Grid>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

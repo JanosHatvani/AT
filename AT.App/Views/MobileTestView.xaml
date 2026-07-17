@@ -235,6 +235,52 @@
                         </StackPanel>
                     </Grid>
 
+                    <Grid Margin="0,0,0,10" IsEnabled="{Binding IsLocatorNeeded}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                            <TextBlock Text="Elem sorszáma" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox Text="{Binding NewElementIndex, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Bottom">
+                            <TextBlock Text="Ha több egyforma lokátor is van (pl. lista minden sorában ugyanaz), itt add meg, hányadikkal dolgozzon a lépés — 1-től számolva (1 = első elem). Üresen az első elemmel."
+                                       Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,10" IsEnabled="{Binding IsLocatorNeeded}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                            <TextBlock Text="Újrapróbálkozás" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox Text="{Binding NewRetryCount, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                            <TextBlock Text="Tartalék lokátor típusa" Style="{StaticResource FieldLabelStyle}" />
+                            <ComboBox ItemsSource="{Binding AvailableLocatorTypes}" SelectedItem="{Binding NewFallbackLocatorType}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Converter={x:Static conv:LocatorTypeToLabelConverter.Instance}}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Tartalék lokátor (self-healing — ha az elsődleges nem található)" Style="{StaticResource FieldLabelStyle}" />
+                            <TextBox Text="{Binding NewFallbackLocator, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                    </Grid>
+
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -391,6 +437,24 @@
                                                 <Border Style="{StaticResource TagBadgeStyle}" Background="{StaticResource Brush.Accent}"
                                                         Visibility="{Binding Step.ContinueOnError, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}">
                                                     <TextBlock Text="Folytatás" Style="{StaticResource TagBadgeTextStyle}" />
+                                                </Border>
+                                                <Border Style="{StaticResource TagBadgeStyle}" Background="{StaticResource Brush.Accent}"
+                                                        Visibility="{Binding Step.ElementIndex, Converter={x:Static conv:NullToVisibilityConverter.Instance}}">
+                                                    <TextBlock Style="{StaticResource TagBadgeTextStyle}">
+                                                        <Run Text="Elem #" />
+                                                        <Run Text="{Binding Step.ElementIndex, Mode=OneWay}" />
+                                                    </TextBlock>
+                                                </Border>
+                                                <Border Style="{StaticResource TagBadgeStyle}" Background="{StaticResource Brush.Accent}"
+                                                        Visibility="{Binding Step.RetryCount, Converter={x:Static conv:IntGreaterThanZeroToVisibilityConverter.Instance}}">
+                                                    <TextBlock Style="{StaticResource TagBadgeTextStyle}">
+                                                        <Run Text="Retry ×" />
+                                                        <Run Text="{Binding Step.RetryCount, Mode=OneWay}" />
+                                                    </TextBlock>
+                                                </Border>
+                                                <Border Style="{StaticResource TagBadgeStyle}" Background="{StaticResource Brush.Accent}"
+                                                        Visibility="{Binding Step.FallbackLocator, Converter={x:Static conv:NullToVisibilityConverter.Instance}}">
+                                                    <TextBlock Text="Self-healing" Style="{StaticResource TagBadgeTextStyle}" />
                                                 </Border>
                                             </StackPanel>
                                             <TextBlock Style="{StaticResource SubtleTextStyle}" Margin="0,2,0,0" TextWrapping="Wrap">

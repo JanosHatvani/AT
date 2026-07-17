@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using System.IO;
+using System.Linq;
 
 namespace AT.Automation.Mobile;
 
-
-// Az Android SDK eszközeinek (emulator.exe, adb.exe) feloldása. Elsőként a
+// Az Android SDK eszközeinek (emulator.exe, adb.exe, aapt2.exe) feloldása. Elsőként a
 // Beállításokból kapott felülírást használja (ha van), különben az ANDROID_SDK_ROOT
 // vagy ANDROID_HOME környezeti változóra esik vissza — ugyanaz az elv, mint a régi,
 // részben megírt kódban, csak egy helyre összeszedve, konfigurálhatóan.
@@ -41,6 +41,34 @@ internal static class AndroidSdkLocator
         if (!File.Exists(path))
             throw new InvalidOperationException($"Nem található az adb.exe a várt helyen: {path}");
         return path;
+    }
+
+    /// <summary>
+    /// A legfrissebb (ábécé szerint utolsó, ami version-számoknál gyakorlatilag a
+    /// legmagasabb verziót is jelenti, pl. "34.0.0" > "33.0.2") telepített Build Tools
+    /// verzió aapt2.exe-jét adja vissza — ezt használja a MobileAutomationDriver az
+    /// elindított APK csomagnevének kiolvasásához (self-healing/elem-index számláláshoz).
+    /// </summary>
+    public static string ResolveAapt2Path(string? overrideRoot = null)
+    {
+        var sdkRoot = ResolveSdkRoot(overrideRoot);
+        var buildToolsDir = Path.Combine(sdkRoot, "build-tools");
+
+        if (!Directory.Exists(buildToolsDir))
+            throw new InvalidOperationException($"Nem található Android Build Tools a várt helyen: {buildToolsDir}.");
+
+        var latestVersionDir = Directory.GetDirectories(buildToolsDir)
+            .OrderByDescending(d => d)
+            .FirstOrDefault();
+
+        if (latestVersionDir is null)
+            throw new InvalidOperationException($"Nincs telepített Build Tools verzió itt: {buildToolsDir}.");
+
+        var aapt2Path = Path.Combine(latestVersionDir, "aapt2.exe");
+        if (!File.Exists(aapt2Path))
+            throw new InvalidOperationException($"Nem található az aapt2.exe a várt helyen: {aapt2Path}");
+
+        return aapt2Path;
     }
 
     /// <summary>

@@ -34,6 +34,13 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
 
     public bool IsRunning => _driver is not null;
 
+    /// <summary>Igaz, ha a LEGUTÓBB végrehajtott lépésnél az elsődleges lokátor nem volt
+    /// megtalálható, és a driver a tartalék (FallbackLocator) lokátorral tudta csak
+    /// megtalálni az elemet — a ViewModel ezt ellenőrzi minden sikeres ExecuteStepAsync
+    /// után, hogy figyelmeztető üzenetet mutasson ("frissítsd az elsődleges lokátort").
+    /// Minden ExecuteStepAsync hívás elején false-ra áll vissza.</summary>
+    public bool LastStepUsedFallbackLocator { get; private set; }
+
     // ===================== ÉLETCIKLUS =====================
 
     /// <summary>
@@ -79,10 +86,15 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
 
             if (File.Exists(BundledNodePath) && File.Exists(BundledAppiumMainJsPath))
             {
+                // Becsomagolt runtime használata — a végfelhasználónak nem kell
+                // semmit telepítenie, teljesen önállóan működik.
                 builder = builder
                     .UsingDriverExecutable(new FileInfo(BundledNodePath))
                     .WithAppiumJS(new FileInfo(BundledAppiumMainJsPath));
             }
+            // Ha a becsomagolt runtime hiányzik, a builder a rendszer PATH-ján
+            // keresi a node-ot és a globálisan telepített appium-ot (a korábbi,
+            // "telepítsd magad" viselkedés) — ez a fallback fejlesztői gépeken hasznos.
 
             _appiumService = builder.Build();
             _appiumService.Start();
@@ -126,7 +138,6 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
     }
 
     /// <summary>APK telepítése (ha kell) és az alkalmazás indítása — az "LaunchApp" lépés hívja.</summary>
-
     public Task LaunchAppAsync(string apkPath, CancellationToken cancellationToken = default)
     {
         if (_appiumService is null)
@@ -145,85 +156,8 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
             };
             options.AddAdditionalAppiumOption("noReset", false);
 
-            try
-            {
-                _driver = new AndroidDriver(_appiumService!.ServiceUrl, options, TimeSpan.FromSeconds(90));
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException(TranslateLaunchError(ex.Message, apkPath), ex);
-            }
+            _driver = new AndroidDriver(_appiumService!.ServiceUrl, options, TimeSpan.FromSeconds(90));
         }, cancellationToken);
-    }
-
-    /// <summary>
-    /// A UiAutomator2/adb néhány gyakori, kriptikus hibaüzenetét emberi, magyar nyelvű,
-    /// tettre-ösztönző szöveggé fordítja — a nyers eredeti üzenet az InnerException-ben
-    /// (és a naplóban) megmarad, csak a felhasználó felé megjelenő szöveg lesz barátságosabb.
-    /// </summary>
-    private static string TranslateLaunchError(string rawMessage, string apkPath)
-    {
-        if (rawMessage.Contains("INSTALL_FAILED_NO_MATCHING_ABIS"))
-        {
-            return "Az APK nem telepíthető erre a telefonra, mert nem a telefon processzor-" +
-                   "architektúrájához (ARM: arm64-v8a / armeabi-v7a) készült — valószínűleg egy " +
-                   "x86/x86_64 emulátorhoz buildelt APK-t próbáltál valódi telefonra telepíteni. " +
-                   "Kérj vagy buildelj egy ARM-kompatibilis APK-t (a build.gradle 'abiFilters' vagy " +
-                   $"'splits.abi' beállítását kell bővíteni), majd próbáld újra.{Environment.NewLine}" +
-                   $"Fájl: {apkPath}";
-        }
-
-        if (rawMessage.Contains("device unauthorized") || rawMessage.Contains("device 'unauthorized'"))
-        {
-            return "A telefon csatlakozva van, de nincs elfogadva rajta az USB hibakeresési " +
-                   "engedélykérés. Nézd meg a telefon képernyőjét, fogadd el a felugró ablakot " +
-                   "(pipáld be a \"Mindig engedélyezés erről a gépről\" opciót is), majd próbáld újra.";
-        }
-
-        if (rawMessage.Contains("INSTALL_FAILED_INSUFFICIENT_STORAGE"))
-        {
-            return "Nincs elég szabad tárhely a telefonon az alkalmazás telepítéséhez. " +
-                   "Szabadíts fel helyet, majd próbáld újra.";
-        }
-
-        if (rawMessage.Contains("INSTALL_FAILED_VERSION_DOWNGRADE"))
-        {
-            return "A telefonon már egy újabb verziója van telepítve ennek az alkalmazásnak, " +
-                   "mint amit most telepíteni próbálsz. Előbb távolítsd el a régebbi verziót a " +
-                   "telefonról, vagy állítsd be a lépésnél a \"noReset\"/újratelepítést engedélyező " +
-                   "opciót, majd próbáld újra.";
-        }
-
-        if (rawMessage.Contains("INSTALL_FAILED_UPDATE_INCOMPATIBLE") || rawMessage.Contains("signatures do not match"))
-        {
-            return "A telefonon már telepítve van ez az alkalmazás, de más aláírással (más " +
-                   "kulccsal) lett buildelve, mint a most telepíteni kívánt APK. Távolítsd el " +
-                   "kézzel a telefonról a meglévő alkalmazást, majd próbáld újra.";
-        }
-
-        if (rawMessage.Contains("Could not find a driver"))
-        {
-            return "Az Appium UiAutomator2 driver nincs telepítve a becsomagolt runtime-hoz. " +
-                   "Ez telepítési/csomagolási hiba, nem a teszt-lépés problémája — jelezd a " +
-                   "fejlesztőnek.";
-        }
-
-        if (rawMessage.Contains("Could not find 'aapt2.exe'") || rawMessage.Contains("aapt2"))
-        {
-            return "Hiányoznak az Android Build Tools az SDK-ból (aapt2.exe nem található). " +
-                   "Ez telepítési hiba — jelezd a fejlesztőnek, hogy az Android SDK telepítője " +
-                   "nem futtatta le a build-tools telepítését.";
-        }
-
-        if (rawMessage.Contains("Neither ANDROID_HOME nor ANDROID_SDK_ROOT"))
-        {
-            return "A program nem találja az Android SDK útvonalát a háttérben futó Appium " +
-                   "folyamat számára. Ellenőrizd a Beállítások oldalon az Android SDK " +
-                   "gyökérmappáját.";
-        }
-
-        // Ismeretlen hiba — az eredeti nyers üzenetet adjuk tovább, hogy semmi ne vesszen el.
-        return $"Az alkalmazás indítása sikertelen: {rawMessage}";
     }
 
     /// <summary>Az IAutomationDriver szerződés kötelező tagja — a mobil modulban ez a LaunchApp-ra delegál.</summary>
@@ -256,7 +190,27 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
     }
 
     /// <summary>
-    /// Az élő kijelző-tükrözés képére kattintva hívjuk: a relatív (0..1) koordinátát a
+    /// Képernyőkép közvetlenül adb-vel ("adb exec-out screencap -p") — NEM igényel Appium-
+    /// session-t, ezért már LaunchApp ELŐTT is meghívható, amint a telefon "device"
+    /// állapotban van. A élő kijelző ezt hívja, amíg nincs aktív session; utána átvált a
+    /// TryGetScreenshotAsync-re (Appium), ami session közben pontosabb/gyorsabb, mert nem
+    /// indít külön folyamatot minden képkockához.
+    /// </summary>
+    public async Task<byte[]?> TryGetScreenshotViaAdbAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var adbPath = AndroidSdkLocator.ResolveAdbPath(SdkRootOverride);
+            return await RunAdbBinaryAsync(adbPath, "exec-out screencap -p", cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Az élő kijelző képére kattintva hívjuk: a relatív (0..1) koordinátát a
     /// tényleges eszköz-felbontásra vetíti, és a PageSource XML-jéből (Appium UiAutomator2
     /// dump, minden elemhez van "bounds" attribútum) megkeresi a legkisebb, a pontot
     /// tartalmazó elemet — ez a mobil megfelelője a desktopos FromPoint-nak.
@@ -300,19 +254,251 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
                 if (best is null)
                     return null;
 
-                return new MobileElementInfo
-                {
-                    ResourceId = best.Attribute("resource-id")?.Value ?? "",
-                    ContentDesc = best.Attribute("content-desc")?.Value ?? "",
-                    ClassName = best.Attribute("class")?.Value ?? "",
-                    Text = best.Attribute("text")?.Value ?? ""
-                };
+                return BuildElementInfo(doc.Descendants().ToList(), best);
             }
             catch
             {
                 return null;
             }
         }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Ugyanaz, mint a GetElementAtRelativePointAsync, csak közvetlenül adb-vel (nem
+    /// Appium-session-en keresztül) — LaunchApp előtt is használható. Az "adb shell
+    /// uiautomator dump" ugyanazt a UI-hierarchia XML-t állítja elő, amit a UiAutomator2
+    /// driver PageSource-ja is ad, ezért a lokátor-kinyerési logika (TryParseBounds,
+    /// legkisebb-találat-keresés, BuildElementInfo) újrahasználható változtatás nélkül.
+    /// </summary>
+    public async Task<MobileElementInfo?> GetElementAtRelativePointViaAdbAsync(double relativeX, double relativeY, CancellationToken cancellationToken = default)
+    {
+        const string deviceDumpPath = "/sdcard/at_studio_window_dump.xml";
+        string? adbPath = null;
+
+        try
+        {
+            adbPath = AndroidSdkLocator.ResolveAdbPath(SdkRootOverride);
+
+            var (width, height) = await ResolveDeviceScreenSizeAsync(adbPath, cancellationToken);
+            if (width <= 0 || height <= 0)
+                return null;
+
+            var targetX = (int)(relativeX * width);
+            var targetY = (int)(relativeY * height);
+
+            await RunAdbAsync(adbPath, $"shell uiautomator dump {deviceDumpPath}", cancellationToken);
+
+            var localTempPath = Path.Combine(Path.GetTempPath(), "at-studio-window-dump.xml");
+            await RunAdbAsync(adbPath, $"pull {deviceDumpPath} \"{localTempPath}\"", cancellationToken);
+
+            if (!File.Exists(localTempPath))
+                return null;
+
+            var xml = await File.ReadAllTextAsync(localTempPath, cancellationToken);
+            try { File.Delete(localTempPath); } catch { /* ignore */ }
+
+            var doc = System.Xml.Linq.XDocument.Parse(xml);
+
+            System.Xml.Linq.XElement? best = null;
+            long bestArea = long.MaxValue;
+
+            foreach (var el in doc.Descendants())
+            {
+                var boundsAttr = el.Attribute("bounds")?.Value;
+                if (string.IsNullOrEmpty(boundsAttr) || !TryParseBounds(boundsAttr, out var rect))
+                    continue;
+
+                if (targetX < rect.X1 || targetX > rect.X2 || targetY < rect.Y1 || targetY > rect.Y2)
+                    continue;
+
+                var area = (long)(rect.X2 - rect.X1) * (rect.Y2 - rect.Y1);
+                if (area < bestArea)
+                {
+                    bestArea = area;
+                    best = el;
+                }
+            }
+
+            if (best is null)
+                return null;
+
+            return BuildElementInfo(doc.Descendants().ToList(), best);
+        }
+        catch
+        {
+            return null;
+        }
+        finally
+        {
+            // A telefonon hagyott dump-fájlt minden esetben töröljük — hiba esetén is
+            // (pl. ha a dump/pull sikerült, de az XML-parse hibázott), hogy ne maradjon
+            // szemét a /sdcard-on. Csendben hagyjuk, ha ez a törlés maga hibázna (pl.
+            // mert menet közben megszakadt a kapcsolat) — ez nem kritikus mellékhatás.
+            if (adbPath is not null)
+            {
+                try { await RunAdbAsync(adbPath, $"shell rm {deviceDumpPath}", cancellationToken); }
+                catch { /* ignore */ }
+            }
+        }
+    }
+
+    /// <summary>A "best" elemből épít egy MobileElementInfo-t, kitöltve a MatchIndex/MatchCount
+    /// mezőket is — megszámolja, hány elemnek van ugyanolyan resource-id/content-desc/class
+    /// attribútuma, és hányadik a "best" közöttük. A MatchIndex 1-alapú, emberi számozású
+    /// (1 = első találat), hogy a felhasználó felé megjelenő szám és a mezőbe beírandó
+    /// érték ugyanaz legyen, amit ténylegesen a lépésbe kell írni. FONTOS: minden
+    /// attribútum-találati listát a "domináns package" heurisztikával szűkítünk —
+    /// megnézzük, a nyers találatok közül melyik "package" attribútum-érték fordul elő
+    /// a legtöbbször, és csak azokat vesszük figyelembe. Ez azért megbízhatóbb, mint egy
+    /// előre kiolvasott csomagnévhez hasonlítani, mert MAUI/Android debug build-eknél
+    /// gyakori, hogy a ténylegesen futó applicationId ELTÉR a manifestből kiolvasható
+    /// névtől (pl. ".debug" utótag miatt) — egy pontos-egyezés szűrés emiatt tévesen
+    /// KIZÁRHATNÁ magát a saját alkalmazást is. A domináns-package heurisztika ehelyett
+    /// magukból az élő találatokból dolgozik: a rendszerszintű elemek (pl. virtuális
+    /// billentyűzet saját mezői) szinte biztos kisebbségben vannak a saját alkalmazás
+    /// elemeihez képest, ezért a "melyik fordul elő többször" megbízhatóan kiszűri őket.</summary>
+    private MobileElementInfo BuildElementInfo(System.Collections.Generic.List<System.Xml.Linq.XElement> allElements, System.Xml.Linq.XElement best)
+    {
+        (int Index, int Count) MatchInfo(string attributeName, string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return (0, 0);
+
+            var rawMatches = allElements.Where(e => e.Attribute(attributeName)?.Value == value).ToList();
+            var scopedMatches = FilterToDominantPackage(rawMatches, e => e.Attribute("package")?.Value);
+            var zeroBasedIndex = scopedMatches.FindIndex(e => ReferenceEquals(e, best));
+            return (Math.Max(0, zeroBasedIndex) + 1, scopedMatches.Count);
+        }
+
+        var resourceId = best.Attribute("resource-id")?.Value ?? "";
+        var contentDesc = best.Attribute("content-desc")?.Value ?? "";
+        var className = best.Attribute("class")?.Value ?? "";
+
+        var (resIdx, resCount) = MatchInfo("resource-id", resourceId);
+        var (descIdx, descCount) = MatchInfo("content-desc", contentDesc);
+        var (clsIdx, clsCount) = MatchInfo("class", className);
+
+        return new MobileElementInfo
+        {
+            ResourceId = resourceId,
+            ContentDesc = contentDesc,
+            ClassName = className,
+            Text = best.Attribute("text")?.Value ?? "",
+            ResourceIdMatchIndex = resIdx,
+            ResourceIdMatchCount = resCount,
+            ContentDescMatchIndex = descIdx,
+            ContentDescMatchCount = descCount,
+            ClassNameMatchIndex = clsIdx,
+            ClassNameMatchCount = clsCount
+        };
+    }
+
+    /// <summary>Egy nyers találati listát szűkít le a "domináns" (leggyakoribb) package-
+    /// csoportra — lásd BuildElementInfo doksi a heurisztika indoklásáért. Ha legfeljebb
+    /// 1 elem van, nincs mit szűrni, azt adjuk vissza változatlanul.</summary>
+    private static System.Collections.Generic.List<System.Xml.Linq.XElement> FilterToDominantPackage(
+        System.Collections.Generic.List<System.Xml.Linq.XElement> elements,
+        Func<System.Xml.Linq.XElement, string?> packageSelector)
+    {
+        if (elements.Count <= 1)
+            return elements;
+
+        var dominantPackage = elements
+            .GroupBy(packageSelector)
+            .OrderByDescending(g => g.Count())
+            .First().Key;
+
+        return elements.Where(e => packageSelector(e) == dominantPackage).ToList();
+    }
+
+    /// <summary>"adb shell wm size" kimenetét dolgozza fel — jellemzően "Physical size: 1080x2400"
+    /// formátumú (esetenként két sor is lehet, "Override size" felülbírálhatja — azt részesítjük
+    /// előnyben, ha van, mert az tükrözi a ténylegesen aktív felbontást).</summary>
+    private static async Task<(int Width, int Height)> ResolveDeviceScreenSizeAsync(string adbPath, CancellationToken cancellationToken)
+    {
+        var output = await RunAdbTextAsync(adbPath, "shell wm size", cancellationToken);
+
+        var overrideLine = output.Split('\n').FirstOrDefault(l => l.Contains("Override size"));
+        var physicalLine = output.Split('\n').FirstOrDefault(l => l.Contains("Physical size"));
+        var line = overrideLine ?? physicalLine;
+
+        if (line is null)
+            return (0, 0);
+
+        var sizePart = line.Split(':').LastOrDefault()?.Trim();
+        var dims = sizePart?.Split('x');
+        if (dims is not { Length: 2 })
+            return (0, 0);
+
+        if (!int.TryParse(dims[0], out var w) || !int.TryParse(dims[1], out var h))
+            return (0, 0);
+
+        return (w, h);
+    }
+
+    /// <summary>Szöveges kimenetet váró adb-hívás (async változat) — a meglévő, szinkron RunAdb
+    /// mellett, mert ezek a metódusok async kontextusban vannak.</summary>
+    private static async Task<string> RunAdbTextAsync(string adbPath, string arguments, CancellationToken cancellationToken)
+    {
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = adbPath,
+            Arguments = arguments,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        });
+
+        if (process is null)
+            return string.Empty;
+
+        var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+        await process.WaitForExitAsync(cancellationToken);
+        return output;
+    }
+
+    /// <summary>Egy adb-hívás eredményét nem olvassuk vissza (pl. "shell uiautomator dump",
+    /// "pull", "shell rm") — csak megvárjuk, hogy lefusson.</summary>
+    private static async Task RunAdbAsync(string adbPath, string arguments, CancellationToken cancellationToken)
+    {
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = adbPath,
+            Arguments = arguments,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        });
+
+        if (process is null)
+            return;
+
+        await process.WaitForExitAsync(cancellationToken);
+    }
+
+    /// <summary>Bináris (nem szöveges) kimenetet váró adb-hívás — a "screencap -p" nyers PNG-
+    /// bájtokat ír a stdout-ra, ezt NEM szabad szövegként (ReadToEnd) olvasni, mert az a
+    /// karakterkódolási konverzió miatt tönkretenné a bináris adatot.</summary>
+    private static async Task<byte[]?> RunAdbBinaryAsync(string adbPath, string arguments, CancellationToken cancellationToken)
+    {
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = adbPath,
+            Arguments = arguments,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        });
+
+        if (process is null)
+            return null;
+
+        using var ms = new MemoryStream();
+        await process.StandardOutput.BaseStream.CopyToAsync(ms, cancellationToken);
+        await process.WaitForExitAsync(cancellationToken);
+
+        return ms.Length > 0 ? ms.ToArray() : null;
     }
 
     /// <summary>"[x1,y1][x2,y2]" formátumú UiAutomator2 bounds string feldolgozása.</summary>
@@ -342,6 +528,8 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
 
     public Task<string?> ExecuteStepAsync(TestStep step, CancellationToken cancellationToken = default)
     {
+        LastStepUsedFallbackLocator = false;
+
         var action = Enum.Parse<MobileStepAction>(step.Action);
 
         //if (action == MobileStepAction.StartEmulator)
@@ -367,8 +555,30 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
     {
         var driver = _driver!;
         var timeout = TimeSpan.FromSeconds(Math.Max(1, step.TimeoutSeconds));
+        // A TestStep.ElementIndex 1-alapú, emberi számozású (1 = első elem, ahogy a
+        // felhasználó a felületen megadja) — itt váltjuk 0-alapú tömb-indexre, amit a
+        // FindElements(...)[index] vár. Null vagy 1 esetén az első elem (index 0).
+        var elementIndex = Math.Max(0, (step.ElementIndex ?? 1) - 1);
 
-        IWebElement Element() => FindElement(driver, RequireLocator(step.Locator), step.LocatorType, timeout);
+        // "Self-healing": ha az elsődleges lokátor a Timeout-on belül nem található, és
+        // van megadva tartalék lokátor (FallbackLocator), azzal próbálkozunk újra, MÉG
+        // EGY teljes timeout erejéig — csak akkor dobjuk tovább a kivételt, ha a tartalék
+        // sem talál semmit. A LastStepUsedFallbackLocator jelzi a hívó felé (ViewModel),
+        // hogy sikerült, de nem az elsődleges lokátorral — érdemes frissíteni azt.
+        IWebElement Element()
+        {
+            try
+            {
+                return FindElement(driver, RequireLocator(step.Locator), step.LocatorType, timeout, elementIndex);
+            }
+            catch (WebDriverTimeoutException) when (!string.IsNullOrWhiteSpace(step.FallbackLocator))
+            {
+                var fallbackElement = FindElement(driver, step.FallbackLocator!, step.FallbackLocatorType, timeout, elementIndex);
+                LastStepUsedFallbackLocator = true;
+                return fallbackElement;
+            }
+        }
+
         WebDriverWait Wait() => new(driver, timeout);
 
         switch (action)
@@ -394,7 +604,7 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
                 return null;
 
             case MobileStepAction.ScrollToElement:
-                ScrollToElement(driver, RequireLocator(step.Locator), step.LocatorType, timeout);
+                ScrollToElement(driver, RequireLocator(step.Locator), step.LocatorType, timeout, elementIndex);
                 return null;
 
             case MobileStepAction.ReadAttribute:
@@ -409,11 +619,11 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
                 return null;
 
             case MobileStepAction.WaitPresent:
-                Wait().Until(d => d.FindElements(ToBy(RequireLocator(step.Locator), step.LocatorType)).Count > 0);
+                Wait().Until(d => d.FindElements(ToBy(RequireLocator(step.Locator), step.LocatorType)).Count > elementIndex);
                 return null;
 
             case MobileStepAction.WaitAbsent:
-                Wait().Until(d => d.FindElements(ToBy(RequireLocator(step.Locator), step.LocatorType)).Count == 0);
+                Wait().Until(d => d.FindElements(ToBy(RequireLocator(step.Locator), step.LocatorType)).Count <= elementIndex);
                 return null;
 
             case MobileStepAction.WaitHasText:
@@ -498,14 +708,14 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
         driver.PerformActions(new List<ActionSequence> { seq });
     }
 
-    private static void ScrollToElement(AndroidDriver driver, string locator, LocatorType type, TimeSpan timeout)
+    private static void ScrollToElement(AndroidDriver driver, string locator, LocatorType type, TimeSpan timeout, int elementIndex = 0)
     {
         var by = ToBy(locator, type);
         const int maxAttempts = 8;
 
         for (var i = 0; i < maxAttempts; i++)
         {
-            if (driver.FindElements(by).Count > 0)
+            if (driver.FindElements(by).Count > elementIndex)
                 return;
 
             Swipe(driver, "Up");
@@ -569,8 +779,8 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
     /// <summary>
     /// Lekérdezi az ADB-n keresztül látott, elsőként csatlakoztatott eszköz állapotát és
     /// (ha elérhető) a hardver-modell nevét. A Mobil nézet "Csatlakoztatva: Samsung Galaxy S23"
-    /// jellegű állapot-sávja hívja, kézi Frissítés gombra vagy a nézet betöltésekor — NEM
-    /// automatikusan, időzítve, hogy ne fusson feleslegesen a háttérben.
+    /// jellegű állapot-sávja hívja, kézi Frissítés gombra vagy a nézet betöltésekor (és mostantól
+    /// automatikusan, időzítve is — lásd MobileTestViewModel._deviceStatusTimer).
     ///
     /// Ez a metódus független az aktív Appium session-től (_driver-től) — pusztán az ADB-t
     /// hívja közvetlenül, ezért akkor is működik, ha még nincs elindítva a StartAsync/
@@ -688,17 +898,61 @@ public sealed class MobileAutomationDriver : IAutomationDriver, IDisposable
         return (raw[..idx].Trim(), raw[(idx + 1)..].Trim());
     }
 
-    private static IWebElement FindElement(AndroidDriver driver, string locator, LocatorType type, TimeSpan timeout)
+    /// <summary>elementIndex esetén az összes találatot lekéri (FindElements), a
+    /// FilterToDominantPackage-dzsel kiszűri a nem a tesztelt alkalmazáshoz tartozó
+    /// elemeket (lásd BuildElementInfo doksi a heurisztika indoklásáért — ugyanaz a
+    /// "domináns package" logika, itt IWebElement-ekre alkalmazva), és a megadott
+    /// 0-alapú indexűt adja vissza — ha kevesebb találat van, mint amennyi az index+1
+    /// lenne, a WebDriverWait a timeout lejártáig újrapróbálkozik, majd
+    /// WebDriverTimeoutException-t dob.</summary>
+    private IWebElement FindElement(AndroidDriver driver, string locator, LocatorType type, TimeSpan timeout, int elementIndex = 0)
     {
         var wait = new WebDriverWait(driver, timeout);
-        return wait.Until(d => d.FindElement(ToBy(locator, type)));
+        return wait.Until(d =>
+        {
+            var matches = FilterToDominantPackage(d.FindElements(ToBy(locator, type)));
+            return elementIndex < matches.Count ? matches[elementIndex] : null;
+        });
     }
 
+    /// <summary>Egy nyers IWebElement-találati listát szűkít le a "domináns" (leggyakoribb)
+    /// package-csoportra — lásd BuildElementInfo doksi a heurisztika indoklásáért. Ha
+    /// legfeljebb 1 elem van, nincs mit szűrni, azt adjuk vissza változatlanul.</summary>
+    private static System.Collections.Generic.List<IWebElement> FilterToDominantPackage(
+        System.Collections.ObjectModel.ReadOnlyCollection<IWebElement> elements)
+    {
+        if (elements.Count <= 1)
+            return elements.ToList();
+
+        var withPackage = elements.Select(e =>
+        {
+            string? package;
+            try { package = e.GetAttribute("package"); }
+            catch { package = null; }
+            return (Element: e, Package: package);
+        }).ToList();
+
+        var dominantPackage = withPackage
+            .GroupBy(x => x.Package)
+            .OrderByDescending(g => g.Count())
+            .First().Key;
+
+        return withPackage.Where(x => x.Package == dominantPackage).Select(x => x.Element).ToList();
+    }
+
+    /// <summary>A ClassName lokátort szándékosan XPath-ra fordítjuk ("//{locator}"), NEM a
+    /// Selenium natív By.ClassName-jét használjuk — az utóbbi az Appium/UiAutomator2
+    /// "UiSelector"-alapú keresési mechanizmusára épül, ami MAUI CollectionView-szerű,
+    /// több egyforma osztályú elemet tartalmazó UI-knál megbízhatatlanul csak 1 találatot
+    /// adhat vissza (megfigyelt, reprodukált hiba), miközben az Inspector (PageSource-
+    /// alapú) helyesen az összeset látja. Az Appium XPath-keresője más, PageSource-szerű
+    /// mechanizmust használ, ami konzisztensen ugyanazokat a találatokat adja, mint amit
+    /// az Inspectorban láttál — ezért ezzel megszűnik az eltérés a kettő között.</summary>
     private static By ToBy(string locator, LocatorType type) => type switch
     {
         LocatorType.Id => By.Id(locator),
         LocatorType.XPath => By.XPath(locator),
-        LocatorType.ClassName => By.ClassName(locator),
+        LocatorType.ClassName => By.XPath($"//{locator}"),
         LocatorType.Name => By.Name(locator),
         LocatorType.AccessibilityId => OpenQA.Selenium.Appium.MobileBy.AccessibilityId(locator),
         _ => throw new NotSupportedException($"'{type}' lokátor-típus nem támogatott mobil automatizálásnál (Id, XPath, ClassName, Name, AccessibilityId közül választhatsz).")
