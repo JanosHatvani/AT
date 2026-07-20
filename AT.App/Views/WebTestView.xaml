@@ -492,6 +492,14 @@
         <StackPanel Orientation="Horizontal">
             <Button Content="Futtatás" Style="{StaticResource PrimaryButtonStyle}"
                     Command="{Binding RunStepsCommand}" Margin="0,0,10,0" />
+            <Button Style="{StaticResource GhostButtonStyle}"
+                    Command="{Binding ToggleRecordingCommand}" Margin="0,0,10,0">
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="8" Height="8" Fill="#FF4D4D" Margin="0,0,6,0" VerticalAlignment="Center"
+                             Visibility="{Binding IsRecording, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}" />
+                    <TextBlock Text="{Binding IsRecording, Converter={x:Static conv:RecordingButtonLabelConverter.Instance}}" />
+                </StackPanel>
+            </Button>
             <Button Content="Böngésző bezárása" Style="{StaticResource GhostButtonStyle}"
                     Command="{Binding CloseBrowserCommand}" Margin="0,0,10,0" />
             <Button Content="Riport exportálása" Style="{StaticResource GhostButtonStyle}"
@@ -500,6 +508,9 @@
             <TextBlock Text="Fut…" Style="{StaticResource SubtleTextStyle}"
                        VerticalAlignment="Center" Margin="14,0,0,0"
                        Visibility="{Binding IsRunning, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}" />
+            <TextBlock Text="● Felvétel folyamatban…" Foreground="#FF4D4D"
+                       VerticalAlignment="Center" Margin="14,0,0,0"
+                       Visibility="{Binding IsRecording, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}" />
         </StackPanel>
 
     </StackPanel>

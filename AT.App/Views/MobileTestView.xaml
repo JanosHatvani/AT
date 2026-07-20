@@ -102,10 +102,25 @@
 
                     <Button Content="Élő kijelző megnyitása"
                             Style="{StaticResource GhostButtonStyle}"
+                            Margin="0,0,10,0"
                             Command="{Binding OpenMirrorWindowCommand}"
                             Visibility="{Binding IsMirrorWindowOpen, Converter={x:Static conv:InverseBoolToVisibilityConverter.Instance}}" />
+
+                    <Button Style="{StaticResource GhostButtonStyle}"
+                            Command="{Binding ToggleRecordingCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="8" Height="8" Fill="#FF4D4D" Margin="0,0,6,0" VerticalAlignment="Center"
+                                     Visibility="{Binding IsRecording, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}" />
+                            <TextBlock Text="{Binding IsRecording, Converter={x:Static conv:RecordingButtonLabelConverter.Instance}}" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </Grid>
+
+            <TextBlock Text="● Felvétel folyamatban — kattints az élő kijelzőn a rögzítendő elemekre"
+                       Foreground="#FF4D4D"
+                       Margin="0,8,0,0"
+                       Visibility="{Binding IsRecording, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}" />
 
             <!-- ===================== ESZKÖZ-ÁLLAPOT SÁV ===================== -->
             <Border Style="{StaticResource CardStyle}" Padding="14,10" Margin="0,16,0,0">

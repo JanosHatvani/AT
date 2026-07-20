@@ -87,6 +87,13 @@ public partial class DesktopTestView : UserControl
         var ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
         var shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
 
+        if (ctrl && e.Key == Key.R && !isTextInputFocused)
+        {
+            viewModel.ToggleRecordingCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.F5 when shift:

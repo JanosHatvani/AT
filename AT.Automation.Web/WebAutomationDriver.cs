@@ -485,6 +485,125 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
                 raw, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }, cancellationToken);
 
+    // ===================== FELVEVŐ MÓD (Recorder) =====================
+    // A böngészőbe injektált JS "capture" fázisban (harmadik paraméter: true) figyeli a
+    // click és change eseményeket az egész dokumentumon — ezért olyan elemekre kattintva
+    // is elkapja az eseményt, amiken belül van egy másik, mélyebb elem (pl. egy span egy
+    // gombon belül). A change esemény (NEM input/keyup) szándékos: szövegmezőknél csak a
+    // fókusz elvesztésekor (blur) tüzel, a VÉGSŐ értékkel — nem generál egy SendKeys
+    // lépést minden egyes lenyomott billentyűre.
+
+    private const string RecorderAttachScript = @"
+        (function() {
+            if (window.__atRecorderAttached) return;
+            window.__atRecorderAttached = true;
+            window.__atRecordedQueue = [];
+
+            function atXPath(node) {
+                if (node.id) return '//*[@id=""' + node.id + '""]';
+                var parts = [];
+                while (node && node.nodeType === 1) {
+                    var idx = 1, sib = node.previousElementSibling;
+                    while (sib) { if (sib.tagName === node.tagName) idx++; sib = sib.previousElementSibling; }
+                    parts.unshift(node.tagName.toLowerCase() + '[' + idx + ']');
+                    node = node.parentElement;
+                }
+                return '/' + parts.join('/');
+            }
+
+            function bestLocator(el) {
+                if (el.id) return { type: 'Id', value: el.id };
+                var nameAttr = el.getAttribute('name');
+                if (nameAttr) return { type: 'Name', value: nameAttr };
+                return { type: 'XPath', value: atXPath(el) };
+            }
+
+            document.addEventListener('click', function(e) {
+                var el = e.target;
+                if (!el || el.nodeType !== 1) return;
+                var tag = el.tagName.toLowerCase();
+                // Szövegbeviteli mezőkre kattintva NEM rögzítünk 'Click'-et — a
+                // 'change' esemény úgyis fel fogja venni SendKeys-ként a végleges
+                // értékkel, egy plusz, felesleges Click lépés csak zajt adna.
+                if (tag === 'input' || tag === 'textarea') return;
+
+                var loc = bestLocator(el);
+                window.__atRecordedQueue.push({
+                    action: 'Click',
+                    locatorType: loc.type,
+                    locator: loc.value,
+                    value: null
+                });
+            }, true);
+
+            document.addEventListener('change', function(e) {
+                var el = e.target;
+                if (!el || el.nodeType !== 1) return;
+                var tag = el.tagName.toLowerCase();
+                if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') return;
+
+                var loc = bestLocator(el);
+                var isSelect = tag === 'select';
+                window.__atRecordedQueue.push({
+                    action: isSelect ? 'SelectByText' : 'SendKeys',
+                    locatorType: loc.type,
+                    locator: loc.value,
+                    value: isSelect ? (el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : '') : el.value
+                });
+            }, true);
+        })();";
+
+    private const string RecorderPollScript = @"
+        var queue = window.__atRecordedQueue || [];
+        window.__atRecordedQueue = [];
+        return JSON.stringify(queue);";
+
+    private const string RecorderDetachScript = @"
+        window.__atRecorderAttached = false;
+        window.__atRecordedQueue = [];";
+
+    /// <summary>Elindítja a felvételt: beinjektálja az esemény-figyelő JS-t a böngészőbe.
+    /// Idempotens — ha már fut a figyelés (pl. egy korábbi StartRecordingAsync óta nem
+    /// navigáltunk el), nem duplázza a feliratkozásokat (lásd __atRecorderAttached flag).
+    /// FONTOS: ha a felhasználó közben egy ÚJ oldalra navigál, a böngésző törli a JS
+    /// állapotot (ez normál, minden oldal saját JS-kontextussal indul) — ilyenkor a
+    /// StartRecordingAsync-et újra meg kell hívni az új oldalon. A ViewModel-oldali
+    /// polling-hurok ezt automatikusan megteszi minden ciklusban (lásd WebTestViewModel).</summary>
+    public Task StartRecordingAsync(CancellationToken cancellationToken = default)
+        => RunOnDriver(d => ((IJavaScriptExecutor)d).ExecuteScript(RecorderAttachScript), cancellationToken);
+
+    /// <summary>Leállítja a felvételt — a JS-oldali figyelőket "kikapcsolja" (a flag
+    /// visszaállításával; a document-re feliratkozott addEventListener-eket ez nem
+    /// távolítja el ténylegesen, de üresen hagyja a queue-t, és egy új StartRecordingAsync
+    /// hívás újra felül tudja írni az állapotot).</summary>
+    public Task StopRecordingAsync(CancellationToken cancellationToken = default)
+        => RunOnDriver(d => ((IJavaScriptExecutor)d).ExecuteScript(RecorderDetachScript), cancellationToken);
+
+    /// <summary>Lekéri és KIÜRÍTI a felvételi sort — a ViewModel-oldali időzítő hívja
+    /// rendszeresen (pl. 600ms-enként), amíg a felvétel aktív. Minden hívás csak az
+    /// ELŐZŐ hívás óta történt eseményeket adja vissza (a JS oldalon a queue kiürül
+    /// olvasáskor), így nem lesz duplikáció.</summary>
+    public Task<List<RecordedWebAction>> PollRecordedActionsAsync(CancellationToken cancellationToken = default)
+        => RunOnDriver(d =>
+        {
+            var raw = ((IJavaScriptExecutor)d).ExecuteScript(RecorderPollScript) as string;
+            if (string.IsNullOrWhiteSpace(raw))
+                return new List<RecordedWebAction>();
+
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<List<RecordedWebAction>>(
+                    raw, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+            }
+            catch
+            {
+                // Ha a felhasználó közben navigált, és a JS-kontextus törlődött, a
+                // window.__atRecordedQueue undefined lehet — ilyenkor egyszerűen nincs
+                // mit visszaadni, nem hiba.
+                return new List<RecordedWebAction>();
+            }
+        }, cancellationToken);
+
     // ===================== SEGÉDMETÓDUSOK =====================
 
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(10);
@@ -553,4 +672,19 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
         if (!shouldPreserveBrowser)
             _driver?.Quit();
     }
+}
+
+/// <summary>Egy, a Felvevő mód által a böngészőben elkapott esemény — a
+/// WebTestViewModel ebből épít teljes TestStep-et.</summary>
+public sealed class RecordedWebAction
+{
+    /// <summary>"Click", "SendKeys" vagy "SelectByText" — közvetlenül a WebStepAction
+    /// enum értékének felel meg, a ViewModel Enum.Parse-szal alakítja át.</summary>
+    public string Action { get; set; } = "";
+
+    /// <summary>"Id", "Name" vagy "XPath" — közvetlenül a LocatorType enum értékének felel meg.</summary>
+    public string LocatorType { get; set; } = "";
+
+    public string Locator { get; set; } = "";
+    public string? Value { get; set; }
 }

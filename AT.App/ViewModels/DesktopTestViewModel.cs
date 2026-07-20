@@ -143,6 +143,10 @@ public sealed partial class DesktopTestViewModel : ObservableObject
     [ObservableProperty]
     private bool isRunning;
 
+    /// <summary>Igaz, amíg a Felvevő mód aktív.</summary>
+    [ObservableProperty]
+    private bool isRecording;
+
 
     // A lépéslistában kijelölt sor — sorra kattintva állítódik be (lásd DesktopTestView.xaml,
     // SelectStepCommand). A billentyűparancsok (Delete, Ctrl+D, Ctrl+↑/↓) ezen keresztül
@@ -599,7 +603,7 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         finally
         {
             IsRunning = false;
-            
+
             RunStepsCommand.NotifyCanExecuteChanged();
 
             _schedulerService.SetModuleBusy(AutomationTarget.Desktop, false);
@@ -802,6 +806,62 @@ public sealed partial class DesktopTestViewModel : ObservableObject
         {
             _notificationService.Show($"Betöltés sikertelen: {ex.Message}", NotificationType.Error);
         }
+    }
+
+    /// <summary>
+    /// Felvevő mód be-/kikapcsolása. NEM igényel előzetes LaunchApp/AttachToWindow
+    /// lépést — a kattintás-felismerés a képernyő BÁRMELY pontján lévő elemet fel tudja
+    /// oldani (Automation.FromPoint), csak a UI Automation motor inicializálására
+    /// (StartAsync) van szükség, amit itt automatikusan elvégzünk, ha még nem történt
+    /// meg. FONTOS: amíg aktív, a driver a TELJES KÉPERNYŐ eseményeit figyeli (lásd
+    /// DesktopAutomationDriver doksi) — kizárólag a tesztelt alkalmazással érdemes
+    /// dolgozni eközben, függetlenül attól, hogy azt AT Studio indította-e, vagy már
+    /// eleve futott.
+    /// </summary>
+    [RelayCommand]
+    private async Task ToggleRecording()
+    {
+        if (IsRecording)
+        {
+            _driver.StopRecording();
+            _driver.ActionRecorded -= OnActionRecorded;
+            IsRecording = false;
+            _notificationService.Show("Felvétel leállítva.", NotificationType.Info);
+            return;
+        }
+
+        // Csak a UI Automation motort indítjuk el (ha még nem fut) — ez NEM indít el
+        // semmilyen alkalmazást, csupán a FromPoint-alapú elem-felismeréshez szükséges
+        // előfeltétel. Idempotens: no-op, ha már fut.
+        await _driver.StartAsync();
+
+        try
+        {
+            _driver.ActionRecorded += OnActionRecorded;
+            _driver.StartRecording();
+        }
+        catch (Exception ex)
+        {
+            _driver.ActionRecorded -= OnActionRecorded;
+            _notificationService.Show($"Felvétel indítása sikertelen: {ex.Message}", NotificationType.Error);
+            return;
+        }
+
+        IsRecording = true;
+        _notificationService.Show(
+            "Felvétel elindult — használd normálisan a tesztelt alkalmazást (kattints, gépelj), " +
+            "a lépések automatikusan megjelennek a listában. Amíg aktív, kerüld a többi ablakra " +
+            "(pl. erre az AT Studio ablakra) történő kattintást.",
+            NotificationType.Success);
+    }
+
+    /// <summary>A driver ActionRecorded eseménye hívja minden rögzített akciónál — a WPF
+    /// Dispatcher-en keresztül biztosan UI-szálon fut, ezért közvetlenül módosíthatja a
+    /// Steps ObservableCollection-t.</summary>
+    private void OnActionRecorded(TestStep step)
+    {
+        step.Label = AT.Infrastructure.StepFlowResolver.GenerateNextLabel(Steps.Select(r => r.Step).ToList());
+        Steps.Add(new TestStepRow { Step = step });
     }
 
     [RelayCommand]

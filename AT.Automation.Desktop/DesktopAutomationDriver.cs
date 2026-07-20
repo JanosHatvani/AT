@@ -46,6 +46,252 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
     /// false-ra áll vissza.</summary>
     public bool LastStepUsedFallbackLocator { get; private set; }
 
+    // ===================== FELVEVŐ MÓD (Recorder) =====================
+    // FONTOS KORLÁTOZÁS: az alacsony szintű Win32 hook-ok (WH_MOUSE_LL/WH_KEYBOARD_LL)
+    // a TELJES KÉPERNYŐN minden kattintást/billentyűleütést elkapnak, nem csak a
+    // tesztelt alkalmazáson belülieket — amíg a felvétel aktív, kizárólag a tesztelt
+    // alkalmazással érdemes dolgozni, mert MINDEN más ablakra (pl. magára az AT Studio-ra,
+    // vagy a Visual Studio-ra) történő kattintás is rögzítésre kerül.
+
+    /// <summary>Egy rögzített akció eseménye — a ViewModel iratkozik fel rá, és minden
+    /// egyes tüzelésnél hozzáadja a kapott TestStep-et a lépéslistához. SZINKRON módon,
+    /// ugyanazon a szálon tüzel, amelyiken a StartRecording() meghívódott (jellemzően a
+    /// WPF UI-szál) — lásd RaiseActionRecorded doksi.</summary>
+    public event Action<TestStep>? ActionRecorded;
+
+    public bool IsRecording => _mouseHookHandle != IntPtr.Zero;
+
+    private IntPtr _mouseHookHandle = IntPtr.Zero;
+    private IntPtr _keyboardHookHandle = IntPtr.Zero;
+    private NativeMethods.LowLevelMouseProc? _mouseProc;
+    private NativeMethods.LowLevelKeyboardProc? _keyboardProc;
+    private (string Locator, LocatorType Type, int? ElementIndex)? _lastClickLocatorInfo;
+    private bool _lastClickWasTextInput;
+    private readonly System.Text.StringBuilder _typedBuffer = new();
+
+    /// <summary>Elindítja a felvételt — telepíti az egér- és billentyűzet-hook-okat.
+    /// Idempotens: ha már fut, nem csinál semmit. A hook-oknak a hívó szálon (jellemzően
+    /// a WPF UI-szálon) kell maradniuk életben, mivel a Win32 hook-üzenetek végfeldolgozása
+    /// az adott szál üzenetszivattyúján (a WPF Dispatcher ezt biztosítja) történik.</summary>
+    public void StartRecording()
+    {
+        if (IsRecording)
+            return;
+
+        _typedBuffer.Clear();
+        _lastClickLocatorInfo = null;
+        _lastClickWasTextInput = false;
+
+        _mouseProc = MouseHookCallback;
+        _keyboardProc = KeyboardHookCallback;
+
+        using var curProcess = Process.GetCurrentProcess();
+        using var curModule = curProcess.MainModule!;
+        var moduleHandle = NativeMethods.GetModuleHandle(curModule.ModuleName);
+
+        _mouseHookHandle = NativeMethods.SetWindowsHookEx(NativeMethods.WH_MOUSE_LL, _mouseProc, moduleHandle, 0);
+        _keyboardHookHandle = NativeMethods.SetWindowsHookEx(NativeMethods.WH_KEYBOARD_LL, _keyboardProc, moduleHandle, 0);
+
+        if (_mouseHookHandle == IntPtr.Zero || _keyboardHookHandle == IntPtr.Zero)
+        {
+            StopRecording();
+            throw new InvalidOperationException("Nem sikerült telepíteni a billentyűzet-/egér-figyelést (Win32 hook hiba).");
+        }
+    }
+
+    /// <summary>Leállítja a felvételt — eltávolítja a hook-okat, és lezárja (rögzíti) az
+    /// esetleg még folyamatban lévő, be nem fejezett szöveg-gépelést.</summary>
+    public void StopRecording()
+    {
+        if (_mouseHookHandle != IntPtr.Zero)
+        {
+            NativeMethods.UnhookWindowsHookEx(_mouseHookHandle);
+            _mouseHookHandle = IntPtr.Zero;
+        }
+
+        if (_keyboardHookHandle != IntPtr.Zero)
+        {
+            NativeMethods.UnhookWindowsHookEx(_keyboardHookHandle);
+            _keyboardHookHandle = IntPtr.Zero;
+        }
+
+        FlushTypedBuffer();
+        _mouseProc = null;
+        _keyboardProc = null;
+    }
+
+    private IntPtr MouseHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+    {
+        if (nCode >= 0 && wParam == (IntPtr)NativeMethods.WM_LBUTTONDOWN)
+        {
+            try
+            {
+                var hookStruct = Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(lParam);
+                // Az ELŐZŐ mezőbe gépelt (de még le nem zárt) szöveget lezárjuk, mielőtt
+                // az új kattintást feldolgoznánk — enélkül egy gyors kattintás-gépelés-
+                // kattintás sorozatnál a szöveg a rossz (a következő) elemhez kerülne.
+                FlushTypedBuffer();
+                TryRecordClick(hookStruct.pt.x, hookStruct.pt.y);
+            }
+            catch
+            {
+                // A felvétel folytatódjon akkor is, ha egy adott kattintás feldolgozása
+                // hibázna — egyetlen kihagyott lépés jobb, mint az egész felvétel leállása.
+            }
+        }
+
+        return NativeMethods.CallNextHookEx(_mouseHookHandle, nCode, wParam, lParam);
+    }
+
+    private void TryRecordClick(int screenX, int screenY)
+    {
+        if (_automation is null)
+            return;
+
+        var element = _automation.FromPoint(new System.Drawing.Point(screenX, screenY));
+        if (element is null)
+            return;
+
+        var automationId = SafeGet(() => element.AutomationId);
+        var name = SafeGet(() => element.Name);
+        var className = SafeGet(() => element.ClassName);
+        var controlType = SafeGetControlType(element);
+
+        string locator;
+        LocatorType locatorType;
+        int? elementIndex = null;
+
+        if (!string.IsNullOrEmpty(automationId))
+        {
+            locator = automationId;
+            locatorType = LocatorType.Id;
+            var (idx, cnt) = ComputeMatchInfo(element, automationId, e => SafeGet(() => e.AutomationId));
+            if (cnt > 1) elementIndex = idx;
+        }
+        else if (!string.IsNullOrEmpty(name))
+        {
+            locator = name;
+            locatorType = LocatorType.Name;
+            var (idx, cnt) = ComputeMatchInfo(element, name, e => SafeGet(() => e.Name));
+            if (cnt > 1) elementIndex = idx;
+        }
+        else if (!string.IsNullOrEmpty(className))
+        {
+            locator = className;
+            locatorType = LocatorType.ClassName;
+            var (idx, cnt) = ComputeMatchInfo(element, className, e => SafeGet(() => e.ClassName));
+            if (cnt > 1) elementIndex = idx;
+        }
+        else
+        {
+            // Nincs használható lokátor erre az elemre (se AutomationId, se Name, se
+            // ClassName) — csendben kihagyjuk, nem tudnánk vele mit kezdeni futtatáskor
+            // sem.
+            return;
+        }
+
+        _lastClickLocatorInfo = (locator, locatorType, elementIndex);
+        _lastClickWasTextInput = controlType == FlaUI.Core.Definitions.ControlType.Edit
+            || controlType == FlaUI.Core.Definitions.ControlType.Document;
+
+        var step = new TestStep
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = $"Kattintás → {locator}",
+            Target = AutomationTarget.Desktop,
+            Action = DesktopStepAction.Click.ToString(),
+            Locator = locator,
+            LocatorType = locatorType,
+            ElementIndex = elementIndex,
+            TimeoutSeconds = 10
+        };
+
+        RaiseActionRecorded(step);
+    }
+
+    private IntPtr KeyboardHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+    {
+        if (nCode >= 0 && wParam == (IntPtr)NativeMethods.WM_KEYDOWN && _lastClickWasTextInput)
+        {
+            try
+            {
+                var hookStruct = Marshal.PtrToStructure<NativeMethods.KBDLLHOOKSTRUCT>(lParam);
+                var vk = hookStruct.vkCode;
+
+                if (vk == NativeMethods.VK_RETURN || vk == NativeMethods.VK_TAB)
+                {
+                    FlushTypedBuffer();
+                }
+                else if (vk == NativeMethods.VK_BACK)
+                {
+                    if (_typedBuffer.Length > 0)
+                        _typedBuffer.Length--;
+                }
+                else
+                {
+                    var ch = NativeMethods.VirtualKeyToChar(vk);
+                    if (ch.HasValue)
+                        _typedBuffer.Append(ch.Value);
+                }
+            }
+            catch
+            {
+                // A felvétel folytatódjon akkor is, ha egy adott billentyű feldolgozása hibázna.
+            }
+        }
+
+        return NativeMethods.CallNextHookEx(_keyboardHookHandle, nCode, wParam, lParam);
+    }
+
+    /// <summary>Az addig összegyűjtött, begépelt szöveget SendKeys lépésként lezárja és
+    /// kiküldi (ha van mit) — az utolsó kattintás lokátorát célozva. Hívódik: Enter/Tab
+    /// leütésekor, a következő kattintás előtt, és a felvétel leállításakor.</summary>
+    private void FlushTypedBuffer()
+    {
+        if (_typedBuffer.Length == 0 || _lastClickLocatorInfo is null)
+        {
+            _typedBuffer.Clear();
+            return;
+        }
+
+        var (locator, locatorType, elementIndex) = _lastClickLocatorInfo.Value;
+        var text = _typedBuffer.ToString();
+        _typedBuffer.Clear();
+
+        var step = new TestStep
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = $"Szöveg beírása → {locator} → {text}",
+            Target = AutomationTarget.Desktop,
+            Action = DesktopStepAction.SetText.ToString(),
+            Locator = locator,
+            LocatorType = locatorType,
+            ElementIndex = elementIndex,
+            Value = text,
+            TimeoutSeconds = 10
+        };
+
+        RaiseActionRecorded(step);
+        _lastClickWasTextInput = false;
+    }
+
+    private void RaiseActionRecorded(TestStep step)
+    {
+        // A hook callback ugyanazon a szálon fut, amelyik a SetWindowsHookEx-et hívta
+        // (StartRecording-ban) — vagyis a WPF UI-szálon, hiszen a ViewModel a UI-szálról
+        // hívja a StartRecording()-ot. Emiatt NEM kell külön Dispatcher-en átküldeni az
+        // eseményt (ráadásul ez a projekt egy sima osztálykönyvtár, nem WPF-projekt,
+        // a System.Windows.Application itt nem is lenne elérhető) — egyszerű, szinkron
+        // hívás biztonságos.
+        ActionRecorded?.Invoke(step);
+    }
+
+    private static FlaUI.Core.Definitions.ControlType? SafeGetControlType(AutomationElement element)
+    {
+        try { return element.ControlType; }
+        catch { return null; }
+    }
+
     // ===================== ÉLETCIKLUS =====================
 
     public Task StartAsync(CancellationToken cancellationToken = default)
@@ -466,6 +712,101 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
     {
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         public static extern IntPtr FindWindow(string? lpClassName, string lpWindowName);
+
+        // ===== Felvevő mód: alacsony szintű egér-/billentyűzet-hook =====
+
+        public const int WH_MOUSE_LL = 14;
+        public const int WH_KEYBOARD_LL = 13;
+        public const int WM_LBUTTONDOWN = 0x0201;
+        public const int WM_KEYDOWN = 0x0100;
+        public const uint VK_RETURN = 0x0D;
+        public const uint VK_TAB = 0x09;
+        public const uint VK_BACK = 0x08;
+
+        public delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
+        public delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct POINT
+        {
+            public int x;
+            public int y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MSLLHOOKSTRUCT
+        {
+            public POINT pt;
+            public uint mouseData;
+            public uint flags;
+            public uint time;
+            public IntPtr dwExtraInfo;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct KBDLLHOOKSTRUCT
+        {
+            public uint vkCode;
+            public uint scanCode;
+            public uint flags;
+            public uint time;
+            public IntPtr dwExtraInfo;
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        public static extern IntPtr GetModuleHandle(string? lpModuleName);
+
+        [DllImport("user32.dll")]
+        public static extern bool GetKeyboardState(byte[] lpKeyState);
+
+        [DllImport("user32.dll")]
+        public static extern uint MapVirtualKey(uint uCode, uint uMapType);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetKeyboardLayout(uint idThread);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern int ToUnicodeEx(
+            uint wVirtKey, uint wScanCode, byte[] lpKeyState,
+            [Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pwszBuff,
+            int cchBuff, uint wFlags, IntPtr dwhkl);
+
+        /// <summary>Egy virtuális billentyűkódot ("VK_...") a jelenlegi billentyűzet-
+        /// kiosztás és Shift/CapsLock állapot szerint tényleges karakterré alakít — pl.
+        /// Shift+'a' VK-ból 'A'-t ad. Null-t ad vissza vezérlő-/funkcióbillentyűknél
+        /// (F1-F12, nyilak, stb.), amikhez nincs értelmes karakter-megfelelő.</summary>
+        public static char? VirtualKeyToChar(uint vkCode)
+        {
+            try
+            {
+                var keyboardState = new byte[256];
+                if (!GetKeyboardState(keyboardState))
+                    return null;
+
+                var scanCode = MapVirtualKey(vkCode, 0);
+                var sb = new System.Text.StringBuilder(4);
+                var result = ToUnicodeEx(vkCode, scanCode, keyboardState, sb, sb.Capacity, 0, GetKeyboardLayout(0));
+
+                return result > 0 && sb.Length > 0 ? sb[0] : (char?)null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
     }
 
     /// <summary>

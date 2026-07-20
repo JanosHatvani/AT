@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Threading;
 using AT.App.Models;
 using AT.App.Services;
 using AT.Automation.Web;
@@ -25,6 +26,7 @@ public sealed partial class WebTestViewModel : ObservableObject
     private readonly IScheduledTaskService _scheduledTaskService;
     private readonly ISchedulerService _schedulerService;
     private readonly ITestCategoryService _categoryService;
+    private readonly DispatcherTimer _recordingTimer;
 
     // A folyamatban lévő (vagy legutóbb befejezett) futtatás képernyőkép-mappája — null, ha ehhez a futtatáshoz nem készül kép.
     private string? _currentRunScreenshotFolder;
@@ -146,6 +148,11 @@ public sealed partial class WebTestViewModel : ObservableObject
     [ObservableProperty]
     private bool isRunning;
 
+    /// <summary>Igaz, amíg a Felvevő mód aktív — a felület ez alapján mutatja/rejti a
+    /// "Felvétel leállítása" gombot, és pirosít egy jelző-pöttyöt.</summary>
+    [ObservableProperty]
+    private bool isRecording;
+
 
     // A lépéslistában kijelölt sor — sorra kattintva állítódik be (lásd WebTestView.xaml,
     // SelectStepCommand). A billentyűparancsok (Delete, Ctrl+D, Ctrl+↑/↓) ezen keresztül
@@ -188,6 +195,9 @@ public sealed partial class WebTestViewModel : ObservableObject
         _scheduledTaskService = scheduledTaskService;
         _schedulerService = schedulerService;
         _categoryService = categoryService;
+        _recordingTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
+        _recordingTimer.Tick += async (_, _) => await PollRecordingAsync();
+
         Steps.CollectionChanged += (_, _) =>
         {
             RunStepsCommand.NotifyCanExecuteChanged();
@@ -601,7 +611,7 @@ public sealed partial class WebTestViewModel : ObservableObject
         finally
         {
             IsRunning = false;
-
+            
             RunStepsCommand.NotifyCanExecuteChanged();
 
             _schedulerService.SetModuleBusy(AutomationTarget.Web, false);
@@ -809,6 +819,111 @@ public sealed partial class WebTestViewModel : ObservableObject
         catch (Exception ex)
         {
             _notificationService.Show($"Betöltés sikertelen: {ex.Message}", NotificationType.Error);
+        }
+    }
+
+    /// <summary>
+    /// Felvevő mód be-/kikapcsolása. Bekapcsoláskor — ugyanúgy, mint az Elem-kereső — ha
+    /// nincs aktív session, CSATLAKOZUNK egy már megnyitott (vagy egyszeri alkalommal
+    /// most elindított) böngészőhöz, majd beinjektáljuk a felvevő JS-t, és elindul egy
+    /// időzítő, ami 600ms-enként lekérdezi az azóta történt kattintásokat/gépeléseket, és
+    /// automatikusan lépésként hozzáadja őket a listához. Kikapcsoláskor csak az
+    /// időzítőt állítjuk le és a JS-oldali figyelést kapcsoljuk ki — magát a böngésző-
+    /// session-t NEM zárjuk be (ugyanúgy használható utána "Futtatás"-hoz is).
+    /// </summary>
+    [RelayCommand]
+    private async Task ToggleRecording()
+    {
+        if (IsRecording)
+        {
+            _recordingTimer.Stop();
+            IsRecording = false;
+
+            try { await _driver.StopRecordingAsync(); }
+            catch { /* a session úgyis megmarad, egy hiba itt nem kritikus */ }
+
+            _notificationService.Show("Felvétel leállítva.", NotificationType.Info);
+            return;
+        }
+
+        if (!_driver.IsRunning)
+        {
+            try
+            {
+                await _driver.AttachToRunningBrowserAsync();
+            }
+            catch (Exception ex)
+            {
+                _notificationService.Show($"Nem sikerült csatlakozni a böngészőhöz: {ex.Message}", NotificationType.Error);
+                return;
+            }
+        }
+
+        try
+        {
+            await _driver.StartRecordingAsync();
+        }
+        catch (Exception ex)
+        {
+            _notificationService.Show($"Felvétel indítása sikertelen: {ex.Message}", NotificationType.Error);
+            return;
+        }
+
+        IsRecording = true;
+        _recordingTimer.Start();
+        _notificationService.Show(
+            "Felvétel elindult — böngéssz és kattints/gépelj normálisan a böngészőben, a lépések automatikusan megjelennek a listában.",
+            NotificationType.Success);
+    }
+
+    /// <summary>A _recordingTimer hívja rendszeresen, amíg a felvétel aktív. Minden
+    /// lekérdezett eseményből egy teljes TestStep-et épít, és hozzáadja a Steps-hez.
+    /// Ha a felhasználó közben új oldalra navigált (a JS-kontextus emiatt törlődött),
+    /// csendben újra beinjektáljuk a figyelőt — enélkül navigáció után a felvétel
+    /// némán leállna, amit a felhasználó könnyen észre sem venne.</summary>
+    private async Task PollRecordingAsync()
+    {
+        List<RecordedWebAction> actions;
+        try
+        {
+            actions = await _driver.PollRecordedActionsAsync();
+        }
+        catch
+        {
+            return;
+        }
+
+        // Ha a queue üres ÉS a session még fut, megpróbáljuk újra beinjektálni a
+        // figyelőt is — ez olcsó (a JS elején van egy "már fut" ellenőrzés), és
+        // biztosítja, hogy egy navigáció utáni új oldalon is folytatódjon a felvétel.
+        if (_driver.IsRunning)
+        {
+            try { await _driver.StartRecordingAsync(); }
+            catch { /* ha épp navigáció közben vagyunk, a következő tick úgyis újrapróbálja */ }
+        }
+
+        foreach (var recorded in actions)
+        {
+            if (!Enum.TryParse<LocatorType>(recorded.LocatorType, out var locatorType))
+                locatorType = LocatorType.XPath;
+
+            if (!Enum.TryParse<WebStepAction>(recorded.Action, out var action))
+                continue;
+
+            var step = new TestStep
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Name = BuildStepName(action, recorded.Locator, recorded.Value ?? "", ""),
+                Target = AutomationTarget.Web,
+                Action = action.ToString(),
+                Locator = recorded.Locator,
+                LocatorType = locatorType,
+                Value = recorded.Value,
+                TimeoutSeconds = _defaultTimeoutSeconds,
+                Label = AT.Infrastructure.StepFlowResolver.GenerateNextLabel(Steps.Select(r => r.Step).ToList())
+            };
+
+            Steps.Add(new TestStepRow { Step = step });
         }
     }
 

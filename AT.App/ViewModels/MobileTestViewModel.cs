@@ -265,6 +265,10 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
     [ObservableProperty]
     private bool isPicking;
 
+    /// <summary>Igaz, amíg a Felvevő mód aktív — lásd ToggleRecordingCommand.</summary>
+    [ObservableProperty]
+    private bool isRecording;
+
     /// <summary>Igaz, ha az Élő kijelző önálló ablaka jelenleg látható. A fő nézet ez alapján
     /// dönti el, hogy mutassa-e az "Élő kijelző megnyitása" gombot.</summary>
     [ObservableProperty]
@@ -1112,6 +1116,8 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         }
 
         IsPicking = !IsPicking;
+        if (IsPicking)
+            IsRecording = false; // a két mód kölcsönösen kizárja egymást
         InspectorCandidates.Clear();
         OnPropertyChanged(nameof(HasInspectorResult));
 
@@ -1121,24 +1127,39 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
 
     /// <summary>Az élő kijelző képére kattintva hívja a code-behind (relatív, 0..1 koordinátával).
     /// Aktív Appium-session esetén az Appium PageSource-t, egyébként (session nélkül, csak
-    /// csatlakoztatott eszközzel) a közvetlen adb-alapú uiautomator dump-ot használja.</summary>
+    /// csatlakoztatott eszközzel) a közvetlen adb-alapú uiautomator dump-ot használja.
+    /// Felvevő módban (IsRecording) a talált elemet NEM jelölt-listaként mutatja meg
+    /// kiválasztásra, hanem AZONNAL, automatikusan hozzáad egy "Kattintás" lépést —
+    /// ez az asszisztált felvétel lényege: a mobil oldalon nincs natív "hallgasd az
+    /// érintéseket" mechanizmus, ezért minden rögzítendő kattintást a felhasználónak
+    /// magán az élő kijelzőn kell megtennie (nem a telefonon közvetlenül).</summary>
     public async Task CaptureElementAtAsync(double relativeX, double relativeY)
     {
-        if (!IsPicking || relativeX is < 0 or > 1 || relativeY is < 0 or > 1)
+        if ((!IsPicking && !IsRecording) || relativeX is < 0 or > 1 || relativeY is < 0 or > 1)
             return;
 
         var info = _driver.IsRunning
             ? await _driver.GetElementAtRelativePointAsync(relativeX, relativeY)
             : await _driver.GetElementAtRelativePointViaAdbAsync(relativeX, relativeY);
 
-        InspectorCandidates.Clear();
-
         if (info is null)
         {
             _notificationService.Show("Nem található elem ezen a ponton.", NotificationType.Warning);
-            OnPropertyChanged(nameof(HasInspectorResult));
+            if (IsPicking)
+            {
+                InspectorCandidates.Clear();
+                OnPropertyChanged(nameof(HasInspectorResult));
+            }
             return;
         }
+
+        if (IsRecording)
+        {
+            AddRecordedClickStep(info);
+            return;
+        }
+
+        InspectorCandidates.Clear();
 
         AddInspectorCandidate(LocatorType.Id, "resource-id", info.ResourceId, info.ResourceIdMatchIndex, info.ResourceIdMatchCount);
         AddInspectorCandidate(LocatorType.AccessibilityId, "content-desc", info.ContentDesc, info.ContentDescMatchIndex, info.ContentDescMatchCount);
@@ -1148,6 +1169,148 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
 
         if (!HasInspectorResult)
             _notificationService.Show("Az elemnek nincs használható azonosítója.", NotificationType.Warning);
+    }
+
+    /// <summary>Felvevő módban a kattintott elemből közvetlenül épít egy "Click" TestStep-et,
+    /// és hozzáadja a listához — ugyanazt a prioritási sorrendet követi, mint amit a
+    /// felhasználó kézzel is választana a jelöltek közül (content-desc > resource-id >
+    /// class), csak automatikusan, a legjobb elérhető lokátort választva.</summary>
+    private void AddRecordedClickStep(MobileElementInfo info)
+    {
+        string locator;
+        LocatorType locatorType;
+        int? elementIndex = null;
+
+        if (!string.IsNullOrWhiteSpace(info.ContentDesc))
+        {
+            locator = info.ContentDesc;
+            locatorType = LocatorType.AccessibilityId;
+            if (info.ContentDescMatchCount > 1) elementIndex = info.ContentDescMatchIndex;
+        }
+        else if (!string.IsNullOrWhiteSpace(info.ResourceId))
+        {
+            locator = info.ResourceId;
+            locatorType = LocatorType.Id;
+            if (info.ResourceIdMatchCount > 1) elementIndex = info.ResourceIdMatchIndex;
+        }
+        else if (!string.IsNullOrWhiteSpace(info.ClassName))
+        {
+            locator = info.ClassName;
+            locatorType = LocatorType.ClassName;
+            if (info.ClassNameMatchCount > 1) elementIndex = info.ClassNameMatchIndex;
+        }
+        else
+        {
+            _notificationService.Show("Az elemnek nincs használható azonosítója — kihagyva.", NotificationType.Warning);
+            return;
+        }
+
+        _lastRecordedLocator = locator;
+        _lastRecordedLocatorType = locatorType;
+        _lastRecordedElementIndex = elementIndex;
+
+        var step = new TestStep
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = $"Kattintás → {locator}",
+            Target = AutomationTarget.Android,
+            Action = MobileStepAction.Click.ToString(),
+            Locator = locator,
+            LocatorType = locatorType,
+            ElementIndex = elementIndex,
+            TimeoutSeconds = _defaultTimeoutSeconds,
+            Label = AT.Infrastructure.StepFlowResolver.GenerateNextLabel(Steps.Select(r => r.Step).ToList())
+        };
+
+        Steps.Add(new TestStepRow { Step = step });
+        _notificationService.Show($"Rögzítve: Kattintás → {locator}", NotificationType.Success);
+    }
+
+    /// <summary>Felvevő módban az utolsó rögzített kattintás lokátorát tároljuk el, hogy
+    /// a "Szöveg rögzítése" gomb (lásd RecordingTextInput/AddRecordedTextCommand) tudja,
+    /// melyik elemre vonatkozzon a SendKeys lépés.</summary>
+    private string? _lastRecordedLocator;
+    private LocatorType _lastRecordedLocatorType;
+    private int? _lastRecordedElementIndex;
+
+    /// <summary>Felvevő módban a szövegbeviteli mezőkbe írandó szöveg gyors rögzítéséhez —
+    /// mivel a mobil oldalon nincs natív "hallgasd a begépelt karaktereket" mechanizmus,
+    /// a felhasználó ide írja be a szöveget, ami a "Szöveg rögzítése" gombra kattintva
+    /// SendKeys lépésként kerül be, az UTOLJÁRA rögzített kattintás lokátorát célozva
+    /// (a tipikus munkafolyamat: kattints a mezőre az élő kijelzőn → írd be ide a
+    /// szöveget → "Szöveg rögzítése").</summary>
+    [ObservableProperty]
+    private string recordingTextInput = "";
+
+    [RelayCommand]
+    private void AddRecordedText()
+    {
+        if (string.IsNullOrWhiteSpace(RecordingTextInput))
+            return;
+
+        if (_lastRecordedLocator is null)
+        {
+            _notificationService.Show("Előbb kattints egy mezőre az élő kijelzőn, hogy legyen mihez rendelni a szöveget.", NotificationType.Warning);
+            return;
+        }
+
+        var step = new TestStep
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = $"Szöveg beírása → {_lastRecordedLocator} → {RecordingTextInput}",
+            Target = AutomationTarget.Android,
+            Action = MobileStepAction.SendKeys.ToString(),
+            Locator = _lastRecordedLocator,
+            LocatorType = _lastRecordedLocatorType,
+            ElementIndex = _lastRecordedElementIndex,
+            Value = RecordingTextInput,
+            TimeoutSeconds = _defaultTimeoutSeconds,
+            Label = AT.Infrastructure.StepFlowResolver.GenerateNextLabel(Steps.Select(r => r.Step).ToList())
+        };
+
+        Steps.Add(new TestStepRow { Step = step });
+        RecordingTextInput = "";
+    }
+
+    /// <summary>
+    /// Felvevő mód be-/kikapcsolása. Bekapcsoláskor — ha még nincs aktív session vagy
+    /// csatlakoztatott eszköz — figyelmezteti a felhasználót, hogy előbb fusson le egy
+    /// LaunchApp lépés. Automatikusan elindítja az élő kijelző tükrözését is (ha még
+    /// nem aktív), mert a felvétel MAGÁN az élő kijelzőn történő kattintásokra épül.
+    /// </summary>
+    [RelayCommand]
+    private async Task ToggleRecording()
+    {
+        if (IsRecording)
+        {
+            IsRecording = false;
+            _lastRecordedLocator = null;
+            RecordingTextInput = "";
+            _notificationService.Show("Felvétel leállítva.", NotificationType.Info);
+            return;
+        }
+
+        if (!_driver.IsRunning)
+            await RefreshDeviceStatusAsync();
+
+        if (!_driver.IsRunning && !IsDeviceConnected)
+        {
+            _notificationService.Show("Nincs csatlakoztatott eszköz és nincs aktív session sem — előbb futtass egy 'LaunchApp' lépést, vagy csatlakoztass egy telefont.", NotificationType.Warning);
+            return;
+        }
+
+        IsRecording = true;
+        IsPicking = false;
+        InspectorCandidates.Clear();
+        OnPropertyChanged(nameof(HasInspectorResult));
+
+        if (!IsMirroring)
+            await ToggleMirroring();
+
+        _notificationService.Show(
+            "Felvétel elindult — kattints az élő kijelzőn a kívánt elemekre; minden kattintás automatikusan 'Kattintás' lépést ad hozzá. " +
+            "Szövegbeviteli mezőnél a kattintás után írd be a szöveget a felvétel-panel mezőjébe, majd 'Szöveg rögzítése'.",
+            NotificationType.Success);
     }
 
     /// <summary>matchCount &gt; 1 esetén a Label-hez hozzáfűzi a "lokátor N. eleme (összesen M)"
