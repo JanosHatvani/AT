@@ -11,6 +11,21 @@ public partial class MobileTestView : UserControl
     public MobileTestView()
     {
         InitializeComponent();
+
+        // Enélkül a billentyűparancsok (F5, Ctrl+R, stb.) csak azután működnének, hogy
+        // a felhasználó előbb kattint valahova a tartalomban — navigáláskor a fókusz
+        // gyakran a nézetet megnyitó menügombon marad.
+        // A sima "Loaded += Focus()" időzítési okokból nem mindig megbízható (a
+        // ContentControl-alapú, ViewModel-first navigációnál — lásd MainWindow.xaml
+        // CurrentViewModel binding — a nézet betöltésekor a fókusz még a sidebar
+        // navigációs gombján van, ami a vizuális fa EGY MÁSIK ágán van, mint ez a
+        // nézet). A Dispatcher.BeginInvoke Input-prioritással biztosítja, hogy a
+        // Focus() hívás már azután fusson le, hogy a vizuális fa teljesen kész
+        // (látható, elrendezett) — enélkül a Focus() néha csendben sikertelen marad,
+        // és a PreviewKeyDown-alapú billentyűparancsok (Ctrl+R, stb.) soha nem sülnek el.
+        Loaded += (_, _) => Dispatcher.BeginInvoke(
+            new Action(() => Focus()),
+            System.Windows.Threading.DispatcherPriority.Input);
     }
 
     
@@ -137,7 +152,10 @@ public partial class MobileTestView : UserControl
         var ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
         var shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
 
-        if (ctrl && e.Key == Key.R && !isTextInputFocused)
+        // Nincs isTextInputFocused-ellenőrzés — a Ctrl+R-nek nincs alapértelmezett
+        // WPF TextBox-viselkedése (nem ütközik szövegszerkesztéssel), ezért bárhonnan
+        // elsülhet, még akkor is, ha épp egy mezőben áll a fókusz.
+        if (ctrl && e.Key == Key.R)
         {
             viewModel.ToggleRecordingCommand.Execute(null);
             e.Handled = true;

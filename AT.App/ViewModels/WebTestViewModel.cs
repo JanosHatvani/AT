@@ -611,7 +611,7 @@ public sealed partial class WebTestViewModel : ObservableObject
         finally
         {
             IsRunning = false;
-            
+
             RunStepsCommand.NotifyCanExecuteChanged();
 
             _schedulerService.SetModuleBusy(AutomationTarget.Web, false);
@@ -840,23 +840,42 @@ public sealed partial class WebTestViewModel : ObservableObject
             IsRecording = false;
 
             try { await _driver.StopRecordingAsync(); }
-            catch { /* a session úgyis megmarad, egy hiba itt nem kritikus */ }
+            catch { /* a böngészőt úgyis rögtön bezárjuk, egy hiba itt nem kritikus */ }
 
-            _notificationService.Show("Felvétel leállítva.", NotificationType.Info);
+            // A felvétel leállítása egy explicit, szándékos "végeztem" döntés — ilyenkor
+            // a felvételhez megnyitott böngészőnek is be kell záródnia, ne kelljen még
+            // külön a "Böngésző bezárása" gombra is kattintani.
+            await _driver.CloseBrowserForceAsync();
+
+            _notificationService.Show("Felvétel leállítva, böngésző bezárva.", NotificationType.Info);
             return;
         }
 
         if (!_driver.IsRunning)
         {
+            // IsRecording AZONNAL true-ra áll, MIELŐTT bármilyen await elindulna — enélkül,
+            // ha a böngésző megnyitása pár másodpercig tart, és a felhasználó türelmetlenül
+            // újra megnyomja a Ctrl+R-t/gombot, a második hívás is IsRecording==false-t
+            // látna, és megint az "indítás" ágba futna (versenyhelyzet: második böngésző
+            // nyílna, vagy a felvétel dupla indulna). Mivel egy async metódus teste az
+            // első await-ig SZINKRON fut le, ez a sor garantáltan lefut, mielőtt bármi
+            // más (pl. egy második gombnyomás) a metódusba léphetne.
+            IsRecording = true;
+
             try
             {
                 await _driver.AttachToRunningBrowserAsync();
             }
             catch (Exception ex)
             {
+                IsRecording = false;
                 _notificationService.Show($"Nem sikerült csatlakozni a böngészőhöz: {ex.Message}", NotificationType.Error);
                 return;
             }
+        }
+        else
+        {
+            IsRecording = true;
         }
 
         try
@@ -865,11 +884,11 @@ public sealed partial class WebTestViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            IsRecording = false;
             _notificationService.Show($"Felvétel indítása sikertelen: {ex.Message}", NotificationType.Error);
             return;
         }
 
-        IsRecording = true;
         _recordingTimer.Start();
         _notificationService.Show(
             "Felvétel elindult — böngéssz és kattints/gépelj normálisan a böngészőben, a lépések automatikusan megjelennek a listában.",
@@ -965,7 +984,20 @@ public sealed partial class WebTestViewModel : ObservableObject
     [RelayCommand]
     private async Task CloseBrowserAsync()
     {
-        await _driver.StopAsync();
+        // Ha épp fut a Felvevő, azt is le kell állítani — a böngésző bezárása után a
+        // JS-oldali figyelő úgyis eltűnik, az időzítő viszont felesleges hívásokat
+        // küldene egy már nem létező session-nek.
+        if (IsRecording)
+        {
+            _recordingTimer.Stop();
+            IsRecording = false;
+        }
+
+        // Szándékosan a "force" változatot hívjuk, NEM a StopAsync-et — ez a gomb egy
+        // explicit, szándékos "zárd be a böngészőt" döntés a felhasználótól, ezért
+        // mindig ténylegesen be kell záródnia, akkor is, ha épp egy már korábban futó
+        // (nem az AT Studio által indított) böngészőhöz csatlakoztunk.
+        await _driver.CloseBrowserForceAsync();
         _notificationService.Show("Böngésző bezárva.", NotificationType.Info);
     }
 

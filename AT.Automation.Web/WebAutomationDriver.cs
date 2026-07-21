@@ -161,6 +161,16 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
         }
     }
 
+    /// <summary>Az általunk indított debug-módú böngésző folyamat-objektuma — ezt
+    /// KÖZVETLENÜL állítjuk le bezáráskor (CloseBrowserForceAsync), NEM a Selenium
+    /// driver.Quit()-jára hagyatkozva. Ez azért fontos, mert amikor a ChromeDriver egy
+    /// MÁR FUTÓ böngészőhöz csatlakozik "debuggerAddress"-en keresztül (nem ő indította
+    /// a folyamatot közvetlenül a saját ChromeDriverService-én keresztül), a Quit() sok
+    /// esetben NEM zárja be ténylegesen a böngészőt — csak a WebDriver-session-t
+    /// fejezi be, a böngésző-ablak nyitva marad. A saját magunk által indított folyamat
+    /// kilövése (Kill) viszont garantáltan működik.</summary>
+    private Process? _launchedBrowserProcess;
+
     /// <summary>
     /// Elindít egy Chrome/Edge-et "remote debugging" móddal — ez egy TELJESEN NORMÁL,
     /// látható böngészőablak, amiben a felhasználó szabadon navigálhat, bejelentkezhet,
@@ -172,14 +182,24 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
     /// "normál", nem debug-módú böngészőjével (a kettő nem futtatható ugyanazzal a
     /// profillal egyszerre).
     /// </summary>
-    private static void LaunchDebugModeBrowser(string executableName, int port)
+    private void LaunchDebugModeBrowser(string executableName, int port)
     {
         var profileDir = Path.Combine(Path.GetTempPath(), $"AT-Studio-{executableName}-Debug-Profile");
         Directory.CreateDirectory(profileDir);
 
-        Process.Start(new ProcessStartInfo
+        // UseShellExecute=false + a folyamat-objektum elmentése — enélkül (UseShellExecute
+        // =true esetén) nem biztos, hogy a visszaadott Process a TÉNYLEGES böngésző-
+        // folyamatra mutat (némely gépen a ShellExecute csak egy indító "launcher"
+        // folyamatot ad vissza, ami rögtön ki is lép, miután elindította a valódi
+        // böngészőt) — UseShellExecute=false-szal a .NET a megadott .exe-t KÖZVETLENÜL
+        // indítja el egy gyerekfolyamatként, aminek életciklusát megbízhatóan tudjuk követni.
+        // CSERÉBE viszont a teljes elérési utat magunknak kell feloldanunk (lásd
+        // ResolveBrowserExecutablePath) — a puszta "chrome"/"msedge" név, amit korábban
+        // a ShellExecute az "App Paths" registry-n keresztül automatikusan feloldott,
+        // UseShellExecute=false mellett már nem elég.
+        _launchedBrowserProcess = Process.Start(new ProcessStartInfo
         {
-            FileName = executableName,
+            FileName = ResolveBrowserExecutablePath(executableName),
             // A --remote-allow-origins=* KÖTELEZŐ Chrome 111+ verziótól — enélkül a
             // böngésző elutasítja/instabillá teszi a külső DevTools-kapcsolatokat
             // (amit a Selenium a csatlakozáshoz használ), ami pont olyan, időszakos,
@@ -187,8 +207,90 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
             // manuálisan beírt URL-eknél — miközben a kezdőlap (helyi, nem hálózati
             // navigáció) még simán betöltődik, ezért tűnhet úgy, mintha "majdnem" működne.
             Arguments = $"--remote-debugging-port={port} --remote-allow-origins=* --user-data-dir=\"{profileDir}\" --no-first-run --no-default-browser-check",
-            UseShellExecute = true
+            UseShellExecute = false
         });
+    }
+
+    /// <summary>A régi kód UseShellExecute=true mellett a Windows "App Paths" registry-
+    /// bejegyzését használta a puszta "chrome"/"msedge" név feloldásához — mivel most
+    /// UseShellExecute=false-ra váltottunk (hogy a folyamat-objektumot megbízhatóan
+    /// tudjuk követni/kilőni), ezt a feloldást explicit magunknak kell elvégeznünk.</summary>
+    private static string ResolveBrowserExecutablePath(string executableName)
+    {
+        try
+        {
+            var registryPath = $@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{executableName}.exe";
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(registryPath)
+                ?? Microsoft.Win32.Registry.CurrentUser.OpenSubKey(registryPath);
+
+            if (key?.GetValue(null) as string is { } registryPathValue && File.Exists(registryPathValue))
+                return registryPathValue;
+        }
+        catch
+        {
+            // Ha a registry-olvasás bármiért hibázna, egyszerűen a lenti tartalék
+            // útvonalakkal próbálkozunk tovább.
+        }
+
+        // Végső tartalék: a leggyakoribb telepítési helyek, ha a registry-bejegyzés
+        // valamiért hiányozna.
+        var fallbackCandidates = executableName == "msedge"
+            ? new[]
+            {
+                @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                @"C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+            }
+            : new[]
+            {
+                @"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                @"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
+            };
+
+        foreach (var candidate in fallbackCandidates)
+        {
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        // Ha semmi nem vált be, visszaadjuk az eredeti nevet — a Process.Start ekkor
+        // valószínűleg hibázni fog, de legalább egyértelmű "nem található" hibát kapsz,
+        // nem egy hamis "sikeresen elindult, de nem követhető" állapotot.
+        return executableName;
+    }
+
+    /// <summary>Közvetlenül, az OS-folyamatot leállítva bezárja a MI ÁLTALUNK indított
+    /// debug-böngészőt (ha volt ilyen) — a Selenium driver.Quit()-jától FÜGGETLENÜL,
+    /// mert az (lásd _launchedBrowserProcess doksi) attach-elt session-nél gyakran nem
+    /// hatásos. Előbb megpróbálja "szelíden" (CloseMainWindow — ez engedi a böngészőnek
+    /// elmenteni a munkamenet-állapotot, "Visszaállítja a korábbi lapokat" funkcióhoz),
+    /// majd ha rövid időn belül nem záródna be magától, kényszerrel (Kill) megszünteti.</summary>
+    private void KillLaunchedBrowserProcessIfAny()
+    {
+        var process = _launchedBrowserProcess;
+        _launchedBrowserProcess = null;
+
+        if (process is null)
+            return;
+
+        try
+        {
+            if (process.HasExited)
+                return;
+
+            process.CloseMainWindow();
+
+            if (!process.WaitForExit(2000))
+                process.Kill(entireProcessTree: true);
+        }
+        catch
+        {
+            // Ha már időközben magától bezáródott, vagy bármi más hiba történne itt,
+            // nincs mit tenni — a lényeg, hogy ez sose dobjon tovább kivételt a hívónak.
+        }
+        finally
+        {
+            process.Dispose();
+        }
     }
 
     private static IWebDriver CreateChrome()
@@ -221,6 +323,36 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
         return driver;
     }
 
+    /// <summary>
+    /// Mindig TÉNYLEGESEN bezárja a böngészőt, függetlenül attól, hogy csatlakoztunk-e
+    /// hozzá (IsAttachedToExistingBrowser) vagy mi indítottuk — ezt a "Böngésző bezárása"
+    /// gomb hívja, ami egy EXPLICIT, szándékos felhasználói döntés, nem egy mellékhatásos,
+    /// automatikus leállás (mint pl. az Elem-kereső bezárása, amit a StopAsync véd). Ha a
+    /// felhasználó rákattint a "Böngésző bezárása" gombra, helyénvaló, hogy tényleg
+    /// bezáródjon, akkor is, ha épp egy már korábban futó böngészőhöz csatlakoztunk.
+    /// </summary>
+    public Task CloseBrowserForceAsync(CancellationToken cancellationToken = default)
+    {
+        var driver = _driver;
+        _driver = null;
+        IsAttachedToExistingBrowser = false;
+        _weLaunchedAttachedBrowser = false;
+
+        return Task.Run(() =>
+        {
+            if (driver is not null)
+            {
+                try { driver.Quit(); } catch { /* ha ez nem hatásos (attach-elt session), a lenti Kill mindenképp bezárja */ }
+                driver.Dispose();
+            }
+
+            // A driver.Quit() attach-elt session-nél (debuggerAddress) gyakran NEM zárja
+            // be ténylegesen a böngészőt — ezért, ha MI indítottuk a folyamatot, azt
+            // közvetlenül, az OS-szinten is leállítjuk, a Selenium-tól függetlenül.
+            KillLaunchedBrowserProcessIfAny();
+        }, cancellationToken);
+    }
+
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
         var driver = _driver;
@@ -234,7 +366,7 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
         IsAttachedToExistingBrowser = false;
         _weLaunchedAttachedBrowser = false;
 
-        if (driver is null)
+        if (driver is null && shouldPreserveBrowser)
             return Task.CompletedTask;
 
         return Task.Run(() =>
@@ -242,14 +374,21 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
             if (shouldPreserveBrowser)
             {
                 // A felhasználó saját, már korábban is futó böngészőjénél NEM hívunk
-                // Quit()-et — az bezárná a böngészőt is. Egyszerűen leválasztjuk a
+                // Quit()-et/Kill-t — az bezárná a böngészőt is. Egyszerűen leválasztjuk a
                 // vezérlést, a böngésző (és a felhasználó tabjai/munkamenete) nyitva
-                // és érintetlenül marad.
+                // és érintetlenül marad. (KillLaunchedBrowserProcessIfAny ilyenkor
+                // amúgy is no-op lenne, mert _launchedBrowserProcess null, hiszen nem mi
+                // indítottuk ezt a böngészőt.)
                 return;
             }
 
-            driver.Quit();
-            driver.Dispose();
+            if (driver is not null)
+            {
+                try { driver.Quit(); } catch { /* ha ez nem hatásos (attach-elt session), a lenti Kill mindenképp bezárja */ }
+                driver.Dispose();
+            }
+
+            KillLaunchedBrowserProcessIfAny();
         }, cancellationToken);
     }
 
@@ -670,7 +809,10 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
     {
         var shouldPreserveBrowser = IsAttachedToExistingBrowser && !_weLaunchedAttachedBrowser;
         if (!shouldPreserveBrowser)
-            _driver?.Quit();
+        {
+            try { _driver?.Quit(); } catch { /* ignore */ }
+            KillLaunchedBrowserProcessIfAny();
+        }
     }
 }
 

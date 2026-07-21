@@ -53,7 +53,7 @@ public sealed class AndroidSdkInstallProgress
         AndroidSdkInstallPhase.InstallingEmulator => "Emulátor telepítése",
         AndroidSdkInstallPhase.InstallingPlatform => "Android platform telepítése",
         AndroidSdkInstallPhase.InstallingBuildTools => "Build Tools telepítése",
-        AndroidSdkInstallPhase.InstallingSystemImage => "Rendszerkép letöltése (ez tart a legtovább)",
+        AndroidSdkInstallPhase.InstallingSystemImage => "Rendszerkép letöltése",
         AndroidSdkInstallPhase.CreatingVirtualDevice => "Virtuális eszköz létrehozása",
         AndroidSdkInstallPhase.Finished => "Kész",
         _ => Phase.ToString()
