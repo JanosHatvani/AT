@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using AT.Core.Contracts;
 using AT.Core.Models;
@@ -626,17 +627,45 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
 
     // ===================== FELVEVŐ MÓD (Recorder) =====================
     // A böngészőbe injektált JS "capture" fázisban (harmadik paraméter: true) figyeli a
-    // click és change eseményeket az egész dokumentumon — ezért olyan elemekre kattintva
-    // is elkapja az eseményt, amiken belül van egy másik, mélyebb elem (pl. egy span egy
-    // gombon belül). A change esemény (NEM input/keyup) szándékos: szövegmezőknél csak a
-    // fókusz elvesztésekor (blur) tüzel, a VÉGSŐ értékkel — nem generál egy SendKeys
-    // lépést minden egyes lenyomott billentyűre.
+    // click, dblclick, contextmenu, change, dragstart és drop eseményeket az egész
+    // dokumentumon — ezért olyan elemekre kattintva is elkapja az eseményt, amiken belül
+    // van egy másik, mélyebb elem (pl. egy span egy gombon belül). A change esemény (NEM
+    // input/keyup) szándékos: szövegmezőknél csak a fókusz elvesztésekor (blur) tüzel, a
+    // VÉGSŐ értékkel — nem generál egy SendKeys lépést minden egyes lenyomott billentyűre.
+    //
+    // FONTOS KORLÁT a drag&drop-nál: csak a natív HTML5 drag-and-drop API-t (draggable
+    // attribútum + dragstart/drop események) ismeri fel — sok modern JS-keretrendszer
+    // (pl. React DnD, SortableJS, vagy egyéni Kanban-táblák) NEM ezt használja, hanem
+    // egyéni mousedown/mousemove/mouseup-alapú "húzást" szimulál, amit ez a figyelő nem
+    // tud elkapni. Ilyen esetben a húzás egyáltalán nem, vagy csak különálló
+    // kattintásokként rögzülne.
 
     private const string RecorderAttachScript = @"
         (function() {
             if (window.__atRecorderAttached) return;
             window.__atRecorderAttached = true;
-            window.__atRecordedQueue = [];
+            window.__atPendingDragSource = null;
+
+            var STORAGE_KEY = '__atRecordedQueue';
+
+            // A sort SZÁNDÉKOSAN localStorage-ban tároljuk, NEM egy sima JS-változóban —
+            // egy memóriabeli tömb megsemmisülne, amint az oldal navigál (pl. egy
+            // menüpontra kattintva), MIELŐTT a C#-oldali lekérdezés (ami csak 600ms-enként
+            // fut) egyáltalán kiolvashatná. A localStorage viszont AZONOS DOMAIN-en belüli
+            // navigációt túlél — csak teljesen más domainre való átnavigálásnál vész el
+            // (az elkerülhetetlen, ott úgyis más JS-kontextus, más storage van).
+            function pushAction(action) {
+                try {
+                    var raw = localStorage.getItem(STORAGE_KEY);
+                    var queue = raw ? JSON.parse(raw) : [];
+                    queue.push(action);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
+                } catch (e) {
+                    // Ha a localStorage valamiért nem elérhető (pl. szigorú privát
+                    // böngészés-beállítás, vagy betelt a tárhely-kvóta), csendben
+                    // eldobjuk ezt az eseményt — a felvétel többi része folytatódik.
+                }
+            }
 
             function atXPath(node) {
                 if (node.id) return '//*[@id=""' + node.id + '""]';
@@ -662,17 +691,58 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
                 if (!el || el.nodeType !== 1) return;
                 var tag = el.tagName.toLowerCase();
                 // Szövegbeviteli mezőkre kattintva NEM rögzítünk 'Click'-et — a
-                // 'change' esemény úgyis fel fogja venni SendKeys-ként a végleges
-                // értékkel, egy plusz, felesleges Click lépés csak zajt adna.
+                // 'change' esemény úgyis fel fogja venni SendKeys-ként (vagy Clear-ként)
+                // a végleges értékkel, egy plusz, felesleges Click lépés csak zajt adna.
                 if (tag === 'input' || tag === 'textarea') return;
 
                 var loc = bestLocator(el);
-                window.__atRecordedQueue.push({
-                    action: 'Click',
-                    locatorType: loc.type,
-                    locator: loc.value,
-                    value: null
-                });
+                // Azonnal, szinkron módon rögzítünk — semmilyen késleltetés, hogy egy
+                // navigációt kiváltó kattintás is biztosan bekerüljön a (navigáció-
+                // túlélő) localStorage-ba, mielőtt az oldal elnavigálna.
+                pushAction({ action: 'Click', locatorType: loc.type, locator: loc.value, value: null });
+            }, true);
+
+            document.addEventListener('dblclick', function(e) {
+                var el = e.target;
+                if (!el || el.nodeType !== 1) return;
+
+                var loc = bestLocator(el);
+
+                try {
+                    var raw = localStorage.getItem(STORAGE_KEY);
+                    var queue = raw ? JSON.parse(raw) : [];
+
+                    // A böngésző egy dupla kattintásnál a 'dblclick' ELŐTT már kiadta
+                    // mindkét 'click' eseményt is, amiket a fenti figyelő már rögzített —
+                    // itt, UTÓLAG távolítjuk el a sor VÉGÉRŐL ezt a (legfeljebb) 2 Click
+                    // bejegyzést, és egy DoubleClick-kel helyettesítjük. Csak a sor
+                    // legvégén, egymás után álló, ugyanerre az elemre mutató Click-eket
+                    // töröljük — amint egy nem-egyező bejegyzésbe ütközünk, megállunk,
+                    // nehogy egy korábbi, független kattintást is véletlenül eltávolítsunk.
+                    var removed = 0;
+                    for (var i = queue.length - 1; i >= 0 && removed < 2; i--) {
+                        var entry = queue[i];
+                        if (entry.action === 'Click' && entry.locator === loc.value && entry.locatorType === loc.type) {
+                            queue.splice(i, 1);
+                            removed++;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    queue.push({ action: 'DoubleClick', locatorType: loc.type, locator: loc.value, value: null });
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
+                } catch (e) {
+                    // Ha bármi hibázna, legalább egy DoubleClick-et rögzítsünk simán.
+                    pushAction({ action: 'DoubleClick', locatorType: loc.type, locator: loc.value, value: null });
+                }
+            }, true);
+
+            document.addEventListener('contextmenu', function(e) {
+                var el = e.target;
+                if (!el || el.nodeType !== 1) return;
+                var loc = bestLocator(el);
+                pushAction({ action: 'RightClick', locatorType: loc.type, locator: loc.value, value: null });
             }, true);
 
             document.addEventListener('change', function(e) {
@@ -683,65 +753,174 @@ public sealed class WebAutomationDriver : IAutomationDriver, IDisposable
 
                 var loc = bestLocator(el);
                 var isSelect = tag === 'select';
-                window.__atRecordedQueue.push({
+
+                if (!isSelect && el.value === '') {
+                    // A mező a felvétel során ürült ki (a felhasználó törölte a
+                    // tartalmát) — ezt 'Clear' lépésként rögzítjük, nem egy üres
+                    // értékű SendKeys-ként.
+                    pushAction({ action: 'Clear', locatorType: loc.type, locator: loc.value, value: null });
+                    return;
+                }
+
+                pushAction({
                     action: isSelect ? 'SelectByText' : 'SendKeys',
                     locatorType: loc.type,
                     locator: loc.value,
                     value: isSelect ? (el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : '') : el.value
                 });
             }, true);
+
+            // Natív HTML5 drag&drop (draggable=""true"" elemek) — lásd a metódus feletti
+            // doksit a korlátról egyéni (nem natív) drag&drop-ot használó oldalaknál. Ez
+            // szándékosan CSAK memóriában (window) tárolt átmeneti állapot, nem
+            // localStorage-ban — egy húzás-és-elengedés eleve egyetlen oldalon belüli,
+            // pillanatnyi gesztus, nem kell navigáció-túlélőnek lennie.
+            document.addEventListener('dragstart', function(e) {
+                var el = e.target;
+                if (!el || el.nodeType !== 1) return;
+                window.__atPendingDragSource = bestLocator(el);
+            }, true);
+
+            document.addEventListener('drop', function(e) {
+                var el = e.target;
+                if (!el || el.nodeType !== 1 || !window.__atPendingDragSource) return;
+
+                var targetLoc = bestLocator(el);
+                pushAction({
+                    action: 'DragAndDrop',
+                    locatorType: window.__atPendingDragSource.type,
+                    locator: window.__atPendingDragSource.value,
+                    targetLocatorType: targetLoc.type,
+                    targetLocator: targetLoc.value,
+                    value: null
+                });
+                window.__atPendingDragSource = null;
+            }, true);
         })();";
 
     private const string RecorderPollScript = @"
-        var queue = window.__atRecordedQueue || [];
-        window.__atRecordedQueue = [];
-        return JSON.stringify(queue);";
+        var raw = localStorage.getItem('__atRecordedQueue');
+        localStorage.removeItem('__atRecordedQueue');
+        return raw || '[]';";
 
     private const string RecorderDetachScript = @"
         window.__atRecorderAttached = false;
-        window.__atRecordedQueue = [];";
+        try { localStorage.removeItem('__atRecordedQueue'); } catch (e) {}";
 
-    /// <summary>Elindítja a felvételt: beinjektálja az esemény-figyelő JS-t a böngészőbe.
-    /// Idempotens — ha már fut a figyelés (pl. egy korábbi StartRecordingAsync óta nem
-    /// navigáltunk el), nem duplázza a feliratkozásokat (lásd __atRecorderAttached flag).
-    /// FONTOS: ha a felhasználó közben egy ÚJ oldalra navigál, a böngésző törli a JS
-    /// állapotot (ez normál, minden oldal saját JS-kontextussal indul) — ilyenkor a
-    /// StartRecordingAsync-et újra meg kell hívni az új oldalon. A ViewModel-oldali
-    /// polling-hurok ezt automatikusan megteszi minden ciklusban (lásd WebTestViewModel).</summary>
+    /// <summary>Elindítja a felvételt: beinjektálja az esemény-figyelő JS-t a böngésző
+    /// MINDEN JELENLEG NYITOTT LAPJÁRA/ABLAKÁRA, nem csak arra az egyre, amelyiket a
+    /// Selenium "aktuálisnak" ismer. Ez azért fontos, mert a debug-böngésző gyakran egy
+    /// üres lappal nyílik meg, és ha a felhasználó ÚJ LAPOT nyit (Ctrl+T) a teszteléshez
+    /// (ahelyett hogy ugyanabban a lapban navigálna tovább), a Selenium által eredetileg
+    /// ismert lap üres marad, a ténylegesen használt, új lap pedig soha nem kapná meg a
+    /// figyelőt — ezt tapasztalta a felhasználó "semmi nem kerül fel" tünetként. Idempotens
+    /// laponként — ha egy adott lapon már fut a figyelés, nem duplázza a feliratkozásokat
+    /// (lásd __atRecorderAttached flag a JS-ben).</summary>
     public Task StartRecordingAsync(CancellationToken cancellationToken = default)
-        => RunOnDriver(d => ((IJavaScriptExecutor)d).ExecuteScript(RecorderAttachScript), cancellationToken);
+        => RunOnDriver(d =>
+        {
+            var originalHandle = SafeGetCurrentWindowHandle(d);
 
-    /// <summary>Leállítja a felvételt — a JS-oldali figyelőket "kikapcsolja" (a flag
-    /// visszaállításával; a document-re feliratkozott addEventListener-eket ez nem
-    /// távolítja el ténylegesen, de üresen hagyja a queue-t, és egy új StartRecordingAsync
-    /// hívás újra felül tudja írni az állapotot).</summary>
+            foreach (var handle in d.WindowHandles.ToList())
+            {
+                try
+                {
+                    d.SwitchTo().Window(handle);
+                    ((IJavaScriptExecutor)d).ExecuteScript(RecorderAttachScript);
+                }
+                catch
+                {
+                    // Egy adott lap hibája (pl. időközben bezáródott, vagy egy chrome://
+                    // rendszer-oldal, ahova nem lehet szkriptet injektálni) ne akassza meg
+                    // a többi lap feldolgozását.
+                }
+            }
+
+            RestoreWindow(d, originalHandle);
+        }, cancellationToken);
+
+    /// <summary>Leállítja a felvételt MINDEN nyitott lapon — a JS-oldali figyelőket
+    /// "kikapcsolja" (a flag visszaállításával; a document-re feliratkozott
+    /// addEventListener-eket ez nem távolítja el ténylegesen, de üresen hagyja a
+    /// queue-t, és egy új StartRecordingAsync hívás újra felül tudja írni az állapotot).</summary>
     public Task StopRecordingAsync(CancellationToken cancellationToken = default)
-        => RunOnDriver(d => ((IJavaScriptExecutor)d).ExecuteScript(RecorderDetachScript), cancellationToken);
+        => RunOnDriver(d =>
+        {
+            var originalHandle = SafeGetCurrentWindowHandle(d);
 
-    /// <summary>Lekéri és KIÜRÍTI a felvételi sort — a ViewModel-oldali időzítő hívja
-    /// rendszeresen (pl. 600ms-enként), amíg a felvétel aktív. Minden hívás csak az
-    /// ELŐZŐ hívás óta történt eseményeket adja vissza (a JS oldalon a queue kiürül
-    /// olvasáskor), így nem lesz duplikáció.</summary>
+            foreach (var handle in d.WindowHandles.ToList())
+            {
+                try
+                {
+                    d.SwitchTo().Window(handle);
+                    ((IJavaScriptExecutor)d).ExecuteScript(RecorderDetachScript);
+                }
+                catch
+                {
+                    // Lásd StartRecordingAsync doksi — egy lap hibája ne akassza meg a többit.
+                }
+            }
+
+            RestoreWindow(d, originalHandle);
+        }, cancellationToken);
+
+    /// <summary>Lekéri és KIÜRÍTI a felvételi sort MINDEN nyitott lapról — a ViewModel-
+    /// oldali időzítő hívja rendszeresen (pl. 600ms-enként), amíg a felvétel aktív. Minden
+    /// hívás csak az ELŐZŐ hívás óta, BÁRMELYIK lapon történt eseményeket adja vissza (a
+    /// JS oldalon laponként külön queue van, ami kiürül olvasáskor), így nem lesz
+    /// duplikáció, és az sem számít, melyik lapon dolgozik éppen a felhasználó.</summary>
     public Task<List<RecordedWebAction>> PollRecordedActionsAsync(CancellationToken cancellationToken = default)
         => RunOnDriver(d =>
         {
-            var raw = ((IJavaScriptExecutor)d).ExecuteScript(RecorderPollScript) as string;
-            if (string.IsNullOrWhiteSpace(raw))
-                return new List<RecordedWebAction>();
+            var allActions = new List<RecordedWebAction>();
+            var originalHandle = SafeGetCurrentWindowHandle(d);
 
-            try
+            foreach (var handle in d.WindowHandles.ToList())
             {
-                return System.Text.Json.JsonSerializer.Deserialize<List<RecordedWebAction>>(
-                    raw, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                try
+                {
+                    d.SwitchTo().Window(handle);
+                    var raw = ((IJavaScriptExecutor)d).ExecuteScript(RecorderPollScript) as string;
+                    if (string.IsNullOrWhiteSpace(raw))
+                        continue;
+
+                    var actions = System.Text.Json.JsonSerializer.Deserialize<List<RecordedWebAction>>(
+                        raw, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    if (actions is not null)
+                        allActions.AddRange(actions);
+                }
+                catch
+                {
+                    // Ha egy adott lapon a felhasználó közben navigált, és a JS-kontextus
+                    // törlődött (window.__atRecordedQueue undefined), vagy a lap már be is
+                    // záródott, egyszerűen nincs mit visszaadni onnan — a többi lap
+                    // feldolgozása folytatódik.
+                }
             }
-            catch
-            {
-                // Ha a felhasználó közben navigált, és a JS-kontextus törlődött, a
-                // window.__atRecordedQueue undefined lehet — ilyenkor egyszerűen nincs
-                // mit visszaadni, nem hiba.
-                return new List<RecordedWebAction>();
-            }
+
+            RestoreWindow(d, originalHandle);
+            return allActions;
         }, cancellationToken);
+
+    /// <summary>A WindowHandles bejárása közben ideiglenesen átváltunk másik lapra/
+    /// ablakra — ezt hívjuk a bejárás végén, hogy a felhasználó szemszögéből (és a
+    /// screenshot-készítés, Futtatás stb. szempontjából) minden maradjon úgy, ahogy
+    /// volt, mielőtt elkezdtünk volna laponként végigmenni.</summary>
+    private static void RestoreWindow(IWebDriver driver, string? originalHandle)
+    {
+        if (string.IsNullOrEmpty(originalHandle))
+            return;
+
+        try { driver.SwitchTo().Window(originalHandle); }
+        catch { /* ha az eredeti lap időközben bezáródott, nincs hova visszaváltani */ }
+    }
+
+    private static string? SafeGetCurrentWindowHandle(IWebDriver driver)
+    {
+        try { return driver.CurrentWindowHandle; }
+        catch { return null; }
+    }
 
     // ===================== SEGÉDMETÓDUSOK =====================
 
@@ -829,4 +1008,9 @@ public sealed class RecordedWebAction
 
     public string Locator { get; set; } = "";
     public string? Value { get; set; }
+
+    /// <summary>Csak "DragAndDrop" akciónál kitöltött mezők — a húzás CÉLPONTJÁN talált
+    /// elem lokátora/típusa. A forrás a fenti Locator/LocatorType.</summary>
+    public string? TargetLocator { get; set; }
+    public string? TargetLocatorType { get; set; }
 }

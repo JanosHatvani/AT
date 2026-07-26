@@ -61,7 +61,7 @@
                             Background="{StaticResource ScrollBar.ThumbBrush}"
                             CornerRadius="4"
                             Margin="2,0,2,0"
-                            Width="6"
+                            Width="20"
                             HorizontalAlignment="Center">
                         <Border.RenderTransform>
                             <ScaleTransform x:Name="ThumbScale" CenterX="0.5" ScaleX="1" />

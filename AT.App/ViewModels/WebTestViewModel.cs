@@ -611,7 +611,7 @@ public sealed partial class WebTestViewModel : ObservableObject
         finally
         {
             IsRunning = false;
-
+            
             RunStepsCommand.NotifyCanExecuteChanged();
 
             _schedulerService.SetModuleBusy(AutomationTarget.Web, false);
@@ -932,7 +932,7 @@ public sealed partial class WebTestViewModel : ObservableObject
             var step = new TestStep
             {
                 Id = Guid.NewGuid().ToString("N"),
-                Name = BuildStepName(action, recorded.Locator, recorded.Value ?? "", ""),
+                Name = BuildStepName(action, recorded.Locator, recorded.Value ?? "", recorded.TargetLocator ?? ""),
                 Target = AutomationTarget.Web,
                 Action = action.ToString(),
                 Locator = recorded.Locator,
@@ -941,6 +941,19 @@ public sealed partial class WebTestViewModel : ObservableObject
                 TimeoutSeconds = _defaultTimeoutSeconds,
                 Label = AT.Infrastructure.StepFlowResolver.GenerateNextLabel(Steps.Select(r => r.Step).ToList())
             };
+
+            // A DragAndDrop akciónál a JS a cél-lokátort is elküldi (lásd
+            // RecorderAttachScript "drop" eseménykezelője) — ezt a TestStep saját
+            // TargetLocator/TargetLocatorType mezőire kell átvenni, mert a futtatáskori
+            // ExecuteStepCore ebből olvassa ki a húzás célpontját, nem a Locator-ból.
+            if (action == WebStepAction.DragAndDrop && !string.IsNullOrWhiteSpace(recorded.TargetLocator))
+            {
+                if (!Enum.TryParse<LocatorType>(recorded.TargetLocatorType, out var targetLocatorType))
+                    targetLocatorType = LocatorType.XPath;
+
+                step.TargetLocator = recorded.TargetLocator;
+                step.TargetLocatorType = targetLocatorType;
+            }
 
             Steps.Add(new TestStepRow { Step = step });
         }

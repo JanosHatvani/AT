@@ -10,7 +10,8 @@
         MinWidth="340" MinHeight="480"
         WindowStartupLocation="Manual"
         Background="{StaticResource Brush.Surface}"
-        Closing="Window_Closing">
+        Closing="Window_Closing"
+        PreviewKeyDown="MobileScreenMirrorWindow_PreviewKeyDown">
 
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="32"
@@ -39,6 +40,7 @@
                         <Grid>
                             <Image Source="{Binding ScreenImage}" Stretch="Uniform"
                                    MouseLeftButtonDown="ScreenImage_MouseLeftButtonDown"
+                                   MouseLeftButtonUp="ScreenImage_MouseLeftButtonUp"
                                    Cursor="{Binding IsPicking, Converter={x:Static conv:PickingCursorConverter.Instance}}" />
                             <TextBlock Text="Nincs kép — indítsd el a tükrözést"
                                        Style="{StaticResource SubtleTextStyle}"
@@ -58,7 +60,41 @@
                         <Button Content="{Binding IsPicking, Converter={x:Static conv:PickingButtonLabelConverter.Instance}}"
                                 Style="{StaticResource GhostButtonStyle}"
                                 HorizontalAlignment="Center"
+                                Margin="0,0,0,8"
                                 Command="{Binding TogglePickingCommand}" />
+                        <Button Style="{StaticResource GhostButtonStyle}"
+                                HorizontalAlignment="Center"
+                                Command="{Binding ToggleRecordingCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="8" Height="8" Fill="#FF4D4D" Margin="0,0,6,0" VerticalAlignment="Center"
+                                         Visibility="{Binding IsRecording, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}" />
+                                <TextBlock Text="{Binding IsRecording, Converter={x:Static conv:RecordingButtonLabelConverter.Instance}}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <StackPanel Margin="0,10,0,0"
+                                Visibility="{Binding IsRecording, Converter={x:Static conv:BoolToVisibilityConverter.Instance}}">
+                        <TextBlock Text="● Felvétel folyamatban" Foreground="#FF4D4D" Margin="0,0,0,4" FontWeight="SemiBold" />
+                        <TextBlock Text="Rövid kattintás = Kattintás · nyomva tartás (~0,5 mp+) = Hosszan nyomás · húzd az egeret = Húzás (Swipe)"
+                                   Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                        <TextBlock Text="Szövegbeviteli mezőnél: kattints rá, majd írd be ide a szöveget és rögzítsd, vagy nyomd meg a Mező kiürítése gombot, ha csak üresre akarod állítani."
+                                   Style="{StaticResource SubtleTextStyle}" TextWrapping="Wrap" Margin="0,0,0,6" />
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" Margin="0,0,8,0"
+                                     Text="{Binding RecordingTextInput, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button Grid.Column="1" Content="Szöveg rögzítése"
+                                    Style="{StaticResource GhostButtonStyle}"
+                                    Command="{Binding AddRecordedTextCommand}" />
+                        </Grid>
+                        <Button Content="Mező kiürítése"
+                                Style="{StaticResource GhostButtonStyle}"
+                                HorizontalAlignment="Left"
+                                Command="{Binding AddRecordedClearCommand}" />
                     </StackPanel>
 
 

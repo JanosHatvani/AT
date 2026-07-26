@@ -66,8 +66,40 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
     private NativeMethods.LowLevelMouseProc? _mouseProc;
     private NativeMethods.LowLevelKeyboardProc? _keyboardProc;
     private (string Locator, LocatorType Type, int? ElementIndex)? _lastClickLocatorInfo;
-    private bool _lastClickWasTextInput;
     private readonly System.Text.StringBuilder _typedBuffer = new();
+
+    /// <summary>Az utolsó bal-kattintás időbélyege (MSLLHOOKSTRUCT.time, Windows-tick,
+    /// ms) és képernyő-pozíciója — a dupla kattintás felismeréséhez kell, lásd
+    /// IsDoubleClick doksi.</summary>
+    private uint _lastLeftClickTime;
+    private System.Drawing.Point _lastLeftClickPoint;
+
+    /// <summary>Igaz, amíg a bal egérgomb lenyomva van — a WM_LBUTTONDOWN-nál áll be, a
+    /// WM_LBUTTONUP-nál törlődik. A húzás-és-elengedés (drag&amp;drop) felismeréséhez
+    /// kell: csak akkor releváns a le-/felengedés közötti elmozdulás, ha közben tényleg
+    /// nyomva volt a gomb (nem pl. egy korábbi, már lezárt kattintás után érkező,
+    /// összefüggéstelen "up" üzenetnél).</summary>
+    private bool _leftButtonIsDown;
+    private System.Drawing.Point _leftButtonDownPoint;
+    private uint _leftButtonDownTime;
+
+    /// <summary>Az az elem, amihez ÉPP gyűjtjük a begépelt karaktereket — a JELENLEG
+    /// FÓKUSZBAN LÉVŐ elem alapján frissül minden billentyűleütésnél (lásd
+    /// HandleTypingKeystroke), NEM a legutóbb kattintott elem alapján. Ez azért fontos,
+    /// mert a felhasználó Tab-bal, vagy egy már korábban fókuszált mezőbe is gépelhet
+    /// kattintás nélkül — a régi, "csak a legutóbbi kattintás számít" logika ezeket az
+    /// eseteket kihagyta, és soha nem generált SetText lépést, csak Click-et.</summary>
+    private AutomationElement? _typingTargetElement;
+    private (string Locator, LocatorType Type, int? ElementIndex)? _typingTargetLocatorInfo;
+
+    /// <summary>Hányszor nyomtak Backspace-t/Delete-t úgy, hogy a _typedBuffer MÁR ÜRES
+    /// volt (vagyis nem a MI ÁLTALUNK begépelt karaktert törölték, hanem a mezőben már
+    /// korábban is meglévő tartalmat). Ha a felvétel egy adott mezőnél végül úgy zárul
+    /// le (FlushTypedBuffer), hogy a puffer üres marad, DE ez a számláló pozitív, az azt
+    /// jelzi, hogy a felhasználó a mező korábbi tartalmát törölte ki (Backspace/Delete-
+    /// tel, vagy Ctrl+A + törléssel) anélkül, hogy új szöveget írt volna helyette — ezt
+    /// "Mező kiürítése" (Clear) lépésként rögzítjük, nem hagyjuk figyelmen kívül.</summary>
+    private int _deletionsWhileBufferEmpty;
 
     /// <summary>Elindítja a felvételt — telepíti az egér- és billentyűzet-hook-okat.
     /// Idempotens: ha már fut, nem csinál semmit. A hook-oknak a hívó szálon (jellemzően
@@ -80,7 +112,14 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
 
         _typedBuffer.Clear();
         _lastClickLocatorInfo = null;
-        _lastClickWasTextInput = false;
+        _lastLeftClickTime = 0;
+        _lastLeftClickPoint = default;
+        _leftButtonIsDown = false;
+        _leftButtonDownPoint = default;
+        _leftButtonDownTime = 0;
+        _typingTargetElement = null;
+        _typingTargetLocatorInfo = null;
+        _deletionsWhileBufferEmpty = 0;
 
         _mouseProc = MouseHookCallback;
         _keyboardProc = KeyboardHookCallback;
@@ -120,22 +159,66 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
         _keyboardProc = null;
     }
 
+    /// <summary>A bal gomb LENYOMÁSA és FELENGEDÉSE közötti elmozdulásból dönti el, hogy
+    /// az adott interakció sima kattintás/dupla kattintás volt-e, vagy húzás-és-elengedés
+    /// (drag&amp;drop) — a rendszer saját "húzási küszöbét" (SM_CXDRAG/SM_CYDRAG) használva.
+    /// A jobb kattintást (WM_RBUTTONDOWN) továbbra is AZONNAL, a lenyomás pillanatában
+    /// rögzítjük — jobb gombos húzás felismerése nincs támogatva, nem jellemző igény.</summary>
     private IntPtr MouseHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        if (nCode >= 0 && wParam == (IntPtr)NativeMethods.WM_LBUTTONDOWN)
+        if (nCode >= 0)
         {
+            var msg = wParam.ToInt32();
+
             try
             {
-                var hookStruct = Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(lParam);
-                // Az ELŐZŐ mezőbe gépelt (de még le nem zárt) szöveget lezárjuk, mielőtt
-                // az új kattintást feldolgoznánk — enélkül egy gyors kattintás-gépelés-
-                // kattintás sorozatnál a szöveg a rossz (a következő) elemhez kerülne.
-                FlushTypedBuffer();
-                TryRecordClick(hookStruct.pt.x, hookStruct.pt.y);
+                if (msg == NativeMethods.WM_LBUTTONDOWN)
+                {
+                    var hookStruct = Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(lParam);
+                    _leftButtonIsDown = true;
+                    _leftButtonDownPoint = new System.Drawing.Point(hookStruct.pt.x, hookStruct.pt.y);
+                    _leftButtonDownTime = hookStruct.time;
+                    // A gépelt szöveget itt SZÁNDÉKOSAN nem zárjuk még le — csak a
+                    // WM_LBUTTONUP-nál, amikor már tudjuk, hogy ez tényleg kattintás
+                    // vagy húzás volt (nem pl. egy hosszú lenyomva tartás közben történő,
+                    // más célú interakció).
+                }
+                else if (msg == NativeMethods.WM_LBUTTONUP && _leftButtonIsDown)
+                {
+                    _leftButtonIsDown = false;
+
+                    var hookStruct = Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(lParam);
+                    var upPoint = new System.Drawing.Point(hookStruct.pt.x, hookStruct.pt.y);
+
+                    FlushTypedBuffer();
+
+                    var dragThresholdX = NativeMethods.GetSystemMetrics(NativeMethods.SM_CXDRAG);
+                    var dragThresholdY = NativeMethods.GetSystemMetrics(NativeMethods.SM_CYDRAG);
+                    var isDrag = Math.Abs(upPoint.X - _leftButtonDownPoint.X) > dragThresholdX
+                        || Math.Abs(upPoint.Y - _leftButtonDownPoint.Y) > dragThresholdY;
+
+                    if (isDrag)
+                    {
+                        TryRecordDragAndDrop(_leftButtonDownPoint, upPoint);
+                    }
+                    else
+                    {
+                        var isDoubleClick = IsDoubleClick(_leftButtonDownPoint.X, _leftButtonDownPoint.Y, _leftButtonDownTime);
+                        TryRecordClick(_leftButtonDownPoint.X, _leftButtonDownPoint.Y, isDoubleClick ? DesktopStepAction.DoubleClick : DesktopStepAction.Click);
+                    }
+                }
+                else if (msg == NativeMethods.WM_RBUTTONDOWN)
+                {
+                    var hookStruct = Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(lParam);
+                    // Az ELŐZŐ mezőbe gépelt (de még le nem zárt) szöveget lezárjuk, mielőtt
+                    // az új kattintást feldolgoznánk.
+                    FlushTypedBuffer();
+                    TryRecordClick(hookStruct.pt.x, hookStruct.pt.y, DesktopStepAction.RightClick);
+                }
             }
             catch
             {
-                // A felvétel folytatódjon akkor is, ha egy adott kattintás feldolgozása
+                // A felvétel folytatódjon akkor is, ha egy adott esemény feldolgozása
                 // hibázna — egyetlen kihagyott lépés jobb, mint az egész felvétel leállása.
             }
         }
@@ -143,63 +226,200 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
         return NativeMethods.CallNextHookEx(_mouseHookHandle, nCode, wParam, lParam);
     }
 
-    private void TryRecordClick(int screenX, int screenY)
+    /// <summary>Egy felismert húzás-és-elengedést rögzít: a LENYOMÁS pontján talált elem
+    /// a forrás (Locator/LocatorType/ElementIndex), a FELENGEDÉS pontján talált elem a cél
+    /// (TargetLocator/TargetLocatorType) — pontosan úgy, ahogy a futtatáskori
+    /// DesktopStepAction.DragAndDrop is várja (lásd ExecuteStepCore: Mouse.Drag(source...,
+    /// target...)). FONTOS KORLÁT: a TestStep modellben nincs külön "TargetElementIndex"
+    /// mező, ezért ha a CÉL elemből több egyforma is van a képernyőn, azt jelenleg nem
+    /// tudjuk megkülönböztetni — csak a forrás elemnél működik az elem-sorszám.</summary>
+    private void TryRecordDragAndDrop(System.Drawing.Point downPoint, System.Drawing.Point upPoint)
     {
         if (_automation is null)
             return;
 
-        var element = _automation.FromPoint(new System.Drawing.Point(screenX, screenY));
-        if (element is null)
+        var sourceRaw = _automation.FromPoint(downPoint);
+        if (sourceRaw is null)
+            return;
+        var source = ResolveEffectiveElement(sourceRaw);
+
+        var targetRaw = _automation.FromPoint(upPoint);
+        if (targetRaw is null)
+            return;
+        var target = ResolveEffectiveElement(targetRaw);
+
+        if (!TryResolveLocator(source, out var sourceLocator, out var sourceLocatorType, out var sourceElementIndex))
             return;
 
+        if (!TryResolveLocator(target, out var targetLocator, out var targetLocatorType, out _))
+            return;
+
+        var step = new TestStep
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = $"Húzás és elengedés → {sourceLocator} → {targetLocator}",
+            Target = AutomationTarget.Desktop,
+            Action = DesktopStepAction.DragAndDrop.ToString(),
+            Locator = sourceLocator,
+            LocatorType = sourceLocatorType,
+            ElementIndex = sourceElementIndex,
+            TargetLocator = targetLocator,
+            TargetLocatorType = targetLocatorType,
+            TimeoutSeconds = 10
+        };
+
+        RaiseActionRecorded(step);
+    }
+
+    /// <summary>Eldönti, hogy egy bal-kattintás dupla kattintásnak számít-e — a WH_MOUSE_LL
+    /// hook NEM kapja meg közvetlenül a WM_LBUTTONDBLCLK üzenetet (azt csak egy konkrét
+    /// ablak saját ablak-eljárása szintetizálja, CS_DBLCLKS stílus esetén, a globális
+    /// hook-feldolgozás UTÁN), ezért a két egymást követő WM_LBUTTONDOWN időbeli és térbeli
+    /// közelségéből MAGUNKNAK kell eldöntenünk ezt, a rendszer saját dupla kattintás-
+    /// beállításai (GetDoubleClickTime/SM_CXDOUBLECLK/SM_CYDOUBLECLK) alapján.</summary>
+    private bool IsDoubleClick(int x, int y, uint eventTime)
+    {
+        var doubleClickTimeMs = NativeMethods.GetDoubleClickTime();
+        var maxDx = NativeMethods.GetSystemMetrics(NativeMethods.SM_CXDOUBLECLK) / 2;
+        var maxDy = NativeMethods.GetSystemMetrics(NativeMethods.SM_CYDOUBLECLK) / 2;
+
+        var isDouble = _lastLeftClickTime != 0
+            && (eventTime - _lastLeftClickTime) <= doubleClickTimeMs
+            && Math.Abs(x - _lastLeftClickPoint.X) <= maxDx
+            && Math.Abs(y - _lastLeftClickPoint.Y) <= maxDy;
+
+        if (isDouble)
+        {
+            // A "harmadik" gyors kattintást ne értékeljük megint dupla kattintásnak a
+            // MÁSODIKKAL összevetve — nullázzuk az időzítést, hogy egy hármas
+            // kattintás-sorozat ne generáljon két egymást követő DoubleClick lépést.
+            _lastLeftClickTime = 0;
+        }
+        else
+        {
+            _lastLeftClickTime = eventTime;
+            _lastLeftClickPoint = new System.Drawing.Point(x, y);
+        }
+
+        return isDouble;
+    }
+
+    /// <summary>Egy AutomationElement-ből próbál lokátort építeni (AutomationId > Name >
+    /// ClassName prioritással, egyezésszámmal) — ezt használja mind a kattintás-rögzítés
+    /// (TryRecordClick), mind a fókusz-alapú gépelés-követés (HandleTypingKeystroke), hogy
+    /// a két útvonal KONZISZTENSEN ugyanazt a lokátort/indexet adja ugyanarra az elemre.
+    ///
+    /// FONTOS: szövegbeviteli mezőknél (Edit/Document ControlType) a "Name"-et SZÁNDÉKOSAN
+    /// kihagyjuk — egy címke nélküli (nincs explicit AutomationProperties.Name/AutomationId
+    /// beállítva) WPF TextBox/RichTextBox automatizálási "peer"-je jól ismerten a mező
+    /// AKTUÁLIS SZÖVEGTARTALMÁT adja vissza "Name"-ként. Enélkül a lokátorunk a beírt
+    /// szöveggel EGYÜTT VÁLTOZNA (instabil), és többsoros tartalomnál a lokátor (és belőle
+    /// a lépés neve) is több sort tartalmazna — pontosan ez okozta, hogy egy szövegmezőre
+    /// kattintás rögzítésekor a mezőbe írt szöveg jelent meg locator/lépésnév gyanánt.
+    /// Emellett egy általános stabilitás-szűrőt (LooksLikeStableLocatorValue) is
+    /// alkalmazunk minden jelöltre, védőhálóként bármilyen más, hasonlóan "tartalom-
+    /// tükröző" tulajdonság ellen is.</summary>
+    private bool TryResolveLocator(AutomationElement element, out string locator, out LocatorType locatorType, out int? elementIndex)
+    {
+        locator = "";
+        locatorType = LocatorType.Id;
+        elementIndex = null;
+
         var automationId = SafeGet(() => element.AutomationId);
-        var name = SafeGet(() => element.Name);
-        var className = SafeGet(() => element.ClassName);
-        var controlType = SafeGetControlType(element);
-
-        string locator;
-        LocatorType locatorType;
-        int? elementIndex = null;
-
-        if (!string.IsNullOrEmpty(automationId))
+        if (LooksLikeStableLocatorValue(automationId))
         {
             locator = automationId;
             locatorType = LocatorType.Id;
             var (idx, cnt) = ComputeMatchInfo(element, automationId, e => SafeGet(() => e.AutomationId));
             if (cnt > 1) elementIndex = idx;
+            return true;
         }
-        else if (!string.IsNullOrEmpty(name))
+
+        var controlType = SafeGetControlType(element);
+        var isTextInput = IsTextInputControl(element, controlType);
+
+        if (!isTextInput)
         {
-            locator = name;
-            locatorType = LocatorType.Name;
-            var (idx, cnt) = ComputeMatchInfo(element, name, e => SafeGet(() => e.Name));
-            if (cnt > 1) elementIndex = idx;
+            var name = SafeGet(() => element.Name);
+            if (LooksLikeStableLocatorValue(name))
+            {
+                locator = name;
+                locatorType = LocatorType.Name;
+                var (idx, cnt) = ComputeMatchInfo(element, name, e => SafeGet(() => e.Name));
+                if (cnt > 1) elementIndex = idx;
+                return true;
+            }
         }
-        else if (!string.IsNullOrEmpty(className))
+
+        var className = SafeGet(() => element.ClassName);
+        if (LooksLikeStableLocatorValue(className))
         {
             locator = className;
             locatorType = LocatorType.ClassName;
             var (idx, cnt) = ComputeMatchInfo(element, className, e => SafeGet(() => e.ClassName));
             if (cnt > 1) elementIndex = idx;
-        }
-        else
-        {
-            // Nincs használható lokátor erre az elemre (se AutomationId, se Name, se
-            // ClassName) — csendben kihagyjuk, nem tudnánk vele mit kezdeni futtatáskor
-            // sem.
-            return;
+            return true;
         }
 
+        // Nincs használható (stabilnak tűnő) lokátor erre az elemre — a hívó csendben
+        // kihagyja, nem tudnánk vele mit kezdeni futtatáskor sem.
+        return false;
+    }
+
+    /// <summary>Gyors, konzervatív "gyanú-szűrő" — ha egy AutomationId/Name/ClassName
+    /// jelölt gyanúsan hosszú, vagy sortörést tartalmaz, valószínűleg nem egy stabil
+    /// azonosító, hanem valamilyen dinamikus TARTALOM (pl. egy szövegmező aktuális
+    /// szövege) szivárgott be a tulajdonságba — ilyenkor inkább elutasítjuk, mint hogy
+    /// egy hasznavehetetlen, a lépés minden újrafuttatásakor máshogy kinéző lokátort
+    /// vegyünk fel.</summary>
+    private static bool LooksLikeStableLocatorValue(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value)
+            && value.Length <= 100
+            && !value.Contains('\n')
+            && !value.Contains('\r');
+    }
+
+    private void TryRecordClick(int screenX, int screenY, DesktopStepAction action)
+    {
+        if (_automation is null)
+            return;
+
+        var rawElement = _automation.FromPoint(new System.Drawing.Point(screenX, screenY));
+        if (rawElement is null)
+            return;
+
+        // A képpont-alapú hit-test gyakran a LEGBELSŐ, technikai gyerekelemre mutat
+        // (pl. egy TextBox belső tartalom-görgetőjére), nem a felhasználó szemével
+        // látott, "valódi" vezérlőre — enélkül a ControlType-alapú döntések (pl. "ez
+        // szövegmező-e") tévesen erre a belső elemre vonatkoznának.
+        var element = ResolveEffectiveElement(rawElement);
+
+        // Csak sima bal-kattintásnál nézzük meg, hogy ez egy legördülő lista elem-
+        // kiválasztása-e — jobb klikk/dupla kattintás egy ComboBox-elemen nem jellemző,
+        // szándékos felhasználói interakció, azt inkább sima Click/DoubleClick/RightClick-
+        // ként hagyjuk (a SelectComboBoxItem futtatáskor amúgy is Click-szerűen viselkedik).
+        if (action == DesktopStepAction.Click && TryRecordComboBoxSelection(element))
+            return;
+
+        if (!TryResolveLocator(element, out var locator, out var locatorType, out var elementIndex))
+            return;
+
         _lastClickLocatorInfo = (locator, locatorType, elementIndex);
-        _lastClickWasTextInput = controlType == FlaUI.Core.Definitions.ControlType.Edit
-            || controlType == FlaUI.Core.Definitions.ControlType.Document;
+
+        var actionLabel = action switch
+        {
+            DesktopStepAction.DoubleClick => "Dupla kattintás",
+            DesktopStepAction.RightClick => "Jobb kattintás",
+            _ => "Kattintás"
+        };
 
         var step = new TestStep
         {
             Id = Guid.NewGuid().ToString("N"),
-            Name = $"Kattintás → {locator}",
+            Name = $"{actionLabel} → {locator}",
             Target = AutomationTarget.Desktop,
-            Action = DesktopStepAction.Click.ToString(),
+            Action = action.ToString(),
             Locator = locator,
             LocatorType = locatorType,
             ElementIndex = elementIndex,
@@ -209,9 +429,60 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
         RaiseActionRecorded(step);
     }
 
+    /// <summary>Ha a kattintott elem egy legördülő lista (ComboBox popup) egyik eleme
+    /// (ControlType.ListItem, aminek van egy ComboBox őse a szülőláncban), SelectComboBoxItem
+    /// lépést rögzít HELYETTE — a ComboBox saját lokátorával (nem a ListItem-ével!) és a
+    /// kiválasztott elem szövegével mint Value, mert a futtatáskori SelectComboBoxItem
+    /// is így várja (FlaUI ComboBox.Select(text) — lásd ExecuteStepCore). Legfeljebb 6
+    /// szintet megyünk felfelé a szülőláncon, hogy ne fussunk bele túl mély/végtelen
+    /// keresésbe, ha valamiért nincs ComboBox ős (pl. egy sima ListBox elemére kattintott).</summary>
+    private bool TryRecordComboBoxSelection(AutomationElement element)
+    {
+        if (SafeGetControlType(element) != FlaUI.Core.Definitions.ControlType.ListItem)
+            return false;
+
+        var itemText = SafeGet(() => element.Name);
+        if (string.IsNullOrEmpty(itemText))
+            return false;
+
+        AutomationElement? current;
+        try { current = element.Parent; }
+        catch { return false; }
+
+        for (var depth = 0; current is not null && depth < 6; depth++)
+        {
+            if (SafeGetControlType(current) == FlaUI.Core.Definitions.ControlType.ComboBox)
+            {
+                if (!TryResolveLocator(current, out var comboLocator, out var comboLocatorType, out var comboElementIndex))
+                    return false;
+
+                var step = new TestStep
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Name = $"Legördülő kiválasztás → {comboLocator} → {itemText}",
+                    Target = AutomationTarget.Desktop,
+                    Action = DesktopStepAction.SelectComboBoxItem.ToString(),
+                    Locator = comboLocator,
+                    LocatorType = comboLocatorType,
+                    ElementIndex = comboElementIndex,
+                    Value = itemText,
+                    TimeoutSeconds = 10
+                };
+
+                RaiseActionRecorded(step);
+                return true;
+            }
+
+            try { current = current.Parent; }
+            catch { return false; }
+        }
+
+        return false;
+    }
+
     private IntPtr KeyboardHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        if (nCode >= 0 && wParam == (IntPtr)NativeMethods.WM_KEYDOWN && _lastClickWasTextInput)
+        if (nCode >= 0 && wParam == (IntPtr)NativeMethods.WM_KEYDOWN)
         {
             try
             {
@@ -219,20 +490,9 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
                 var vk = hookStruct.vkCode;
 
                 if (vk == NativeMethods.VK_RETURN || vk == NativeMethods.VK_TAB)
-                {
                     FlushTypedBuffer();
-                }
-                else if (vk == NativeMethods.VK_BACK)
-                {
-                    if (_typedBuffer.Length > 0)
-                        _typedBuffer.Length--;
-                }
                 else
-                {
-                    var ch = NativeMethods.VirtualKeyToChar(vk);
-                    if (ch.HasValue)
-                        _typedBuffer.Append(ch.Value);
-                }
+                    HandleTypingKeystroke(vk);
             }
             catch
             {
@@ -243,20 +503,132 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
         return NativeMethods.CallNextHookEx(_keyboardHookHandle, nCode, wParam, lParam);
     }
 
-    /// <summary>Az addig összegyűjtött, begépelt szöveget SendKeys lépésként lezárja és
-    /// kiküldi (ha van mit) — az utolsó kattintás lokátorát célozva. Hívódik: Enter/Tab
-    /// leütésekor, a következő kattintás előtt, és a felvétel leállításakor.</summary>
-    private void FlushTypedBuffer()
+    /// <summary>Minden "gépelésnek számító" billentyűnél (Backspace-t is beleértve; az
+    /// Enter/Tab-ot a hívó — KeyboardHookCallback — már külön, FlushTypedBuffer-rel kezeli)
+    /// lekérdezi, MELYIK ELEM van ÉPP fókuszban a UI Automation szerint — NEM a legutóbb
+    /// kattintott elemre hagyatkozik. Ha a fókusz időközben egy MÁSIK elemre került, mint
+    /// amire eddig gyűjtöttünk, előbb lezárjuk (kiküldjük) az addigi szöveget a RÉGI
+    /// elemhez, majd feloldjuk az ÚJ elem lokátorát, és onnantól arra gyűjtünk.</summary>
+    private void HandleTypingKeystroke(uint vk)
     {
-        if (_typedBuffer.Length == 0 || _lastClickLocatorInfo is null)
+        if (_automation is null)
+            return;
+
+        AutomationElement? focusedRaw;
+        try { focusedRaw = _automation.FocusedElement(); }
+        catch { return; }
+
+        if (focusedRaw is null)
+            return;
+
+        // Ugyanaz a "sétáljunk fel a szülőláncon" logika, mint kattintásnál — a
+        // FocusedElement() is rámutathat egy belső, technikai gyerekelemre.
+        var focused = ResolveEffectiveElement(focusedRaw);
+
+        var controlType = SafeGetControlType(focused);
+        var isTextInput = IsTextInputControl(focused, controlType);
+
+        if (!isTextInput)
         {
-            _typedBuffer.Clear();
+            // A fókusz nem szövegbeviteli mezőn van (pl. egy gombra ugrott a Tab, vagy
+            // csak egy nyílbillentyűt nyomtak meg egy listán) — ha eddig gyűjtöttünk
+            // valamit egy korábbi mezőhöz, azt lezárjuk, ezt a billentyűt figyelmen
+            // kívül hagyjuk.
+            FlushTypedBuffer();
             return;
         }
 
-        var (locator, locatorType, elementIndex) = _lastClickLocatorInfo.Value;
+        if (_typingTargetElement is null || !focused.Equals(_typingTargetElement))
+        {
+            // Új mezőre került a fókusz (vagy ez az első gépelt karakter ebben a
+            // felvételben) — az esetleg előző mezőhöz gyűjtött szöveget lezárjuk, majd
+            // feloldjuk ennek az ÚJ mezőnek a lokátorát, és arra kezdjük a gyűjtést.
+            FlushTypedBuffer();
+
+            if (!TryResolveLocator(focused, out var locator, out var locatorType, out var elementIndex))
+                return; // nincs használható lokátor erre a mezőre, nem tudjuk célba venni
+
+            _typingTargetElement = focused;
+            _typingTargetLocatorInfo = (locator, locatorType, elementIndex);
+            _deletionsWhileBufferEmpty = 0;
+        }
+
+        if (vk == NativeMethods.VK_BACK || vk == NativeMethods.VK_DELETE)
+        {
+            if (_typedBuffer.Length > 0)
+            {
+                // A MI ÁLTALUNK ebben a felvételi szakaszban begépelt karakterek közül
+                // töröl egyet — ez a sima "elgépeltem, javítom" eset, nem számít
+                // "mező kiürítésének".
+                _typedBuffer.Length--;
+            }
+            else
+            {
+                // A puffer már üres — ez a mezőben KORÁBBAN (a felvétel elindulása
+                // előtt) is meglévő tartalmat törli. Ha a gépelés végül úgy zárul le,
+                // hogy a puffer üres marad, de itt számoltunk törlést, azt "Mező
+                // kiürítése" lépésként rögzítjük (lásd FlushTypedBuffer).
+                _deletionsWhileBufferEmpty++;
+            }
+
+            return;
+        }
+
+        var ch = NativeMethods.VirtualKeyToChar(vk);
+        if (ch.HasValue)
+            _typedBuffer.Append(ch.Value);
+    }
+
+    /// <summary>Az addig összegyűjtött, begépelt szöveget SetText lépésként lezárja és
+    /// kiküldi (ha van mit) — a gépelés TÉNYLEGES céljához (a fókusz alapján feloldott
+    /// _typingTargetLocatorInfo-hoz), NEM a legutóbbi kattintáshoz. Ha nem gépeltek be
+    /// semmi ÚJAT, de történt törlés a mezőben korábban meglévő tartalomból (lásd
+    /// _deletionsWhileBufferEmpty doksi), ehelyett egy "Mező kiürítése" (Clear) lépést
+    /// küld ki. Hívódik: Enter/Tab leütésekor, fókuszváltáskor, a következő kattintás
+    /// előtt, és a felvétel leállításakor.</summary>
+    private void FlushTypedBuffer()
+    {
+        if (_typingTargetLocatorInfo is null)
+        {
+            _typedBuffer.Clear();
+            _deletionsWhileBufferEmpty = 0;
+            _typingTargetElement = null;
+            _typingTargetLocatorInfo = null;
+            return;
+        }
+
+        var (locator, locatorType, elementIndex) = _typingTargetLocatorInfo.Value;
+
+        if (_typedBuffer.Length == 0)
+        {
+            if (_deletionsWhileBufferEmpty > 0)
+            {
+                var clearStep = new TestStep
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Name = $"Mező kiürítése → {locator}",
+                    Target = AutomationTarget.Desktop,
+                    Action = DesktopStepAction.Clear.ToString(),
+                    Locator = locator,
+                    LocatorType = locatorType,
+                    ElementIndex = elementIndex,
+                    TimeoutSeconds = 10
+                };
+
+                RaiseActionRecorded(clearStep);
+            }
+
+            _deletionsWhileBufferEmpty = 0;
+            _typingTargetElement = null;
+            _typingTargetLocatorInfo = null;
+            return;
+        }
+
         var text = _typedBuffer.ToString();
         _typedBuffer.Clear();
+        _deletionsWhileBufferEmpty = 0;
+        _typingTargetElement = null;
+        _typingTargetLocatorInfo = null;
 
         var step = new TestStep
         {
@@ -272,7 +644,6 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
         };
 
         RaiseActionRecorded(step);
-        _lastClickWasTextInput = false;
     }
 
     private void RaiseActionRecorded(TestStep step)
@@ -290,6 +661,85 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
     {
         try { return element.ControlType; }
         catch { return null; }
+    }
+
+    /// <summary>Ha a UI Automation hit-test (FromPoint) vagy a fókusz-lekérdezés
+    /// (FocusedElement) egy "belső", nem önmagában érdemi elemre mutat (pl. egy TextBox
+    /// belső tartalom-görgetőjére, ami a képpont-alapú hit-testnél gyakran a TÉNYLEGES
+    /// szövegdoboz helyett jön vissza), felfelé sétál a szülőláncon, amíg egy "valódi",
+    /// értelmes elemet nem talál (ismert ControlType VAGY szöveg-mintázatot támogató
+    /// egyedi vezérlő, lásd IsTextInputControl) — ezt adja vissza effektív célelemként.
+    /// Enélkül a ControlType-alapú döntések (pl. "ez szövegmező-e") tévesen a belső,
+    /// technikai gyerekelemre vonatkoznának, nem a felhasználó szemével látott
+    /// vezérlőre. Legfeljebb 6 szintet megyünk felfelé, hogy ne fussunk bele túl mély/
+    /// végtelen keresésbe, ha valamiért nincs ilyen ős (ilyenkor az eredeti elemet
+    /// adjuk vissza).</summary>
+    private static AutomationElement ResolveEffectiveElement(AutomationElement hitElement)
+    {
+        var current = hitElement;
+
+        for (var depth = 0; current is not null && depth < 6; depth++)
+        {
+            var controlType = SafeGetControlType(current);
+            if (controlType is FlaUI.Core.Definitions.ControlType.Edit
+                or FlaUI.Core.Definitions.ControlType.Document
+                or FlaUI.Core.Definitions.ControlType.Button
+                or FlaUI.Core.Definitions.ControlType.CheckBox
+                or FlaUI.Core.Definitions.ControlType.RadioButton
+                or FlaUI.Core.Definitions.ControlType.ComboBox
+                or FlaUI.Core.Definitions.ControlType.ListItem
+                || IsTextInputControl(current, controlType))
+            {
+                return current;
+            }
+
+            try { current = current.Parent; }
+            catch { break; }
+        }
+
+        return hitElement;
+    }
+
+    /// <summary>Eldönti, hogy egy elem szövegbeviteli mezőnek számít-e — NEM kizárólag a
+    /// "címkéjére" (ControlType == Edit/Document) hagyatkozik, mert sok egyedi/natív
+    /// vezérlő (pl. a Notepad++ Scintilla-alapú szövegszerkesztője) MÁSKÉNT jelentkezik
+    /// be a UI Automationnál. Három lépcsőben dönt:
+    /// 1. Klasszikus ControlType.Edit/Document → egyértelműen szövegmező.
+    /// 2. Támogatja a ValuePattern-t vagy TextPattern-t → egyértelműen szövegmező (ez
+    ///    fogná el pl. a legtöbb WinForms/harmadik féltől származó, de UIA-kompatibilis
+    ///    egyedi vezérlőt).
+    /// 3. MEGENGEDŐ TARTALÉK: ha egyik fenti sem teljesül, DE az elem "besorolatlan"
+    ///    típusú (Pane/Custom/Group, vagy egyáltalán nincs ControlType-ja), akkor is
+    ///    szövegmezőnek tekintjük. Ez fogja el a Scintilla-szerű, natív vezérlőket,
+    ///    amik SEMMILYEN modern UIA-jelzést nem adnak arról, hogy szerkeszthető szöveget
+    ///    tartalmaznak — mivel a VALÓBAN interaktív, nem-szöveges vezérlők (Button,
+    ///    CheckBox, RadioButton, ComboBox, ListItem, MenuItem, stb.) MINDIG saját,
+    ///    felismerhető ControlType-tal rendelkeznek, ez a megengedő tartalék rájuk nem
+    ///    vonatkozik — a kockázat minimális (legrosszabb esetben egy nem-szöveges,
+    ///    besorolatlan elemre kattintva a driver hiába figyeli a gépelést, de mivel ott
+    ///    úgysem gépel senki, ennek nincs gyakorlati következménye).</summary>
+    private static bool IsTextInputControl(AutomationElement element, FlaUI.Core.Definitions.ControlType? controlType)
+    {
+        if (controlType == FlaUI.Core.Definitions.ControlType.Edit
+            || controlType == FlaUI.Core.Definitions.ControlType.Document)
+        {
+            return true;
+        }
+
+        try
+        {
+            if (element.Patterns.Value.IsSupported || element.Patterns.Text.IsSupported)
+                return true;
+        }
+        catch
+        {
+            // Ignoráljuk — folytatjuk a megengedő tartalék-ellenőrzéssel.
+        }
+
+        return controlType is FlaUI.Core.Definitions.ControlType.Pane
+            or FlaUI.Core.Definitions.ControlType.Custom
+            or FlaUI.Core.Definitions.ControlType.Group
+            or null;
     }
 
     // ===================== ÉLETCIKLUS =====================
@@ -718,10 +1168,36 @@ public sealed class DesktopAutomationDriver : IAutomationDriver, IDisposable
         public const int WH_MOUSE_LL = 14;
         public const int WH_KEYBOARD_LL = 13;
         public const int WM_LBUTTONDOWN = 0x0201;
+        public const int WM_LBUTTONUP = 0x0202;
+        public const int WM_RBUTTONDOWN = 0x0204;
         public const int WM_KEYDOWN = 0x0100;
         public const uint VK_RETURN = 0x0D;
         public const uint VK_TAB = 0x09;
         public const uint VK_BACK = 0x08;
+        public const uint VK_DELETE = 0x2E;
+
+        // A dupla kattintás detektálásához: a WH_MOUSE_LL hook NEM kapja meg a
+        // WM_LBUTTONDBLCLK üzenetet (azt csak egy konkrét ablak ablak-eljárása
+        // szintetizálja, CS_DBLCLKS stílus esetén, a hook-feldolgozás UTÁN) — ezért
+        // a két egymást követő WM_LBUTTONDOWN időbeli és térbeli közelségéből MAGUNKNAK
+        // kell eldöntenünk, hogy az dupla kattintásnak számít-e, a rendszer saját
+        // dupla kattintás-beállításai (idő/távolság-tolerancia) alapján.
+        public const int SM_CXDOUBLECLK = 36;
+        public const int SM_CYDOUBLECLK = 37;
+
+        // A húzás-és-elengedés (drag&drop) felismeréséhez: a rendszer saját "húzási
+        // küszöbét" (hány pixelt kell elmozdulni lenyomott gomb mellett ahhoz, hogy az
+        // már húzásnak számítson, nem csak egy remegő kattintásnak) használjuk — ez
+        // dönti el, hogy egy WM_LBUTTONDOWN + WM_LBUTTONUP pár sima kattintásnak vagy
+        // húzásnak számít-e.
+        public const int SM_CXDRAG = 68;
+        public const int SM_CYDRAG = 69;
+
+        [DllImport("user32.dll")]
+        public static extern uint GetDoubleClickTime();
+
+        [DllImport("user32.dll")]
+        public static extern int GetSystemMetrics(int nIndex);
 
         public delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
         public delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);

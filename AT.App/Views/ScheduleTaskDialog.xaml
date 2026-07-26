@@ -6,6 +6,7 @@
         Width="480" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
+        WindowStyle="None"
         Background="{StaticResource Brush.Surface}"
         BorderBrush="{StaticResource Brush.Border}"
         BorderThickness="1">

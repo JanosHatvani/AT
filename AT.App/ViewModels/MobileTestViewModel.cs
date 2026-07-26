@@ -1129,11 +1129,13 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
     /// Aktív Appium-session esetén az Appium PageSource-t, egyébként (session nélkül, csak
     /// csatlakoztatott eszközzel) a közvetlen adb-alapú uiautomator dump-ot használja.
     /// Felvevő módban (IsRecording) a talált elemet NEM jelölt-listaként mutatja meg
-    /// kiválasztásra, hanem AZONNAL, automatikusan hozzáad egy "Kattintás" lépést —
-    /// ez az asszisztált felvétel lényege: a mobil oldalon nincs natív "hallgasd az
-    /// érintéseket" mechanizmus, ezért minden rögzítendő kattintást a felhasználónak
-    /// magán az élő kijelzőn kell megtennie (nem a telefonon közvetlenül).</summary>
-    public async Task CaptureElementAtAsync(double relativeX, double relativeY)
+    /// kiválasztásra, hanem AZONNAL, automatikusan hozzáad egy lépést — ez az asszisztált
+    /// felvétel lényege: a mobil oldalon nincs natív "hallgasd az érintéseket"
+    /// mechanizmus, ezért minden rögzítendő kattintást a felhasználónak magán az élő
+    /// kijelzőn kell megtennie (nem a telefonon közvetlenül). Az isLongPress paramétert a
+    /// code-behind (MobileScreenMirrorWindow/MobileTestView) állítja be — onnan méri az
+    /// egér lenyomva tartásának idejét, hogy koppintás vagy hosszan nyomás történt-e.</summary>
+    public async Task CaptureElementAtAsync(double relativeX, double relativeY, bool isLongPress = false)
     {
         if ((!IsPicking && !IsRecording) || relativeX is < 0 or > 1 || relativeY is < 0 or > 1)
             return;
@@ -1155,7 +1157,7 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
 
         if (IsRecording)
         {
-            AddRecordedClickStep(info);
+            AddRecordedClickStep(info, isLongPress ? MobileStepAction.LongPress : MobileStepAction.Click);
             return;
         }
 
@@ -1171,11 +1173,12 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
             _notificationService.Show("Az elemnek nincs használható azonosítója.", NotificationType.Warning);
     }
 
-    /// <summary>Felvevő módban a kattintott elemből közvetlenül épít egy "Click" TestStep-et,
-    /// és hozzáadja a listához — ugyanazt a prioritási sorrendet követi, mint amit a
-    /// felhasználó kézzel is választana a jelöltek közül (content-desc > resource-id >
-    /// class), csak automatikusan, a legjobb elérhető lokátort választva.</summary>
-    private void AddRecordedClickStep(MobileElementInfo info)
+    /// <summary>Felvevő módban a kattintott elemből közvetlenül épít egy "Click" VAGY
+    /// "LongPress" TestStep-et (az action paraméter alapján), és hozzáadja a listához —
+    /// ugyanazt a prioritási sorrendet követi, mint amit a felhasználó kézzel is
+    /// választana a jelöltek közül (content-desc > resource-id > class), csak
+    /// automatikusan, a legjobb elérhető lokátort választva.</summary>
+    private void AddRecordedClickStep(MobileElementInfo info, MobileStepAction action = MobileStepAction.Click)
     {
         string locator;
         LocatorType locatorType;
@@ -1209,12 +1212,14 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         _lastRecordedLocatorType = locatorType;
         _lastRecordedElementIndex = elementIndex;
 
+        var actionLabel = action == MobileStepAction.LongPress ? "Hosszan nyomás" : "Kattintás";
+
         var step = new TestStep
         {
             Id = Guid.NewGuid().ToString("N"),
-            Name = $"Kattintás → {locator}",
+            Name = $"{actionLabel} → {locator}",
             Target = AutomationTarget.Android,
-            Action = MobileStepAction.Click.ToString(),
+            Action = action.ToString(),
             Locator = locator,
             LocatorType = locatorType,
             ElementIndex = elementIndex,
@@ -1223,7 +1228,7 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         };
 
         Steps.Add(new TestStepRow { Step = step });
-        _notificationService.Show($"Rögzítve: Kattintás → {locator}", NotificationType.Success);
+        _notificationService.Show($"Rögzítve: {actionLabel} → {locator}", NotificationType.Success);
     }
 
     /// <summary>Felvevő módban az utolsó rögzített kattintás lokátorát tároljuk el, hogy
@@ -1272,6 +1277,62 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
         RecordingTextInput = "";
     }
 
+    /// <summary>Felvevő módban egy húzó-gesztust (az élő kijelzőn kattintva-húzva-
+    /// elengedve végzett mozdulatot) Swipe lépésként rögzít — a code-behind
+    /// (MobileScreenMirrorWindow/MobileTestView) hívja, ha a le- és felengedés közötti
+    /// elmozdulás meghaladja a húzási küszöböt (különben sima koppintásnak/hosszan
+    /// nyomásnak számít, lásd CaptureElementAtAsync). A direction a MobileStepAction.Swipe
+    /// futtatáskori Value-jának megfelelő magyar irány-szó ("Fel"/"Le"/"Balra"/"Jobbra").</summary>
+    public void AddRecordedSwipeStep(string direction)
+    {
+        if (!IsRecording)
+            return;
+
+        var step = new TestStep
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = $"Húzás → {direction}",
+            Target = AutomationTarget.Android,
+            Action = MobileStepAction.Swipe.ToString(),
+            Value = direction,
+            TimeoutSeconds = _defaultTimeoutSeconds,
+            Label = AT.Infrastructure.StepFlowResolver.GenerateNextLabel(Steps.Select(r => r.Step).ToList())
+        };
+
+        Steps.Add(new TestStepRow { Step = step });
+        _notificationService.Show($"Rögzítve: Húzás → {direction}", NotificationType.Success);
+    }
+
+    /// <summary>Felvevő módban egy "Mező kiürítése" (Clear) lépést rögzít az UTOLJÁRA
+    /// rögzített kattintás/hosszan-nyomás lokátorára — ugyanaz a munkafolyamat, mint a
+    /// "Szöveg rögzítése" gombnál: kattints a mezőre az élő kijelzőn, majd nyomd meg ezt
+    /// a gombot, ha a mezőt üresre szeretnéd állítani (nem szöveget beírni).</summary>
+    [RelayCommand]
+    private void AddRecordedClear()
+    {
+        if (_lastRecordedLocator is null)
+        {
+            _notificationService.Show("Előbb kattints egy mezőre az élő kijelzőn, hogy legyen mit kiüríteni.", NotificationType.Warning);
+            return;
+        }
+
+        var step = new TestStep
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = $"Mező kiürítése → {_lastRecordedLocator}",
+            Target = AutomationTarget.Android,
+            Action = MobileStepAction.Clear.ToString(),
+            Locator = _lastRecordedLocator,
+            LocatorType = _lastRecordedLocatorType,
+            ElementIndex = _lastRecordedElementIndex,
+            TimeoutSeconds = _defaultTimeoutSeconds,
+            Label = AT.Infrastructure.StepFlowResolver.GenerateNextLabel(Steps.Select(r => r.Step).ToList())
+        };
+
+        Steps.Add(new TestStepRow { Step = step });
+        _notificationService.Show("Rögzítve: Mező kiürítése.", NotificationType.Success);
+    }
+
     /// <summary>
     /// Felvevő mód be-/kikapcsolása. Bekapcsoláskor — ha még nincs aktív session vagy
     /// csatlakoztatott eszköz — figyelmezteti a felhasználót, hogy előbb fusson le egy
@@ -1308,8 +1369,10 @@ public sealed partial class MobileTestViewModel : ObservableObject, INavigationA
             await ToggleMirroring();
 
         _notificationService.Show(
-            "Felvétel elindult — kattints az élő kijelzőn a kívánt elemekre; minden kattintás automatikusan 'Kattintás' lépést ad hozzá. " +
-            "Szövegbeviteli mezőnél a kattintás után írd be a szöveget a felvétel-panel mezőjébe, majd 'Szöveg rögzítése'.",
+            "Felvétel elindult — kattints az élő kijelzőn a kívánt elemekre (rövid kattintás), " +
+            "tartsd nyomva ~fél másodpercnél tovább a Hosszan nyomáshoz, vagy húzd el az egeret " +
+            "a Húzáshoz (Swipe). Szövegbeviteli mezőnél kattintás után írd be a szöveget a " +
+            "felvétel-panel mezőjébe, majd 'Szöveg rögzítése' vagy 'Mező kiürítése'.",
             NotificationType.Success);
     }
 
